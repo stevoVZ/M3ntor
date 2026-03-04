@@ -2,9 +2,9 @@
 
 ## Overview
 
-M3NTOR is a mobile-first productivity and life coaching application built with Expo (React Native). It helps users organize their lives into actionable items across different life areas (Health, Career, Finance, Relationships, Growth, Creativity, Home, Fun). Items can be categorized as actions (one-off tasks), habits (recurring), goals (aspirations), or projects (multi-step). The app includes an AI assistant powered by Claude (Anthropic) that analyzes user input and suggests how to categorize and structure their tasks.
+M3NTOR is a mobile-first productivity and life coaching application built with Expo (React Native). It helps users organize their lives into actionable items across different life areas (Health, Career, Finance, Relationships, Learning, Fun, Home, Spirituality, Life Tasks). Items can be categorized as actions (one-off tasks), habits (recurring), goals (aspirations), or projects (multi-step). The app includes an AI assistant powered by Claude (Anthropic) for contextual hints, project task generation, and subtask breakdown.
 
-The app runs as an Expo React Native app for mobile devices and web, with a companion Express.js backend server that handles AI requests. Data is stored locally on the device using AsyncStorage with optional Supabase cloud sync when authenticated.
+The app runs as an Expo React Native app for mobile devices and web, with a companion Express.js backend server. AI calls go directly from the client to Anthropic (no server proxy). Data persistence uses Zustand for local state with optional Supabase cloud sync when authenticated.
 
 ## User Preferences
 
@@ -16,105 +16,92 @@ Preferred communication style: Simple, everyday language.
 
 - **Framework**: Expo (React Native) with expo-router for file-based navigation
 - **Navigation**: Tab-based layout with 4 main tabs: Today, My Life, Discover, and Plan. Modal sheets for adding items and viewing item details. Login screen for Supabase auth (optional)
-- **State Management**: React Context API (`ItemsProvider` in `lib/store.ts`) wraps the app and provides item CRUD operations, auth state (userId, profile), and Supabase sync to all screens. TanStack React Query is available for server data fetching
-- **Local Storage**: `AsyncStorage` (`lib/storage.ts`) persists all item data locally on the device as JSON. When authenticated with Supabase, items are dual-written to both local and remote storage
-- **Supabase Integration**: `lib/supabase.ts` provides client initialization (with graceful fallback if not configured), typed query helpers (`fetchItems`, `upsertItem`, `deleteItemRemote`, `upsertStep`, `upsertSubtask`, `fetchJourneyProgress`), and auth via `@supabase/supabase-js`
-- **NLP Utilities**: `utils/nlp.ts` provides instant local area suggestion and type inference from text (no API call needed). Used in the Add screen for real-time category suggestions as the user types
-- **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers (formatDeadline, isOverdue, formatDate, fromNow, todayISO, greetingForTime)
-- **Styling**: Plain React Native `StyleSheet` with an iOS design system-inspired color palette (`constants/colors.ts`). Supports light/dark mode via `useColorScheme`
+- **State Management**: Zustand store (`lib/store.ts`) provides item CRUD operations, auth state (userId, profile), Supabase sync, and derived selectors (activeItems, pausedItems, somedayItems, projectItems, habitItems, actionItems, itemsByArea, getItem)
+- **Supabase Integration**: `lib/supabase.ts` provides client initialization with graceful fallback if not configured (exports `isSupabaseConfigured` flag), typed query helpers (`fetchItems`, `upsertItem`, `deleteItem`, `upsertStep`, `upsertSubtask`, `fetchJourneyProgress`), and auth via `@supabase/supabase-js`
+- **NLP Utilities**: `utils/nlp.ts` provides instant local area suggestion and type inference from text
+- **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers
+- **Item Utilities**: `utils/items.ts` provides `itemKind()` (derive type from properties), `createItem()` and `createStep()` factories, progress calculations, recurrence helpers
+- **Design System**: `constants/theme.ts` exports `T` (colors/tokens), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows). Legacy `constants/colors.ts` still exists and is used by older UI components
+- **Config**: `constants/config.ts` exports `ITEM_AREAS` (Record<string, {n,c,e}>), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog)
 - **Animations**: `react-native-reanimated` for smooth transitions and spring animations. `expo-haptics` for tactile feedback
 - **Fonts**: Inter font family loaded via `@expo-google-fonts/inter`
-- **UI Components**: Custom reusable components in `components/ui/` (Button, Badge, Card), `components/items/` (ItemCard, TaskRow, ProgressBar), and `components/add/` (FabActionSheet, ProjectAddSheet)
+- **UI Components**: Custom reusable components in `components/ui/` (Button, Card), `components/items/` (ItemCard, TaskRow, ProgressBar), and `components/add/` (FabActionSheet, ProjectAddSheet)
 
 ### Backend Architecture
 
-- **Server**: Express.js (`server/index.ts`) running as a separate Node.js process
-- **AI Routes**: 
-  - `POST /api/ai/assist` — Main AI assist (area, kind, description, steps, timeOfDay)
-  - `POST /api/ai/hint` — Per-kind contextual hint
-  - `POST /api/ai/tasks` — Generate project tasks from title/description
-  - `POST /api/ai/subtasks` — Break down a step into subtasks
+- **Server**: Express.js (`server/index.ts`) running as a separate Node.js process on port 5000
 - **CORS**: Configured dynamically for Replit dev/prod domains and localhost
-- **Storage Layer**: `server/storage.ts` has an in-memory `MemStorage` class for users (not yet wired to the database in active routes)
+- **Storage Layer**: `server/storage.ts` has an in-memory `MemStorage` class
 - **Build**: Server built with esbuild for production deployment
+
+### AI Integration
+
+- **Provider**: Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk` — called directly from the client
+- **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`
+- **Env var**: Requires `EXPO_PUBLIC_ANTHROPIC_KEY` on the client (not server-side)
+- **Graceful degradation**: All AI functions catch errors and return safe defaults
 
 ### Data Models
 
 **Client-side types** (`types/index.ts`):
-- `Item`: The core entity with fields for title, description, area, status (`active`, `someday`, `paused`, `done`), recurrence (with rich types: daily, weekdays, specific_days, interval, monthly, weekly), habit_time_of_day (morning, afternoon, evening, anytime), deadline, priority, effort, emoji, user_id, and optional steps array
-- `Step`: Sub-tasks within a project item, with blocked_by, assignees, and subtasks arrays
+- `Item`: Core entity with title, description, area, status, recurrence, habit_time_of_day, deadline, priority, effort, emoji, user_id, steps array
+- `Step`: Sub-tasks within a project item, with blocked_by, assignees, subtasks
 - `Subtask`: Individual sub-items within a step
-- `Recurrence`: Rich recurrence type supporting daily, weekdays, specific_days, interval, monthly, and weekly patterns
+- `Recurrence`: Supports daily, weekdays, specific_days, interval, monthly
 - `Profile`: User profile with name, avatar_url
 - `JourneyProgress`: Tracks user progress through curated journey programs
-- Item type (`action`, `habit`, `goal`, `project`) is **derived** from item properties at runtime via the `itemKind()` function, not stored directly
-
-**Server-side schema** (`shared/schema.ts`):
-- `users` table with `id`, `username`, `password` — defined with Drizzle ORM for PostgreSQL
-- Validation schemas generated with `drizzle-zod`
-
-### AI Integration
-
-- **Provider**: Anthropic Claude (`claude-sonnet-4-20250514`) via `@anthropic-ai/sdk`
-- **Flow**: User types a title in the Add screen → NLP instantly suggests area and type → after 1 second debounce → frontend calls `/api/ai/assist` → Express server calls Claude → returns JSON with suggested area, kind, description, steps, and timeOfDay
-- **Additional AI features**: Contextual hints per item kind, project task generation, subtask breakdown
-- **Graceful degradation**: If AI call fails, app continues with NLP-based local suggestions
+- `Journey`: Static catalog entry for expert-curated programs
+- Item type is **derived** from properties at runtime via `itemKind()`
 
 ### Routing Structure
 
 ```
 app/
-  _layout.tsx          # Root layout with providers
-  login.tsx            # Supabase auth screen (optional)
+  _layout.tsx          # Root layout with Zustand store, Supabase auth
+  login.tsx            # Supabase auth screen
   (tabs)/
     _layout.tsx        # Tab bar configuration
-    today.tsx          # Today's scheduled items
+    index.tsx          # Redirects to today
+    today.tsx          # Today's active items
     mylife.tsx         # Items organized by life area
     discover.tsx       # Journey/program discovery
     plan.tsx           # Full item list with filters
-  add.tsx              # Add item modal sheet (accepts ?kind= param)
+  add.tsx              # Add item modal sheet
   item/[id].tsx        # Item detail modal sheet
 ```
 
 ### Platform Considerations
 
-- The app targets iOS, Android, and Web. Platform-specific code uses `Platform.OS` checks
-- Tab bar uses native iOS tab implementation (`NativeTabs`) when Liquid Glass is available, falls back to classic Expo `Tabs`
-- Keyboard handling uses `react-native-keyboard-controller` on native, falls back to standard `ScrollView` on web
+- The app targets iOS, Android, and Web
+- Tab bar uses native iOS tab implementation when Liquid Glass is available, falls back to classic Expo Tabs
 
 ## External Dependencies
 
 ### Third-Party Services
 
-- **Anthropic Claude API**: Powers the AI assistant feature. Requires `ANTHROPIC_API_KEY` environment variable on the server
-- **Supabase**: Cloud database and auth. Requires `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` environment variables. App works without Supabase configured (uses local-only storage)
-- **PostgreSQL**: Database provisioned for server-side storage. Requires `DATABASE_URL` environment variable. Drizzle ORM manages schema migrations
+- **Anthropic Claude API**: Powers AI features. Requires `EXPO_PUBLIC_ANTHROPIC_KEY` environment variable (client-side)
+- **Supabase**: Cloud database and auth. Requires `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`. App works without Supabase configured (uses local-only Zustand state)
 
 ### Key Libraries
 
 | Library | Purpose |
 |---|---|
 | `expo-router` | File-based navigation |
-| `@tanstack/react-query` | Server state management and caching |
+| `zustand` | Client state management |
 | `@supabase/supabase-js` | Supabase client for auth and data persistence |
-| `drizzle-orm` + `drizzle-zod` | PostgreSQL ORM and schema validation |
-| `@anthropic-ai/sdk` | Claude AI API client |
+| `@anthropic-ai/sdk` | Claude AI API client (direct from client) |
+| `@shopify/flash-list` | High-performance list rendering |
+| `expo-secure-store` | Secure credential storage |
 | `@react-native-async-storage/async-storage` | Local device data persistence |
 | `react-native-reanimated` | Animations |
 | `expo-haptics` | Haptic feedback |
 | `expo-linear-gradient` | Gradient UI elements |
-| `expo-blur` | Blur effects (tab bar) |
 | `react-native-gesture-handler` | Touch gesture handling |
-| `react-native-keyboard-controller` | Keyboard-aware scrolling |
-| `expo-image-picker` | Image selection (available, not yet fully wired) |
-| `expo-location` | Location access (available) |
-| `dayjs` | Date formatting with relative time and isToday/isTomorrow plugins |
+| `dayjs` | Date formatting |
 
-### Environment Variables Required
+### Environment Variables
 
-- `ANTHROPIC_API_KEY` — For AI assist feature (server-side)
-- `EXPO_PUBLIC_SUPABASE_URL` — Supabase project URL (client-side)
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon/public key (client-side)
-- `DATABASE_URL` — PostgreSQL connection string (server-side)
-- `EXPO_PUBLIC_DOMAIN` — Public domain for API URL resolution (client-side, set automatically in Replit)
-- `REPLIT_DEV_DOMAIN` / `REPLIT_DOMAINS` — Used for CORS configuration and dev server routing
+- `EXPO_PUBLIC_ANTHROPIC_KEY` — Anthropic API key for AI features (client-side)
+- `EXPO_PUBLIC_SUPABASE_URL` — Supabase project URL (client-side, optional)
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon/public key (client-side, optional)
+- `EXPO_PUBLIC_DOMAIN` — Public domain for API URL resolution (set automatically in Replit)

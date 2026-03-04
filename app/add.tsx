@@ -1,16 +1,15 @@
 import { View, Text, TextInput, ScrollView, StyleSheet, Platform, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useItems } from '@/lib/store';
+import { useStore } from '@/lib/store';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { ITEM_AREAS, KIND_CONFIG } from '@/constants/config';
 import { Item, ItemKind, TimeOfDay } from '@/types';
-import { generateId } from '@/utils/items';
-import { fetchAiSuggestion, getLocalSuggestion, AiSuggestion } from '@/lib/ai';
+import { createItem, createStep } from '@/utils/items';
+import { getItemHint, AiHint } from '@/lib/ai';
 import { ProjectAddSheet } from '@/components/add/ProjectAddSheet';
 import Colors from '@/constants/colors';
 
@@ -28,10 +27,17 @@ const KIND_OPTIONS: { key: ItemKind; label: string; icon: string }[] = [
   { key: 'project', label: 'Project', icon: 'layers' },
 ];
 
+const AREA_LIST = Object.entries(ITEM_AREAS).map(([key, val]) => ({
+  key,
+  label: val.n,
+  color: val.c,
+  emoji: val.e,
+}));
+
 export default function AddScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ kind?: string }>();
-  const { addItem } = useItems();
+  const { addItem, userId } = useStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [area, setArea] = useState('');
@@ -40,44 +46,32 @@ export default function AddScreen() {
   const [steps, setSteps] = useState<string[]>([]);
   const [newStep, setNewStep] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+  const [aiHint, setAiHint] = useState<AiHint | null>(null);
   const [saving, setSaving] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleTitleChange = (text: string) => {
     setTitle(text);
 
-    if (text.length > 2) {
-      const local = getLocalSuggestion(text);
-      if (local.area) setArea(local.area);
-    }
-
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (text.length > 5) {
       debounceRef.current = setTimeout(() => {
-        fetchSuggestion(text);
+        fetchHint(text);
       }, 1000);
     } else {
-      setAiSuggestion(null);
+      setAiHint(null);
     }
   };
 
-  const fetchSuggestion = async (prompt: string) => {
+  const fetchHint = async (prompt: string) => {
     setAiLoading(true);
-    const suggestion = await fetchAiSuggestion(prompt);
-    setAiSuggestion(suggestion);
+    try {
+      const hint = await getItemHint(prompt, kind);
+      setAiHint(hint);
+    } catch {
+      setAiHint(null);
+    }
     setAiLoading(false);
-  };
-
-  const applySuggestion = () => {
-    if (!aiSuggestion) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (aiSuggestion.area) setArea(aiSuggestion.area);
-    if (aiSuggestion.kind) setKind(aiSuggestion.kind as ItemKind);
-    if (aiSuggestion.description) setDescription(aiSuggestion.description);
-    if (aiSuggestion.steps) setSteps(aiSuggestion.steps);
-    if (aiSuggestion.timeOfDay) setTimeOfDay(aiSuggestion.timeOfDay as TimeOfDay);
-    setAiSuggestion(null);
   };
 
   const addStepItem = () => {
@@ -103,40 +97,24 @@ export default function AddScreen() {
     setSaving(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    const now = new Date().toISOString();
-    const itemId = generateId();
-    const item: Item = {
-      id: itemId,
+    const item = createItem(userId ?? 'local', {
       title: title.trim(),
       description: description.trim() || undefined,
       area,
       status: kind === 'goal' ? 'someday' : 'active',
-      source: 'self',
-      priority: 'normal',
-      effort: 'medium',
-      created_at: now,
-      updated_at: now,
       ...(kind === 'habit' ? {
         recurrence: { type: 'daily' as const },
         habit_time_of_day: timeOfDay,
       } : {}),
       ...(kind === 'project' && steps.length > 0 ? {
-        steps: steps.map((s, i) => ({
-          id: generateId(),
-          item_id: itemId,
+        steps: steps.map((s, i) => createStep(`temp-${Date.now()}`, {
           title: s,
-          done: false,
-          status: 'todo' as const,
-          priority: 'normal' as const,
-          effort: 'medium' as const,
-          today: false,
           sort_order: i,
-          created_at: now,
         })),
       } : {}),
-    };
+    });
 
-    await addItem(item);
+    addItem(item);
     setSaving(false);
     router.back();
   };
@@ -177,25 +155,20 @@ export default function AddScreen() {
             </View>
           )}
 
-          {aiSuggestion && !aiLoading && (
-            <Pressable onPress={applySuggestion} style={styles.aiSuggestionCard}>
+          {aiHint && !aiLoading && aiHint.why && (
+            <View style={styles.aiSuggestionCard}>
               <View style={styles.aiSuggestionHeader}>
                 <Ionicons name="sparkles" size={14} color={Colors.light.systemBlue} />
-                <Text style={styles.aiSuggestionLabel}>AI Suggestion</Text>
+                <Text style={styles.aiSuggestionLabel}>AI Insight</Text>
               </View>
-              {aiSuggestion.description && (
-                <Text style={styles.aiSuggestionText}>{aiSuggestion.description}</Text>
+              <Text style={styles.aiSuggestionText}>{aiHint.why}</Text>
+              {aiHint.tip && (
+                <Text style={styles.aiSuggestionText}>💡 {aiHint.tip}</Text>
               )}
-              <View style={styles.aiSuggestionMeta}>
-                {aiSuggestion.area && (
-                  <Badge label={aiSuggestion.area} color={Colors.light.systemBlue} tint="rgba(0,122,255,0.1)" />
-                )}
-                {aiSuggestion.kind && (
-                  <Badge label={aiSuggestion.kind} color={Colors.light.systemGreen} tint="rgba(52,199,89,0.1)" />
-                )}
-              </View>
-              <Text style={styles.aiApplyHint}>Tap to apply</Text>
-            </Pressable>
+              {aiHint.firstStep && (
+                <Text style={styles.aiSuggestionText}>→ {aiHint.firstStep}</Text>
+              )}
+            </View>
           )}
 
           <TextInput
@@ -217,7 +190,7 @@ export default function AddScreen() {
               <Pressable
                 key={k.key}
                 onPress={() => { setKind(k.key); Haptics.selectionAsync(); }}
-                style={[styles.kindChip, active && { backgroundColor: cfg.tint, borderColor: cfg.color }]}
+                style={[styles.kindChip, active && { backgroundColor: cfg.color + '18', borderColor: cfg.color }]}
               >
                 <Ionicons name={k.icon as any} size={16} color={active ? cfg.color : '#8E8E93'} />
                 <Text style={[styles.kindChipText, active && { color: cfg.color }]}>{k.label}</Text>
@@ -228,15 +201,15 @@ export default function AddScreen() {
 
         <Text style={styles.sectionLabel}>LIFE AREA</Text>
         <View style={styles.areaGrid}>
-          {ITEM_AREAS.map((a) => {
+          {AREA_LIST.map((a) => {
             const active = area === a.key;
             return (
               <Pressable
                 key={a.key}
                 onPress={() => { setArea(a.key); Haptics.selectionAsync(); }}
-                style={[styles.areaChip, active && { backgroundColor: a.tint, borderColor: a.color }]}
+                style={[styles.areaChip, active && { backgroundColor: a.color + '18', borderColor: a.color }]}
               >
-                <Ionicons name={a.icon as any} size={14} color={active ? a.color : '#8E8E93'} />
+                <Text style={{ fontSize: 14 }}>{a.emoji}</Text>
                 <Text style={[styles.areaChipText, active && { color: a.color }]}>{a.label}</Text>
               </Pressable>
             );
@@ -397,16 +370,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     color: Colors.light.textSecondary,
     lineHeight: 20,
-  },
-  aiSuggestionMeta: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  aiApplyHint: {
-    fontSize: 11,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.light.systemBlue,
-    textAlign: 'right',
   },
   sectionLabel: {
     fontSize: 12,

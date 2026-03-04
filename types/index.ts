@@ -1,16 +1,22 @@
-export type ItemStatus = 'someday' | 'active' | 'paused' | 'done';
-export type ItemKind = 'action' | 'habit' | 'goal' | 'project';
-export type StepStatus = 'todo' | 'doing' | 'blocked' | 'done';
-export type Priority = 'urgent' | 'high' | 'normal' | 'low';
-export type Effort = 'quick' | 'medium' | 'deep';
-export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'anytime';
+// ─────────────────────────────────────────────────────────
+// M3NTOR — Core types
+// The unified Item model: behaviour is derived from
+// properties, not from an explicit "type" field.
+// ─────────────────────────────────────────────────────────
+
+export type ItemStatus   = 'someday' | 'active' | 'paused' | 'done';
+export type ItemKind     = 'action'  | 'habit'  | 'goal'   | 'project';
+export type StepStatus   = 'todo'    | 'doing'  | 'blocked'| 'done';
+export type Priority     = 'urgent'  | 'high'   | 'normal' | 'low';
+export type Effort       = 'quick'   | 'medium' | 'deep';
+export type TimeOfDay    = 'morning' | 'afternoon' | 'evening' | 'anytime';
 
 export interface Subtask {
   id: string;
   step_id: string;
   title: string;
   done: boolean;
-  assignees?: string[];
+  assignees: string[];
   sort_order: number;
 }
 
@@ -24,26 +30,26 @@ export interface Step {
   priority: Priority;
   effort: Effort;
   today: boolean;
-  blocked_by?: string[];
-  assignees?: string[];
+  blocked_by: string[];
+  assignees: string[];
   sort_order: number;
   subtasks?: Subtask[];
-  created_at: string;
+  created_at?: string;
 }
 
 export interface Recurrence {
-  type: 'daily' | 'weekdays' | 'specific_days' | 'interval' | 'monthly' | 'weekly';
-  days?: string[];
-  interval?: number;
-  month_day?: number;
+  type: 'daily' | 'weekdays' | 'specific_days' | 'interval' | 'monthly';
+  days?: string[];      // ['mon','wed','fri']
+  interval?: number;    // for 'interval' type
+  month_day?: number;   // for 'monthly' type
   start_date?: string;
 }
 
 export interface Item {
   id: string;
-  user_id?: string;
+  user_id: string;
   title: string;
-  emoji?: string;
+  emoji: string;
   description?: string;
   area: string;
   secondary_areas?: string[];
@@ -60,13 +66,6 @@ export interface Item {
   steps?: Step[];
   created_at: string;
   updated_at: string;
-}
-
-export function itemKind(item: Item): ItemKind {
-  if (item.status === 'someday') return 'goal';
-  if (item.recurrence) return 'habit';
-  if ((item.steps?.length ?? 0) > 0) return 'project';
-  return 'action';
 }
 
 export interface JourneyProgress {
@@ -87,12 +86,19 @@ export interface Profile {
   created_at: string;
 }
 
+// ── Journey catalog entry (static data, not from DB) ──
 export interface Journey {
   id: string;
-  title: string;
-  description: string;
-  weeks: number;
-  category: string;
-  color: string;
-  icon: string;
+  a: string;           // area
+  sa?: string[];       // secondary areas
+  t: string;           // title
+  e: string;           // expert/author
+  w: number;           // weeks
+  d: 'beginner' | 'moderate' | 'advanced';
+  m: number;           // minutes per session
+  u: number;           // enrolled count
+  rt: number;          // rating
+  f?: boolean;         // featured
+  ds: string;          // description
+  wp: string[];        // week plan titles
 }

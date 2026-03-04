@@ -1,116 +1,247 @@
-import { isLiquidGlassAvailable } from "expo-glass-effect";
-import { Tabs } from "expo-router";
-import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
-import { BlurView } from "expo-blur";
-import { Ionicons } from "@expo/vector-icons";
-import { Platform, StyleSheet, useColorScheme, View } from "react-native";
-import React from "react";
-import Colors from "@/constants/colors";
+import { useState } from 'react';
+import { View, Pressable, Text, StyleSheet, Platform } from 'react-native';
+import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { T, shadow, R } from '../../constants/theme';
+import { FabActionSheet } from '../../components/add/FabActionSheet';
+import { ProjectAddSheet } from '../../components/add/ProjectAddSheet';
 
-function NativeTabLayout() {
+// ── Tab icon SVG paths ────────────────────────────────────
+function TabIcon({ name, active }: { name: string; active: boolean }) {
+  const color = active ? T.brand : T.t3;
+  const sw = active ? 2.2 : 1.8;
+
+  const icons: Record<string, React.ReactNode> = {
+    today: (
+      <View style={{ alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}>
+        {/* Simple calendar icon */}
+        <View style={[styles.iconBox, { borderColor: color, borderWidth: sw }]}>
+          <View style={[styles.iconDot, { backgroundColor: active ? T.brand : T.t3 }]} />
+        </View>
+      </View>
+    ),
+    mylife: (
+      <View style={{ alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}>
+        <View style={[styles.iconCircle, { borderColor: color, borderWidth: sw }]}>
+          <View style={[styles.iconInner, { borderColor: color, borderWidth: sw * 0.7 }]} />
+        </View>
+      </View>
+    ),
+    discover: (
+      <View style={{ alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}>
+        <View style={[styles.iconCompass, { borderColor: color, borderWidth: sw }]} />
+      </View>
+    ),
+    plan: (
+      <View style={{ alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}>
+        <View style={{ gap: 3 }}>
+          {[0, 1, 2].map(i => (
+            <View key={i} style={[styles.iconLine, {
+              width: i === 1 ? 14 : 18,
+              backgroundColor: color,
+              height: sw * 0.9,
+            }]} />
+          ))}
+        </View>
+      </View>
+    ),
+  };
+
+  return icons[name] ?? null;
+}
+
+// ── Custom tab bar with centre FAB ────────────────────────
+function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
+  const insets = useSafeAreaInsets();
+  const [showAdd, setShowAdd]         = useState(false);
+  const [addMode, setAddMode]         = useState<'sheet' | 'project'>('sheet');
+  const [prefill, setPrefill]         = useState('');
+  const fabScale = useSharedValue(1);
+
+  const fabStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: fabScale.value }],
+  }));
+
+  const TAB_ROUTES = ['today', 'mylife', 'discover', 'plan'];
+
+  function handleFabPress() {
+    fabScale.value = withSpring(0.88, {}, () => {
+      fabScale.value = withSpring(1);
+    });
+    setAddMode('sheet');
+    setShowAdd(true);
+  }
+
   return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="today">
-        <Icon sf={{ default: "sun.max", selected: "sun.max.fill" }} />
-        <Label>Today</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="mylife">
-        <Icon sf={{ default: "heart", selected: "heart.fill" }} />
-        <Label>My Life</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="discover">
-        <Icon sf={{ default: "safari", selected: "safari.fill" }} />
-        <Label>Discover</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="plan">
-        <Icon sf={{ default: "list.bullet", selected: "list.bullet" }} />
-        <Label>Plan</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <>
+      {/* ── Tab bar container ── */}
+      <View style={[styles.tabBar, { paddingBottom: Math.max(Platform.OS === 'web' ? 34 : insets.bottom, 8) }]}>
+        {/* Glass background */}
+        <View style={StyleSheet.absoluteFill}>
+          <View style={styles.tabGlass} />
+        </View>
+
+        {TAB_ROUTES.slice(0, 2).map((route) => {
+          const idx    = state.routes.findIndex((r: any) => r.name === route);
+          const active = state.index === idx;
+          return (
+            <Pressable key={route} style={[styles.tabItem, active && styles.tabItemActive]}
+              onPress={() => navigation.navigate(route)}>
+              <TabIcon name={route} active={active} />
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+                {route === 'today' ? 'Today' : 'My Life'}
+              </Text>
+            </Pressable>
+          );
+        })}
+
+        {/* ── Centre FAB ── */}
+        <View style={styles.fabSlot}>
+          <Animated.View style={[styles.fabWrap, fabStyle]}>
+            <Pressable onPress={handleFabPress}>
+              <LinearGradient
+                colors={T.gradColors}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.fab}>
+                <View style={styles.fabIcon}>
+                  <Text style={styles.fabPlus}>+</Text>
+                </View>
+              </LinearGradient>
+            </Pressable>
+          </Animated.View>
+        </View>
+
+        {TAB_ROUTES.slice(2).map((route) => {
+          const idx    = state.routes.findIndex((r: any) => r.name === route);
+          const active = state.index === idx;
+          return (
+            <Pressable key={route} style={[styles.tabItem, active && styles.tabItemActive]}
+              onPress={() => navigation.navigate(route)}>
+              <TabIcon name={route} active={active} />
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+                {route === 'discover' ? 'Discover' : 'Plan'}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* ── Add sheets ── */}
+      {showAdd && addMode === 'sheet' && (
+        <FabActionSheet
+          onProject={(text) => { setPrefill(text); setAddMode('project'); }}
+          onClose={() => setShowAdd(false)}
+        />
+      )}
+      {showAdd && addMode === 'project' && (
+        <ProjectAddSheet
+          prefillText={prefill}
+          onClose={() => { setShowAdd(false); setAddMode('sheet'); }}
+        />
+      )}
+    </>
   );
 }
 
-function ClassicTabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const isWeb = Platform.OS === "web";
-  const isIOS = Platform.OS === "ios";
-
+export default function TabsLayout() {
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: Colors.light.tint,
-        tabBarInactiveTintColor: Colors.light.tabIconDefault,
-        tabBarStyle: {
-          position: "absolute" as const,
-          backgroundColor: isIOS ? "transparent" : isDark ? "#000" : "#fff",
-          borderTopWidth: isWeb ? 1 : 0,
-          borderTopColor: isDark ? "#333" : "#ccc",
-          elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
-        },
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView
-              intensity={100}
-              tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            />
-          ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "#000" : "#fff" }]} />
-          ) : null,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="today"
-        options={{
-          title: "Today",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "sunny" : "sunny-outline"} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="mylife"
-        options={{
-          title: "My Life",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "heart" : "heart-outline"} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="discover"
-        options={{
-          title: "Discover",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "compass" : "compass-outline"} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="plan"
-        options={{
-          title: "Plan",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "list" : "list-outline"} size={24} color={color} />
-          ),
-        }}
-      />
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}>
+      <Tabs.Screen name="today"    />
+      <Tabs.Screen name="mylife"   />
+      <Tabs.Screen name="discover" />
+      <Tabs.Screen name="plan"     />
     </Tabs>
   );
 }
 
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
-}
+const styles = StyleSheet.create({
+  tabBar: {
+    flexDirection:   'row',
+    alignItems:      'flex-end',
+    paddingTop:      6,
+    paddingHorizontal: 8,
+    backgroundColor: 'transparent',
+    position:        'relative',
+  },
+  tabGlass: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor:  T.glassHeavy,
+    borderTopWidth:   0.5,
+    borderTopColor:   'rgba(255,255,255,0.6)',
+  },
+  tabItem: {
+    flex:            1,
+    alignItems:      'center',
+    paddingVertical: 7,
+    gap:             3,
+    borderRadius:    R.md,
+  },
+  tabItemActive: {
+    backgroundColor: T.brand + '10',
+  },
+  tabLabel: {
+    fontSize:   10,
+    fontWeight: '500',
+    color:      T.t3,
+    lineHeight: 12,
+  },
+  tabLabelActive: {
+    color:      T.brand,
+    fontWeight: '700',
+  },
+  fabSlot: {
+    flex:            1,
+    alignItems:      'center',
+    justifyContent:  'flex-end',
+    paddingBottom:   4,
+  },
+  fabWrap: {
+    marginBottom: 6,
+    ...shadow.fab,
+  },
+  fab: {
+    width:          56,
+    height:         56,
+    borderRadius:   18,
+    alignItems:     'center',
+    justifyContent: 'center',
+    borderWidth:    2.5,
+    borderColor:    'rgba(255,255,255,0.85)',
+  },
+  fabIcon: {
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  fabPlus: {
+    fontSize:   28,
+    color:      'white',
+    fontWeight: '300',
+    lineHeight: 30,
+    marginTop:  -2,
+  },
+  // Small icon helpers
+  iconBox: {
+    width: 18, height: 18, borderRadius: 4,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  iconDot: {
+    width: 4, height: 4, borderRadius: 2,
+  },
+  iconCircle: {
+    width: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  iconInner: {
+    width: 8, height: 8, borderRadius: 4,
+  },
+  iconCompass: {
+    width: 18, height: 18, borderRadius: 9,
+  },
+  iconLine: {
+    borderRadius: 2,
+  },
+});

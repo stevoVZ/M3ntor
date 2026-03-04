@@ -1,245 +1,216 @@
-import { View, Text, TextInput, StyleSheet, Pressable, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import {
+  View, Text, TextInput, Pressable, StyleSheet,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
-import { useItems } from '@/lib/store';
-import Colors from '@/constants/colors';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { T, S, F, R, shadow } from '../constants/theme';
+
+type Mode = 'signin' | 'signup';
 
 export default function LoginScreen() {
-  const insets = useSafeAreaInsets();
-  const { setUserId } = useItems();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [mode, setMode]       = useState<Mode>('signin');
+  const [email, setEmail]     = useState('');
+  const [password, setPass]   = useState('');
+  const [name, setName]       = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
-  const webTopInset = Platform.OS === 'web' ? 67 : 0;
-
-  const handleAuth = async () => {
+  async function handleEmailAuth() {
+    if (!isSupabaseConfigured || !supabase) {
+      Alert.alert('Not configured', 'Supabase is not configured. Please add your Supabase credentials.');
+      return;
+    }
     if (!email.trim() || !password.trim()) {
       Alert.alert('Missing fields', 'Please enter your email and password.');
       return;
     }
-
-    const sb = getSupabase();
-    if (!sb) {
-      Alert.alert('Not configured', 'Supabase is not configured.');
-      return;
-    }
-
     setLoading(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
     try {
-      if (isSignUp) {
-        const { data, error } = await sb.auth.signUp({ email: email.trim(), password });
+      if (mode === 'signup') {
+        const { error } = await supabase.auth.signUp({
+          email:    email.trim(),
+          password: password.trim(),
+          options:  { data: { name: name.trim() || undefined } },
+        });
         if (error) throw error;
-        if (data.user) {
-          setUserId(data.user.id);
-          Alert.alert('Account created', 'Check your email to confirm your account, then sign in.');
-        }
+        Alert.alert('Check your email', 'We sent you a confirmation link.');
       } else {
-        const { data, error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
+        const { error } = await supabase.auth.signInWithPassword({
+          email:    email.trim(),
+          password: password.trim(),
+        });
         if (error) throw error;
-        if (data.user) {
-          setUserId(data.user.id);
-          router.replace('/(tabs)/today');
-        }
+        // Auth state change in _layout.tsx will handle navigation
       }
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Authentication failed.');
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Something went wrong.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleSkip = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.replace('/(tabs)/today');
-  };
+  // Apple Sign In — install expo-apple-authentication and enable in app.json
+  // async function handleAppleSignIn() { ... }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={[styles.content, { paddingTop: insets.top + webTopInset + 60 }]}>
-        <View style={styles.logoSection}>
-          <View style={styles.logoCircle}>
-            <Ionicons name="compass" size={40} color={Colors.light.systemBlue} />
-          </View>
-          <Text style={styles.appName}>M3NTOR</Text>
-          <Text style={styles.tagline}>Your unified life management system</Text>
-        </View>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.kav}>
 
+        {/* Brand hero */}
+        <LinearGradient
+          colors={['#16103A', '#261D5A']}
+          style={styles.hero}>
+          <Text style={styles.heroLogo}>M3NTOR</Text>
+          <Text style={styles.heroTagline}>Build the life you actually want</Text>
+        </LinearGradient>
+
+        {/* Form */}
         <View style={styles.form}>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="mail-outline" size={20} color="#8E8E93" style={styles.inputIcon} />
+          {/* Mode toggle */}
+          <View style={styles.modeToggle}>
+            {(['signin', 'signup'] as Mode[]).map(m => (
+              <Pressable key={m} style={[styles.modeBtn, mode === m && styles.modeBtnActive]}
+                onPress={() => setMode(m)}>
+                <Text style={[styles.modeBtnText, mode === m && styles.modeBtnTextActive]}>
+                  {m === 'signin' ? 'Sign in' : 'Create account'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Name (sign-up only) */}
+          {mode === 'signup' && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Name</Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="Your name"
+                placeholderTextColor={T.t3}
+                style={styles.input}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+            </View>
+          )}
+
+          {/* Email */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
             <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#C7C7CC"
               value={email}
               onChangeText={setEmail}
+              placeholder="you@example.com"
+              placeholderTextColor={T.t3}
+              style={styles.input}
               keyboardType="email-address"
               autoCapitalize="none"
-              autoComplete="email"
-              testID="login-email"
+              autoCorrect={false}
+              returnKeyType="next"
             />
           </View>
 
-          <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={20} color="#8E8E93" style={styles.inputIcon} />
+          {/* Password */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Password</Text>
             <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#C7C7CC"
               value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              testID="login-password"
+              onChangeText={setPass}
+              placeholder={mode === 'signup' ? 'Min. 8 characters' : '••••••••'}
+              placeholderTextColor={T.t3}
+              style={styles.input}
+              secureTextEntry
+              returnKeyType="done"
+              onSubmitEditing={handleEmailAuth}
             />
-            <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
-              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#8E8E93" />
-            </Pressable>
           </View>
 
-          <Pressable
-            onPress={handleAuth}
-            style={[styles.authButton, loading && styles.authButtonDisabled]}
-            disabled={loading}
-            testID="login-submit"
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.authButtonText}>{isSignUp ? 'Create Account' : 'Sign In'}</Text>
-            )}
+          {/* Primary CTA */}
+          <Pressable onPress={handleEmailAuth} disabled={loading} style={{ marginTop: S.sm }}>
+            <LinearGradient
+              colors={T.gradColors}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.primaryBtn}>
+              {loading
+                ? <ActivityIndicator color="white" />
+                : <Text style={styles.primaryBtnText}>
+                    {mode === 'signin' ? 'Sign in' : 'Create account'}
+                  </Text>
+              }
+            </LinearGradient>
           </Pressable>
 
-          <Pressable onPress={() => setIsSignUp(!isSignUp)} style={styles.toggleRow}>
-            <Text style={styles.toggleText}>
-              {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-            </Text>
-            <Text style={styles.toggleAction}>
-              {isSignUp ? 'Sign In' : 'Sign Up'}
-            </Text>
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Apple Sign In placeholder — wire up expo-apple-authentication */}
+          <Pressable style={styles.appleBtn}>
+            <Text style={styles.appleBtnText}>🍎  Continue with Apple</Text>
           </Pressable>
+
+          {/* Legal */}
+          <Text style={styles.legal}>
+            By continuing you agree to our Terms of Service and Privacy Policy.
+          </Text>
         </View>
-
-        <Pressable onPress={handleSkip} style={styles.skipButton} testID="login-skip">
-          <Text style={styles.skipText}>Continue without account</Text>
-          <Ionicons name="arrow-forward" size={16} color={Colors.light.textTertiary} />
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.light.groupedBackground,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  appName: {
-    fontSize: 32,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.light.text,
-    letterSpacing: 2,
-  },
-  tagline: {
-    fontSize: 15,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.light.textTertiary,
-    marginTop: 4,
-  },
+  safe:     { flex: 1, backgroundColor: '#16103A' },
+  kav:      { flex: 1 },
+
+  hero:        { paddingTop: 56, paddingBottom: 40, paddingHorizontal: 32, alignItems: 'center' },
+  heroLogo:    { fontSize: 42, fontWeight: '900', color: 'white', letterSpacing: -2 },
+  heroTagline: { fontSize: 15, color: 'rgba(255,255,255,0.55)', marginTop: 8, textAlign: 'center' },
+
   form: {
-    gap: 14,
+    flex: 1, backgroundColor: T.bg,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: S.lg, paddingTop: 28,
   },
-  inputWrapper: {
-    flexDirection: 'row',
+
+  modeToggle: {
+    flexDirection: 'row', backgroundColor: T.sep,
+    borderRadius: R.lg, padding: 3, marginBottom: S.lg,
+  },
+  modeBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: R.md - 2,
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 50,
-    borderWidth: 1,
-    borderColor: Colors.light.separator,
   },
-  inputIcon: {
-    marginRight: 10,
-  },
+  modeBtnActive: { backgroundColor: 'white', ...shadow.sm },
+  modeBtnText:   { fontSize: F.sm, fontWeight: '600', color: T.t3 },
+  modeBtnTextActive: { color: T.brand, fontWeight: '800' },
+
+  inputGroup: { marginBottom: S.md },
+  inputLabel: { fontSize: F.xs, fontWeight: '700', color: T.t2, marginBottom: 6, letterSpacing: 0.2 },
   input: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.light.text,
+    backgroundColor: 'white', borderRadius: R.md,
+    borderWidth: 1, borderColor: T.sep,
+    paddingHorizontal: S.md, paddingVertical: 13,
+    fontSize: F.md, color: T.text,
   },
-  authButton: {
-    backgroundColor: Colors.light.systemBlue,
-    borderRadius: 12,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 6,
-  },
-  authButtonDisabled: {
-    opacity: 0.6,
-  },
-  authButtonText: {
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-    color: '#fff',
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 8,
-  },
-  toggleText: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.light.textTertiary,
-  },
-  toggleAction: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.light.systemBlue,
-  },
-  skipButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 32,
-    paddingVertical: 12,
-  },
-  skipText: {
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.light.textTertiary,
-  },
+
+  primaryBtn:     { borderRadius: R.xl, paddingVertical: 16, alignItems: 'center' },
+  primaryBtnText: { fontSize: F.lg, fontWeight: '800', color: 'white', letterSpacing: -0.3 },
+
+  divider:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: S.md },
+  dividerLine: { flex: 1, height: 0.5, backgroundColor: T.sep },
+  dividerText: { fontSize: F.xs, color: T.t3 },
+
+  appleBtn:     { backgroundColor: '#1C1C1E', borderRadius: R.xl, paddingVertical: 15, alignItems: 'center' },
+  appleBtnText: { fontSize: F.md, fontWeight: '700', color: 'white' },
+
+  legal: { fontSize: 10, color: T.t3, textAlign: 'center', lineHeight: 14, marginTop: S.md },
 });

@@ -1,104 +1,79 @@
-export interface AreaConfig {
-  key: string;
-  label: string;
-  icon: string;
-  iconFamily: 'Ionicons' | 'MaterialCommunityIcons' | 'Feather';
-  color: string;
-  tint: string;
-}
+import { T } from './theme';
+import type { Journey } from '../types';
 
-export const ITEM_AREAS: AreaConfig[] = [
-  { key: 'health', label: 'Health', icon: 'heart', iconFamily: 'Ionicons', color: '#FF3B30', tint: 'rgba(255, 59, 48, 0.1)' },
-  { key: 'career', label: 'Career', icon: 'briefcase', iconFamily: 'Ionicons', color: '#007AFF', tint: 'rgba(0, 122, 255, 0.1)' },
-  { key: 'finance', label: 'Finance', icon: 'wallet', iconFamily: 'Ionicons', color: '#34C759', tint: 'rgba(52, 199, 89, 0.1)' },
-  { key: 'relationships', label: 'Relationships', icon: 'people', iconFamily: 'Ionicons', color: '#FF9500', tint: 'rgba(255, 149, 0, 0.1)' },
-  { key: 'growth', label: 'Growth', icon: 'trending-up', iconFamily: 'Ionicons', color: '#5856D6', tint: 'rgba(88, 86, 214, 0.1)' },
-  { key: 'creativity', label: 'Creativity', icon: 'color-palette', iconFamily: 'Ionicons', color: '#FF2D55', tint: 'rgba(255, 45, 85, 0.1)' },
-  { key: 'home', label: 'Home', icon: 'home', iconFamily: 'Ionicons', color: '#5AC8FA', tint: 'rgba(90, 200, 250, 0.1)' },
-  { key: 'fun', label: 'Fun', icon: 'game-controller', iconFamily: 'Ionicons', color: '#FFCC00', tint: 'rgba(255, 204, 0, 0.1)' },
-];
-
-export interface KindConfig {
-  label: string;
-  icon: string;
-  color: string;
-  tint: string;
-}
-
-export const KIND_CONFIG: Record<string, KindConfig> = {
-  action: { label: 'Action', icon: 'checkmark-circle', color: '#007AFF', tint: 'rgba(0, 122, 255, 0.1)' },
-  habit: { label: 'Habit', icon: 'repeat', color: '#34C759', tint: 'rgba(52, 199, 89, 0.1)' },
-  goal: { label: 'Goal', icon: 'flag', color: '#FF9500', tint: 'rgba(255, 149, 0, 0.1)' },
-  project: { label: 'Project', icon: 'layers', color: '#5856D6', tint: 'rgba(88, 86, 214, 0.1)' },
+// ─────────────────────────────────────────────────────────
+// ITEM_AREAS — life areas with display config
+// ─────────────────────────────────────────────────────────
+export const ITEM_AREAS: Record<string, { n: string; c: string; e: string }> = {
+  health:        { n: 'Health & Fitness',  c: '#FF6B6B', e: '❤️' },
+  home:          { n: 'Home & Living',     c: '#E17055', e: '🏠' },
+  career:        { n: 'Career & Work',     c: '#0984E3', e: '💼' },
+  finance:       { n: 'Finance',           c: '#00B894', e: '💰' },
+  learning:      { n: 'Learning & Growth', c: '#6C5CE7', e: '📚' },
+  relationships: { n: 'Relationships',     c: '#E84393', e: '💜' },
+  fun:           { n: 'Fun & Adventure',   c: '#FDCB6E', e: '✨' },
+  life:          { n: 'Life Tasks',        c: '#636E72', e: '📌' },
+  spirituality:  { n: 'Mind & Spirit',     c: '#A29BFE', e: '🌿' },
 };
 
-export const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
-  urgent: { label: 'Urgent', color: '#FF3B30' },
-  high: { label: 'High', color: '#FF9500' },
-  normal: { label: 'Normal', color: '#8E8E93' },
-  low: { label: 'Low', color: '#C7C7CC' },
-};
+// ─────────────────────────────────────────────────────────
+// KIND_CONFIG — display config per item kind
+// ─────────────────────────────────────────────────────────
+export const KIND_CONFIG = {
+  habit:   { label: 'Habit',   color: T.orange,  icon: 'repeat',  order: 0 },
+  journey: { label: 'Journey', color: T.brand,   icon: 'compass', order: 1 },
+  project: { label: 'Project', color: T.green,   icon: 'folder',  order: 2 },
+  action:  { label: 'To-Do',   color: T.t3,      icon: 'check',   order: 3 },
+  goal:    { label: 'Goal',    color: '#9B59B6',  icon: 'target',  order: 4 },
+} as const;
 
-export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  active: { label: 'Active', color: '#007AFF' },
-  someday: { label: 'Someday', color: '#FF9500' },
-  paused: { label: 'Paused', color: '#8E8E93' },
-  done: { label: 'Done', color: '#34C759' },
-};
+// ─────────────────────────────────────────────────────────
+// PRIORITY config
+// ─────────────────────────────────────────────────────────
+export const PRIORITY = {
+  urgent: { label: 'Urgent', color: '#E53E3E', bg: '#FFF5F5', icon: '⚡' },
+  high:   { label: 'High',   color: '#DD6B20', bg: '#FFFAF0', icon: '🔺' },
+  normal: { label: 'Normal', color: T.t3,      bg: T.fill,    icon: ''   },
+  low:    { label: 'Low',    color: '#718096',  bg: T.fill,    icon: '🔽' },
+} as const;
 
-export const JOURNEYS = [
-  {
-    id: 'fitness-30',
-    title: '30-Day Fitness',
-    description: 'Build a consistent exercise routine with progressive workouts tailored to your fitness level.',
-    weeks: 4,
-    category: 'Health',
-    color: '#FF3B30',
-    icon: 'fitness',
-  },
-  {
-    id: 'morning-routine',
-    title: 'Morning Routine Builder',
-    description: 'Design your ideal morning with habits that energize and focus your day ahead.',
-    weeks: 3,
-    category: 'Growth',
-    color: '#FF9500',
-    icon: 'sunny',
-  },
-  {
-    id: 'career-growth',
-    title: 'Career Growth Sprint',
-    description: 'Advance your career with structured networking, skill-building, and goal-setting.',
-    weeks: 6,
-    category: 'Career',
-    color: '#007AFF',
-    icon: 'rocket',
-  },
-  {
-    id: 'mindfulness',
-    title: 'Mindfulness Journey',
-    description: 'Cultivate inner calm through daily meditation, breathing, and awareness exercises.',
-    weeks: 4,
-    category: 'Growth',
-    color: '#5856D6',
-    icon: 'leaf',
-  },
-  {
-    id: 'financial-reset',
-    title: 'Financial Reset',
-    description: 'Take control of your finances with budgeting, saving, and investing habits.',
-    weeks: 5,
-    category: 'Finance',
-    color: '#34C759',
-    icon: 'cash',
-  },
-  {
-    id: 'creative-spark',
-    title: 'Creative Spark',
-    description: 'Reignite your creativity with daily prompts, experiments, and artistic exploration.',
-    weeks: 3,
-    category: 'Creativity',
-    color: '#FF2D55',
-    icon: 'sparkles',
-  },
+// ─────────────────────────────────────────────────────────
+// EFFORT config
+// ─────────────────────────────────────────────────────────
+export const EFFORT = {
+  quick:  { label: 'Quick',  sub: '< 15 min',  color: T.green,  emoji: '⚡' },
+  medium: { label: 'Medium', sub: '~1–2 hrs',   color: T.orange, emoji: '🔧' },
+  deep:   { label: 'Deep',   sub: 'Half day+',  color: T.brand,  emoji: '🧠' },
+} as const;
+
+// ─────────────────────────────────────────────────────────
+// STEP_STATUS config
+// ─────────────────────────────────────────────────────────
+export const STEP_STATUS = {
+  todo:    { label: 'To do',       color: T.t3,      dot: '#CBD5E0' },
+  doing:   { label: 'In progress', color: T.brand,   dot: T.brand   },
+  blocked: { label: 'Blocked',     color: '#E53E3E',  dot: '#E53E3E' },
+  done:    { label: 'Done',        color: T.green,   dot: T.green   },
+} as const;
+
+// ─────────────────────────────────────────────────────────
+// PRG — Journey catalog (static, expert-curated programs)
+// ─────────────────────────────────────────────────────────
+export const PRG: Journey[] = [
+  { id: 'sleep',       a: 'health',        sa: ['learning'],           t: 'Optimize Your Sleep',      e: 'Andrew Huberman',  w: 6, d: 'beginner', m: 15,  u: 2840, rt: 4.8, f: true,  ds: 'Transform your sleep using neuroscience-backed protocols.',    wp: ['Sleep audit','Morning light','Wind-down design','Temperature','Consistency','Maintenance'] },
+  { id: 'strength',    a: 'health',                                     t: 'Strength Foundations',     e: 'Jeff Nippard',     w: 8, d: 'moderate', m: 30,  u: 1920, rt: 4.7,           ds: 'Build sustainable strength training from scratch.',            wp: ['Assessment','Push/pull','Lower body','Full-body','Overload','Volume','Deload','Programming'] },
+  { id: 'nutrition',   a: 'health',        sa: ['learning'],           t: 'Science-Based Nutrition',  e: 'Layne Norton',     w: 6, d: 'beginner', m: 10,  u: 3100, rt: 4.9,           ds: 'Sustainable eating based on actual science.',                  wp: ['Diet audit','Macros','Meal prep','Social eating','Psychology','Maintenance'] },
+  { id: 'running',     a: 'health',        sa: ['fun','learning'],     t: 'Couch to Runner',          e: 'Research-based',   w: 8, d: 'beginner', m: 25,  u: 1560, rt: 4.6,           ds: 'Zero to 3× per week without burnout.',                        wp: ['Walk/run','15-min run','Consistency','Distance','Form','Speed','30 min','Race prep'] },
+  { id: 'deepwork',    a: 'career',                                     t: 'Deep Work Protocol',       e: 'Cal Newport',      w: 4, d: 'moderate', m: 20,  u: 4200, rt: 4.8, f: true,  ds: 'Eliminate distraction. Build focus blocks.',                   wp: ['Distraction audit','First block','Daily practice','Long-term ritual'] },
+  { id: 'leadership',  a: 'career',                                     t: 'Leadership Essentials',    e: 'Research-based',   w: 6, d: 'moderate', m: 15,  u: 1800, rt: 4.5,           ds: 'Develop communication and delegation skills.',                 wp: ['Style assessment','Listening','Delegation','Hard conversations','Culture','Vision'] },
+  { id: 'negotiate',   a: 'career',                                     t: 'Negotiation Mastery',      e: 'Chris Voss',       w: 4, d: 'advanced', m: 15,  u: 2100, rt: 4.7,           ds: 'Tactical empathy from a former FBI negotiator.',               wp: ['Empathy','Mirroring','Questions','Closing'] },
+  { id: 'financial',   a: 'finance',       sa: ['learning','career'],  t: 'Financial Foundations',    e: 'Ramit Sethi',      w: 4, d: 'beginner', m: 15,  u: 3600, rt: 4.8,           ds: 'Automate finances on autopilot.',                              wp: ['Automation','Spending plan','Debt strategy','Investing'] },
+  { id: 'investing',   a: 'finance',                                    t: 'Investing Fundamentals',   e: 'Morgan Housel',    w: 4, d: 'beginner', m: 15,  u: 2400, rt: 4.7,           ds: 'Behaviour over stock picks.',                                  wp: ['Psychology','Allocation','Accounts','Strategy'] },
+  { id: 'side-income', a: 'finance',                                    t: 'Side Income Builder',      e: 'Research-based',   w: 6, d: 'moderate', m: 20,  u: 1340, rt: 4.3,           ds: 'Validate ideas without quitting.',                             wp: ['Skills','Validation','MVP','Customers','Time','Scaling'] },
+  { id: 'communication',a:'relationships',                              t: 'Communication Mastery',    e: 'John Gottman',     w: 4, d: 'beginner', m: 15,  u: 2900, rt: 4.8,           ds: '40 years of relationship research.',                           wp: ['Patterns','Listening','Repair','Positivity'] },
+  { id: 'boundaries',  a: 'relationships',                              t: 'Healthy Boundaries',       e: 'Nedra Tawwab',     w: 3, d: 'beginner', m: 10,  u: 2200, rt: 4.6,           ds: 'Say no without guilt.',                                        wp: ['Patterns','Setting','Difficult people'] },
+  { id: 'habits',      a: 'learning',                                   t: 'Atomic Habits Builder',    e: 'James Clear',      w: 6, d: 'beginner', m: 10,  u: 5200, rt: 4.9, f: true,  ds: 'Systems that make good habits automatic.',                     wp: ['Audit','Cues','Response','Rewards','Stacking','Systems'] },
+  { id: 'mindfulness', a: 'spirituality',  sa: ['health','learning'],  t: 'Mindfulness & Meditation', e: 'Jon Kabat-Zinn',   w: 4, d: 'beginner', m: 10,  u: 3400, rt: 4.8,           ds: 'Build a sustainable meditation habit.',                        wp: ['Breath','Body scan','Walking','Anchoring'] },
+  { id: 'gratitude',   a: 'spirituality',                              t: 'Gratitude Practice',       e: 'Research-based',   w: 3, d: 'beginner', m: 5,   u: 2100, rt: 4.6,           ds: 'Structured gratitude beyond simple lists.',                    wp: ['Journaling','Expressing','Adversity'] },
+  { id: 'creativity',  a: 'fun',                                        t: 'Creative Spark',           e: 'Research-based',   w: 4, d: 'beginner', m: 15,  u: 720,  rt: 4.4,           ds: 'Unlock creativity regardless of your job.',                    wp: ['Identity','Micro-creation','Frameworks','Launch'] },
 ];

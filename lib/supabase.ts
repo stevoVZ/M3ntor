@@ -1,9 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Item, Step, Subtask, JourneyProgress } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const SUPABASE_URL  = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+const SUPABASE_KEY  = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 function isValidUrl(url: string): boolean {
   try {
@@ -15,126 +14,79 @@ function isValidUrl(url: string): boolean {
   }
 }
 
-export const isSupabaseConfigured = isValidUrl(supabaseUrl) && supabaseAnonKey.length > 10;
+export const isSupabaseConfigured = isValidUrl(SUPABASE_URL) && SUPABASE_KEY.length > 10;
 
-let supabase: SupabaseClient | null = null;
+let _supabase: SupabaseClient | null = null;
 
 if (isSupabaseConfigured) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  _supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
-      storage: AsyncStorage,
+      storage:          AsyncStorage,
       autoRefreshToken: true,
-      persistSession: true,
+      persistSession:   true,
       detectSessionInUrl: false,
     },
   });
 }
 
-export function getSupabase(): SupabaseClient | null {
-  return supabase;
-}
+export const supabase = _supabase as SupabaseClient;
 
-export async function fetchItems(userId: string): Promise<Item[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase
+export async function fetchItems(userId: string) {
+  if (!_supabase) return [];
+  const { data, error } = await _supabase
     .from('items')
-    .select('*')
+    .select('*, steps(*, subtasks(*))')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
-  if (error) {
-    console.error('fetchItems error:', error.message);
-    return [];
-  }
-  return (data ?? []) as Item[];
+  if (error) throw error;
+  return data;
 }
 
-export async function upsertItem(item: Item): Promise<Item | null> {
-  if (!supabase) return null;
-  const { steps, ...row } = item;
-  const { data, error } = await supabase
+export async function upsertItem(item: Record<string, unknown>) {
+  if (!_supabase) return null;
+  const { data, error } = await _supabase
     .from('items')
-    .upsert(row, { onConflict: 'id' })
+    .upsert(item)
     .select()
     .single();
-  if (error) {
-    console.error('upsertItem error:', error.message);
-    return null;
-  }
-  return data as Item;
+  if (error) throw error;
+  return data;
 }
 
-export async function deleteItemRemote(id: string): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase.from('items').delete().eq('id', id);
-  if (error) {
-    console.error('deleteItem error:', error.message);
-    return false;
-  }
-  return true;
+export async function deleteItem(id: string) {
+  if (!_supabase) return;
+  const { error } = await _supabase.from('items').delete().eq('id', id);
+  if (error) throw error;
 }
 
-export async function fetchSteps(itemId: string): Promise<Step[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase
+export async function upsertStep(step: Record<string, unknown>) {
+  if (!_supabase) return null;
+  const { data, error } = await _supabase
     .from('steps')
-    .select('*')
-    .eq('item_id', itemId)
-    .order('sort_order');
-  if (error) {
-    console.error('fetchSteps error:', error.message);
-    return [];
-  }
-  return (data ?? []) as Step[];
-}
-
-export async function upsertStep(step: Step): Promise<Step | null> {
-  if (!supabase) return null;
-  const { subtasks, ...row } = step;
-  const { data, error } = await supabase
-    .from('steps')
-    .upsert(row, { onConflict: 'id' })
+    .upsert(step)
     .select()
     .single();
-  if (error) {
-    console.error('upsertStep error:', error.message);
-    return null;
-  }
-  return data as Step;
+  if (error) throw error;
+  return data;
 }
 
-export async function deleteStepRemote(id: string): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase.from('steps').delete().eq('id', id);
-  if (error) {
-    console.error('deleteStep error:', error.message);
-    return false;
-  }
-  return true;
-}
-
-export async function upsertSubtask(subtask: Subtask): Promise<Subtask | null> {
-  if (!supabase) return null;
-  const { data, error } = await supabase
+export async function upsertSubtask(subtask: Record<string, unknown>) {
+  if (!_supabase) return null;
+  const { data, error } = await _supabase
     .from('subtasks')
-    .upsert(subtask, { onConflict: 'id' })
+    .upsert(subtask)
     .select()
     .single();
-  if (error) {
-    console.error('upsertSubtask error:', error.message);
-    return null;
-  }
-  return data as Subtask;
+  if (error) throw error;
+  return data;
 }
 
-export async function fetchJourneyProgress(userId: string): Promise<JourneyProgress[]> {
-  if (!supabase) return [];
-  const { data, error } = await supabase
+export async function fetchJourneyProgress(userId: string) {
+  if (!_supabase) return [];
+  const { data, error } = await _supabase
     .from('journey_progress')
     .select('*')
     .eq('user_id', userId);
-  if (error) {
-    console.error('fetchJourneyProgress error:', error.message);
-    return [];
-  }
-  return (data ?? []) as JourneyProgress[];
+  if (error) throw error;
+  return data;
 }

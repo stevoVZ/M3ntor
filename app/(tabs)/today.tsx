@@ -1,247 +1,197 @@
-import { View, Text, ScrollView, StyleSheet, Platform, RefreshControl, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import React, { useState, useCallback } from 'react';
-import { useItems } from '@/lib/store';
-import { Card } from '@/components/ui/Card';
-import { ItemCard } from '@/components/items/ItemCard';
-import { Fab } from '@/components/Fab';
-import { FabActionSheet } from '@/components/add/FabActionSheet';
-import { getGreeting, getFormattedDate, formatRecurrence } from '@/utils/items';
-import { isOverdue, formatDeadline } from '@/utils/dates';
-import Colors from '@/constants/colors';
-import { Ionicons } from '@expo/vector-icons';
-import { Item, ItemKind } from '@/types';
+import { useStore } from '../../lib/store';
+import { T, S, F, R, shadow } from '../../constants/theme';
+import { ITEM_AREAS, KIND_CONFIG } from '../../constants/config';
+import { itemKind, projectProgress, formatRecurrence } from '../../utils/items';
+import { greetingForTime, formatDeadline, isOverdue } from '../../utils/dates';
+import type { Item } from '../../types';
 
-function SectionHeader({ title, icon, count }: { title: string; icon: string; count: number }) {
-  if (count === 0) return null;
-  return (
-    <View style={styles.sectionHeader}>
-      <Ionicons name={icon as any} size={16} color="#8E8E93" />
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.sectionCount}>{count}</Text>
-    </View>
-  );
-}
-
-function ItemSection({ title, icon, items, onToggle, onPress }: {
-  title: string;
-  icon: string;
-  items: Item[];
-  onToggle: (id: string) => void;
-  onPress: (id: string) => void;
-}) {
-  if (items.length === 0) return null;
-  return (
-    <View style={styles.section}>
-      <SectionHeader title={title} icon={icon} count={items.length} />
-      <Card variant="grouped">
-        {items.map((item, idx) => (
-          <ItemCard
-            key={item.id}
-            item={item}
-            onToggle={() => onToggle(item.id)}
-            onPress={() => onPress(item.id)}
-            isLast={idx === items.length - 1}
-          />
-        ))}
-      </Card>
-    </View>
-  );
-}
-
-export default function TodayScreen() {
-  const insets = useSafeAreaInsets();
-  const { getTodayItems, toggleDone, isLoading, refresh, getCompletedToday } = useItems();
-  const [refreshing, setRefreshing] = useState(false);
-  const [showActionSheet, setShowActionSheet] = useState(false);
-
-  const today = getTodayItems();
-  const completedToday = getCompletedToday();
-  const totalToday = today.morning.length + today.afternoon.length + today.evening.length + today.actions.length;
-  const hasItems = totalToday > 0;
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
-  }, [refresh]);
-
-  const handleToggle = (id: string) => toggleDone(id);
-  const handlePress = (id: string) => router.push({ pathname: '/item/[id]', params: { id } });
-
-  const webTopInset = Platform.OS === 'web' ? 67 : 0;
-
-  if (isLoading) {
-    return (
-      <View style={[styles.loading, { paddingTop: insets.top + webTopInset }]}>
-        <ActivityIndicator size="large" color={Colors.light.systemBlue} />
-      </View>
-    );
-  }
+// ── Item card for Today screen ────────────────────────────
+function TodayCard({ item }: { item: Item }) {
+  const kind     = itemKind(item);
+  const kindConf = KIND_CONFIG[kind];
+  const area     = ITEM_AREAS[item.area];
+  const progress = kind === 'project' ? projectProgress(item) : null;
+  const overdue  = isOverdue(item.deadline);
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: insets.top + webTopInset + 16, paddingBottom: Platform.OS === 'web' ? 120 : 100 },
-        ]}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.light.systemBlue} />
-        }
-      >
-        <View style={styles.header}>
-          <Text style={styles.greeting}>{getGreeting()}</Text>
-          <Text style={styles.date}>{getFormattedDate()}</Text>
+    <Pressable style={[styles.card, shadow.sm]} onPress={() => router.push(`/item/${item.id}`)}>
+      {/* Left accent bar */}
+      <View style={[styles.cardAccent, { backgroundColor: kindConf.color }]} />
+
+      <View style={styles.cardBody}>
+        {/* Header row */}
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardEmoji}>{item.emoji}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+            {item.description ? (
+              <Text style={styles.cardDesc} numberOfLines={1}>{item.description}</Text>
+            ) : null}
+          </View>
+          {/* Kind badge */}
+          <View style={[styles.kindBadge, { backgroundColor: kindConf.color + '14' }]}>
+            <Text style={[styles.kindBadgeText, { color: kindConf.color }]}>{kindConf.label}</Text>
+          </View>
         </View>
 
-        {completedToday.length > 0 && (
-          <View style={styles.statsRow}>
-            <View style={styles.statBadge}>
-              <Ionicons name="checkmark-circle" size={14} color={Colors.light.systemGreen} />
-              <Text style={styles.statText}>{completedToday.length} completed today</Text>
+        {/* Progress bar for projects */}
+        {progress !== null && (
+          <View style={styles.progressRow}>
+            <View style={styles.progressBg}>
+              <View style={[styles.progressFill, {
+                width:           `${Math.round(progress * 100)}%` as any,
+                backgroundColor: kindConf.color,
+              }]} />
             </View>
+            <Text style={styles.progressLabel}>{Math.round(progress * 100)}%</Text>
           </View>
         )}
 
-        {!hasItems ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="sunny-outline" size={48} color="#C7C7CC" />
-            <Text style={styles.emptyTitle}>Your day is clear</Text>
-            <Text style={styles.emptySubtitle}>Tap + to add actions, habits, or projects</Text>
-          </View>
-        ) : (
-          <>
-            <ItemSection
-              title="Morning"
-              icon="sunny-outline"
-              items={today.morning}
-              onToggle={handleToggle}
-              onPress={handlePress}
-            />
-            <ItemSection
-              title="Afternoon"
-              icon="partly-sunny-outline"
-              items={today.afternoon}
-              onToggle={handleToggle}
-              onPress={handlePress}
-            />
-            <ItemSection
-              title="Evening"
-              icon="moon-outline"
-              items={today.evening}
-              onToggle={handleToggle}
-              onPress={handlePress}
-            />
-            <ItemSection
-              title="Actions"
-              icon="flash-outline"
-              items={today.actions}
-              onToggle={handleToggle}
-              onPress={handlePress}
-            />
-          </>
-        )}
-      </ScrollView>
+        {/* Meta row */}
+        <View style={styles.metaRow}>
+          {area && (
+            <View style={[styles.areaChip, { backgroundColor: area.c + '12' }]}>
+              <Text style={styles.areaChipText}>{area.e} {area.n.split(' ')[0]}</Text>
+            </View>
+          )}
+          {kind === 'habit' && item.recurrence && (
+            <Text style={styles.metaText}>{formatRecurrence(item)}</Text>
+          )}
+          {item.deadline && (
+            <Text style={[styles.metaText, overdue && { color: T.red }]}>
+              {formatDeadline(item.deadline)}
+            </Text>
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
 
-      <Fab onPress={() => setShowActionSheet(true)} />
-      <FabActionSheet
-        visible={showActionSheet}
-        onClose={() => setShowActionSheet(false)}
-        onSelect={(kind: ItemKind) => router.push({ pathname: '/add', params: { kind } })}
-      />
+// ── Section header ────────────────────────────────────────
+function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <View style={styles.sectionBadge}>
+          <Text style={styles.sectionBadgeText}>{count}</Text>
+        </View>
+      </View>
+      {children}
     </View>
+  );
+}
+
+// ── Today screen ──────────────────────────────────────────
+export default function TodayScreen() {
+  const items = useStore(s => s.items);
+
+  const activeItems = items.filter(i => i.status === 'active');
+  const habits   = activeItems.filter(i => !!i.recurrence);
+  const projects = activeItems.filter(i => (i.steps?.length ?? 0) > 0);
+  const actions  = activeItems.filter(i => !i.recurrence && !(i.steps?.length ?? 0));
+
+  const greeting = greetingForTime();
+  const isEmpty  = activeItems.length === 0;
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+
+        {/* ── Hero header ── */}
+        <View style={styles.hero}>
+          <Text style={styles.heroGreeting}>{greeting}</Text>
+          <Text style={styles.heroTitle}>Today</Text>
+          <Text style={styles.heroSub}>
+            {isEmpty
+              ? 'Tap + to add your first item'
+              : `${activeItems.length} active item${activeItems.length !== 1 ? 's' : ''}`}
+          </Text>
+        </View>
+
+        {/* ── Empty state ── */}
+        {isEmpty && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyEmoji}>🌱</Text>
+            <Text style={styles.emptyTitle}>Your slate is clear</Text>
+            <Text style={styles.emptySub}>Add a habit, action, goal or project to get started.</Text>
+          </View>
+        )}
+
+        {/* ── Habits ── */}
+        {habits.length > 0 && (
+          <Section title="Habits" count={habits.length}>
+            {habits.map(item => <TodayCard key={item.id} item={item} />)}
+          </Section>
+        )}
+
+        {/* ── Projects ── */}
+        {projects.length > 0 && (
+          <Section title="Projects" count={projects.length}>
+            {projects.map(item => <TodayCard key={item.id} item={item} />)}
+          </Section>
+        )}
+
+        {/* ── Actions ── */}
+        {actions.length > 0 && (
+          <Section title="Actions" count={actions.length}>
+            {actions.map(item => <TodayCard key={item.id} item={item} />)}
+          </Section>
+        )}
+
+        {/* Bottom padding for tab bar */}
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.light.groupedBackground,
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.light.groupedBackground,
-  },
-  scrollContent: {
-    paddingHorizontal: 0,
-  },
-  header: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  greeting: {
-    fontSize: 34,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.light.text,
-    letterSpacing: -0.5,
-  },
-  date: {
-    fontSize: 15,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.light.textTertiary,
-    marginTop: 2,
-  },
-  statsRow: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  statBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(52, 199, 89, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  statText: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.light.systemGreen,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 20,
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontFamily: 'Inter_600SemiBold',
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    flex: 1,
-  },
-  sectionCount: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    color: '#C7C7CC',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.light.text,
-  },
-  emptySubtitle: {
-    fontSize: 15,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.light.textTertiary,
-    textAlign: 'center',
-  },
+  safe:        { flex: 1, backgroundColor: T.bg, ...(Platform.OS === 'web' ? { paddingTop: 67 } : {}) },
+  scroll:      { flex: 1 },
+  scrollContent: { paddingHorizontal: S.md },
+
+  hero:          { paddingTop: S.lg, paddingBottom: S.md },
+  heroGreeting:  { fontSize: F.sm, color: T.t3, fontWeight: '500', marginBottom: 2 },
+  heroTitle:     { fontSize: F.h1, fontWeight: '800', color: T.text, letterSpacing: -1, lineHeight: 36 },
+  heroSub:       { fontSize: F.sm, color: T.t2, marginTop: 6 },
+
+  emptyState:    { alignItems: 'center', paddingVertical: S.xxl },
+  emptyEmoji:    { fontSize: 48, marginBottom: S.md },
+  emptyTitle:    { fontSize: F.lg, fontWeight: '700', color: T.text, marginBottom: S.sm },
+  emptySub:      { fontSize: F.md, color: T.t2, textAlign: 'center', lineHeight: 22 },
+
+  section:       { marginBottom: S.lg },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: S.sm },
+  sectionTitle:  { fontSize: F.sm, fontWeight: '700', color: T.t2, letterSpacing: 0.2 },
+  sectionBadge:  { backgroundColor: T.brand + '14', borderRadius: R.pill, paddingHorizontal: 7, paddingVertical: 2 },
+  sectionBadgeText: { fontSize: 11, fontWeight: '700', color: T.brand },
+
+  card:          { flexDirection: 'row', backgroundColor: 'white', borderRadius: R.lg, marginBottom: 8, overflow: 'hidden' },
+  cardAccent:    { width: 4 },
+  cardBody:      { flex: 1, padding: S.md },
+  cardHeader:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  cardEmoji:     { fontSize: 22, lineHeight: 26 },
+  cardTitle:     { fontSize: F.md, fontWeight: '700', color: T.text, lineHeight: 20, flex: 1 },
+  cardDesc:      { fontSize: F.xs, color: T.t3, marginTop: 2 },
+
+  kindBadge:     { borderRadius: R.sm, paddingHorizontal: 7, paddingVertical: 3 },
+  kindBadgeText: { fontSize: 10, fontWeight: '700' },
+
+  progressRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  progressBg:    { flex: 1, height: 4, backgroundColor: T.sep, borderRadius: 2, overflow: 'hidden' },
+  progressFill:  { height: '100%', borderRadius: 2 },
+  progressLabel: { fontSize: 11, color: T.t3, fontWeight: '600', minWidth: 28 },
+
+  metaRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' },
+  areaChip:      { borderRadius: R.sm, paddingHorizontal: 8, paddingVertical: 3 },
+  areaChipText:  { fontSize: 11, color: T.t2, fontWeight: '600' },
+  metaText:      { fontSize: 11, color: T.t3 },
 });

@@ -10,7 +10,7 @@ dayjs.extend(isTomorrow);
 export function formatDeadline(iso?: string): string {
   if (!iso) return '';
   const d = dayjs(iso);
-  if (d.isToday()) return 'Due today';
+  if (d.isToday())    return 'Due today';
   if (d.isTomorrow()) return 'Due tomorrow';
   if (d.diff(dayjs(), 'day') < 7) return `Due ${d.fromNow()}`;
   return `Due ${d.format('D MMM YYYY')}`;

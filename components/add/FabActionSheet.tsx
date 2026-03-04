@@ -1,127 +1,398 @@
-import { View, Text, StyleSheet, Pressable, Modal } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { KIND_CONFIG } from '@/constants/config';
-import Colors from '@/constants/colors';
-import { ItemKind } from '@/types';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  View, Text, TextInput, Pressable, StyleSheet, ScrollView,
+  Modal, KeyboardAvoidingView, Platform, ActivityIndicator,
+} from 'react-native';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withSpring, withTiming,
+  runOnJS, SlideInDown, SlideOutDown,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { T, S, F, R, shadow } from '../../constants/theme';
+import { ITEM_AREAS } from '../../constants/config';
+import { suggestArea, inferType } from '../../utils/nlp';
+import { getItemHint } from '../../lib/ai';
+import { createItem } from '../../utils/items';
+import { useStore } from '../../lib/store';
 
-interface FabActionSheetProps {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (kind: ItemKind) => void;
+interface Props {
+  onProject: (text: string) => void;
+  onClose:   () => void;
 }
 
-const OPTIONS: { kind: ItemKind; label: string; subtitle: string; icon: string }[] = [
-  { kind: 'action', label: 'Action', subtitle: 'One-off task', icon: 'checkmark-circle' },
-  { kind: 'habit', label: 'Habit', subtitle: 'Recurring activity', icon: 'repeat' },
-  { kind: 'goal', label: 'Goal', subtitle: 'Future aspiration', icon: 'flag' },
-  { kind: 'project', label: 'Project', subtitle: 'Multi-step plan', icon: 'layers' },
+const TYPE_OPTIONS = [
+  { id: 'action',  label: 'Action',  emoji: '✓',  color: T.green   },
+  { id: 'habit',   label: 'Habit',   emoji: '🔄', color: T.orange  },
+  { id: 'goal',    label: 'Goal',    emoji: '🎯', color: '#9B59B6' },
+  { id: 'project', label: 'Project', emoji: '📁', color: T.brand   },
+  { id: 'journey', label: 'Journey', emoji: '🧭', color: '#007AFF' },
+] as const;
+
+const PROMOS = [
+  { text: 'Meditate every morning',  type: 'habit'   },
+  { text: 'Run a 5K by June',        type: 'goal'    },
+  { text: 'Redesign the website',    type: 'project' },
+  { text: 'Call Mum this week',      type: 'action'  },
+  { text: 'Read 12 books this year', type: 'goal'    },
+  { text: 'Build a sleep routine',   type: 'habit'   },
 ];
 
-export function FabActionSheet({ visible, onClose, onSelect }: FabActionSheetProps) {
-  const handleSelect = (kind: ItemKind) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSelect(kind);
-    onClose();
-  };
+const TOD_OPTIONS = [
+  { id: 'morning',   label: 'AM'  },
+  { id: 'afternoon', label: 'PM'  },
+  { id: 'evening',   label: 'Eve' },
+];
+
+export function FabActionSheet({ onProject, onClose }: Props) {
+  const insets = useSafeAreaInsets();
+  const { userId, addItem } = useStore();
+
+  const [text, setText]                 = useState('');
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [area, setArea]                 = useState<string | null>(null);
+  const [tod, setTod]                   = useState<string | null>(null);
+  const [aiHint, setAiHint]             = useState<{ why?: string; firstStep?: string; tip?: string } | null>(null);
+  const [aiLoading, setAiLoading]       = useState(false);
+  const [saved, setSaved]               = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+
+  const inputRef    = useRef<TextInput>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 200);
+  }, []);
+
+  // NLP type inference
+  const inferredType = useMemo(() => inferType(text), [text]);
+  const activeType   = selectedType ?? (text.trim() ? inferredType : null);
+  const typeConf     = activeType ? TYPE_OPTIONS.find(t => t.id === activeType) : null;
+
+  // NLP area suggestion
+  useEffect(() => {
+    if (activeType === 'goal') return;
+    const s = suggestArea(text);
+    if (s && !area) setArea(s);
+  }, [text]);
+
+  // Debounced AI hint (900ms after last keystroke)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!text.trim() || text.trim().length < 5) { setAiHint(null); return; }
+
+    debounceRef.current = setTimeout(async () => {
+      setAiLoading(true);
+      const hint = await getItemHint(text, activeType ?? 'action');
+      setAiHint(hint);
+      setAiLoading(false);
+    }, 900);
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [text, selectedType]);
+
+  const areaConf = area ? ITEM_AREAS[area] : null;
+  const canSave  = text.trim().length > 0 && (activeType !== 'goal' || !!area);
+
+  function handleTypeSelect(id: string) {
+    if (id === 'journey')                    { /* navigate to discover */ return; }
+    if (id === 'project' && text.trim())     { onProject(text); return; }
+    setSelectedType(prev => prev === id ? null : id);
+    setAiHint(null);
+  }
+
+  function handleSave() {
+    if (!canSave || !userId) return;
+    const type = activeType ?? 'action';
+    if (type === 'project') { onProject(text); return; }
+
+    const item = createItem(userId, {
+      title:             text.trim(),
+      area:              area ?? suggestArea(text) ?? 'life',
+      status:            type === 'goal' ? 'someday' : 'active',
+      emoji:             type === 'habit' ? '🔄' : type === 'goal' ? '🎯' : '✓',
+      habit_time_of_day: tod as any ?? undefined,
+      recurrence:        type === 'habit' ? { type: 'daily' } : undefined,
+    });
+
+    addItem(item);
+    setSaved(true);
+    setTimeout(() => { setSaved(false); onClose(); }, 850);
+  }
+
+  const saveBtnLabel = !text.trim()                     ? 'Type something to start'
+    : activeType === 'goal' && !area                    ? 'Pick a life area first'
+    : activeType === 'project'                          ? 'Set up project →'
+    : activeType === 'habit'                            ? 'Start this habit'
+    : activeType === 'goal'                             ? 'Save to goals'
+    :                                                     'Add it';
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <View style={styles.sheet}>
-          <Text style={styles.sheetTitle}>Create New</Text>
-          {OPTIONS.map((opt) => {
-            const cfg = KIND_CONFIG[opt.kind];
-            return (
-              <Pressable
-                key={opt.kind}
-                onPress={() => handleSelect(opt.kind)}
-                style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: cfg.tint }]}>
-                  <Ionicons name={opt.icon as any} size={22} color={cfg.color} />
+    <Modal transparent animationType="none" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.overlay}>
+        {/* Backdrop */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
+          <View style={styles.backdrop} />
+        </Pressable>
+
+        {/* Sheet */}
+        <Animated.View
+          entering={SlideInDown.springify().damping(32).stiffness(360)}
+          exiting={SlideOutDown.springify().damping(28)}
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 16, 28) }]}>
+
+          {/* Handle */}
+          <View style={styles.handleRow}>
+            <View style={styles.handle} />
+          </View>
+
+          {/* ── Saved confirmation ── */}
+          {saved ? (
+            <View style={styles.savedState}>
+              <View style={[styles.savedIcon, { backgroundColor: (typeConf?.color ?? T.green) + '14' }]}>
+                <Text style={{ fontSize: 24 }}>✓</Text>
+              </View>
+              <Text style={styles.savedTitle}>Added!</Text>
+              <Text style={styles.savedSub}>"{text}"</Text>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Header */}
+              <View style={styles.headerRow}>
+                <View>
+                  <Text style={styles.title}>What's next?</Text>
+                  <Text style={styles.subtitle}>Type your idea — AI shapes it as you write</Text>
                 </View>
-                <View style={styles.optionText}>
-                  <Text style={styles.optionLabel}>{opt.label}</Text>
-                  <Text style={styles.optionSubtitle}>{opt.subtitle}</Text>
+                <Pressable style={styles.closeBtn} onPress={onClose}>
+                  <Text style={styles.closeBtnText}>✕</Text>
+                </Pressable>
+              </View>
+
+              {/* Main input */}
+              <View style={[styles.inputWrap, {
+                borderColor: typeConf ? typeConf.color + '35' : 'rgba(0,0,0,0.09)',
+                backgroundColor: typeConf ? typeConf.color + '04' : 'white',
+              }]}>
+                <TextInput
+                  ref={inputRef}
+                  value={text}
+                  onChangeText={(v) => { setText(v); setAiHint(null); }}
+                  onSubmitEditing={handleSave}
+                  placeholder="e.g. Meditate every morning…"
+                  placeholderTextColor={T.t3}
+                  style={[styles.input, { paddingRight: typeConf ? 96 : 14 }]}
+                  returnKeyType="done"
+                />
+                {typeConf && (
+                  <View style={[styles.typeBadge, { backgroundColor: typeConf.color + '14' }]}>
+                    <Text style={styles.typeBadgeEmoji}>{typeConf.emoji}</Text>
+                    <Text style={[styles.typeBadgeLabel, { color: typeConf.color }]}>{typeConf.label}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* AI hint strip */}
+              <View style={styles.hintArea}>
+                {aiLoading && (
+                  <View style={styles.thinkingRow}>
+                    <ActivityIndicator size="small" color={T.brand} />
+                    <Text style={styles.thinkingText}>Thinking…</Text>
+                  </View>
+                )}
+                {!aiLoading && aiHint && (aiHint.why || aiHint.firstStep || aiHint.tip) && (
+                  <View style={[styles.hintCard, {
+                    backgroundColor: (typeConf?.color ?? T.brand) + '09',
+                    borderColor:     (typeConf?.color ?? T.brand) + '1A',
+                  }]}>
+                    <Text style={styles.hintStar}>✨</Text>
+                    <View style={{ flex: 1 }}>
+                      {aiHint.why && (
+                        <Text style={styles.hintWhy}>{aiHint.why}</Text>
+                      )}
+                      {(aiHint.firstStep || aiHint.tip) && (
+                        <View style={styles.hintDetail}>
+                          <Text style={[styles.hintDetailLabel, { color: typeConf?.color ?? T.brand }]}>
+                            {aiHint.firstStep ? 'Start →' : 'Tip:'}
+                          </Text>
+                          <Text style={styles.hintDetailText}>
+                            {aiHint.firstStep ?? aiHint.tip}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
+                {!aiLoading && !aiHint && !text.trim() && (
+                  <View style={styles.promoRow}>
+                    {PROMOS.map(p => (
+                      <Pressable key={p.text} style={styles.promoChip}
+                        onPress={() => { setText(p.text); setSelectedType(p.type); }}>
+                        <Text style={styles.promoChipText}>{p.text}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* Type chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                style={styles.typeRow} contentContainerStyle={{ gap: 5, paddingVertical: 2 }}>
+                {TYPE_OPTIONS.map(t => {
+                  const on = selectedType === t.id || (!selectedType && inferredType === t.id && text.trim());
+                  return (
+                    <Pressable key={t.id} style={[styles.typeChip, on && {
+                      backgroundColor: t.color + '12',
+                      borderColor:     t.color + '40',
+                    }]} onPress={() => handleTypeSelect(t.id)}>
+                      <Text style={styles.typeChipEmoji}>{t.emoji}</Text>
+                      <Text style={[styles.typeChipLabel, on && { color: t.color, fontWeight: '700' }]}>
+                        {t.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Area + time chips */}
+              {text.trim() && activeType !== 'project' && activeType !== 'journey' && (
+                <View style={styles.extrasRow}>
+                  {areaConf ? (
+                    <Pressable style={[styles.extraChip, { backgroundColor: areaConf.c + '10', borderColor: areaConf.c + '28' }]}
+                      onPress={() => setShowAreaPicker(!showAreaPicker)}>
+                      <Text>{areaConf.e}</Text>
+                      <Text style={[styles.extraChipLabel, { color: areaConf.c }]}>{areaConf.n.split(' ')[0]}</Text>
+                      <Text style={{ color: areaConf.c, fontSize: 10 }}>▾</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable style={styles.extraChipEmpty} onPress={() => setShowAreaPicker(true)}>
+                      <Text style={styles.extraChipEmptyText}>＋ area</Text>
+                    </Pressable>
+                  )}
+                  {activeType !== 'goal' && TOD_OPTIONS.map(o => {
+                    const on = tod === o.id;
+                    return (
+                      <Pressable key={o.id} style={[styles.extraChip, on && {
+                        backgroundColor: (typeConf?.color ?? T.brand) + '10',
+                        borderColor:     (typeConf?.color ?? T.brand) + '30',
+                      }]} onPress={() => setTod(prev => prev === o.id ? null : o.id)}>
+                        <Text style={[styles.extraChipLabel, on && { color: typeConf?.color ?? T.brand, fontWeight: '700' }]}>
+                          {o.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
+              )}
+
+              {/* Area picker */}
+              {showAreaPicker && (
+                <View style={styles.areaPicker}>
+                  {Object.entries(ITEM_AREAS).map(([id, a]) => (
+                    <Pressable key={id}
+                      style={[styles.areaPickerBtn, area === id && { backgroundColor: a.c + '12', borderColor: a.c }]}
+                      onPress={() => { setArea(id); setShowAreaPicker(false); }}>
+                      <Text style={{ fontSize: 18 }}>{a.e}</Text>
+                      <Text style={[styles.areaPickerLabel, area === id && { color: a.c, fontWeight: '700' }]}>
+                        {a.n.split(' ')[0]}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              {/* Goal: require area */}
+              {activeType === 'goal' && !area && text.trim() && (
+                <View style={styles.areaPicker}>
+                  <Text style={styles.areaPickerHint}>Which area of your life?</Text>
+                  {Object.entries(ITEM_AREAS).map(([id, a]) => (
+                    <Pressable key={id}
+                      style={[styles.areaPickerBtn, area === id && { backgroundColor: a.c + '12', borderColor: a.c }]}
+                      onPress={() => setArea(id)}>
+                      <Text style={{ fontSize: 18 }}>{a.e}</Text>
+                      <Text style={[styles.areaPickerLabel, area === id && { color: a.c }]}>{a.n.split(' ')[0]}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              {/* Save button */}
+              <Pressable onPress={handleSave} disabled={!canSave} style={{ marginTop: S.md }}>
+                <LinearGradient
+                  colors={canSave ? (typeConf ? [typeConf.color, typeConf.color + 'BB'] : T.gradColors) : ['#E8E4F4','#E8E4F4']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={styles.saveBtn}>
+                  <Text style={[styles.saveBtnText, !canSave && { color: T.t3 }]}>{saveBtnLabel}</Text>
+                </LinearGradient>
               </Pressable>
-            );
-          })}
-          <Pressable onPress={onClose} style={styles.cancelButton}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </Pressable>
-        </View>
-      </Pressable>
+
+              <Pressable onPress={onClose} style={styles.cancelBtn}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </Pressable>
+            </ScrollView>
+          )}
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 8,
-    paddingBottom: 34,
-  },
-  sheet: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingTop: 20,
-    paddingBottom: 8,
-  },
-  sheetTitle: {
-    fontSize: 15,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.light.textTertiary,
-    textAlign: 'center',
-    marginBottom: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    gap: 14,
-  },
-  optionPressed: {
-    backgroundColor: 'rgba(0,0,0,0.04)',
-  },
-  optionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionText: {
-    flex: 1,
-  },
-  optionLabel: {
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.light.text,
-  },
-  optionSubtitle: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.light.textTertiary,
-    marginTop: 1,
-  },
-  cancelButton: {
-    alignItems: 'center',
-    paddingVertical: 14,
-    marginTop: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.light.separator,
-  },
-  cancelText: {
-    fontSize: 17,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.light.systemRed,
-  },
+  overlay:        { flex: 1, justifyContent: 'flex-end' },
+  backdrop:       { flex: 1, backgroundColor: 'rgba(10,8,22,0.52)' },
+  sheet:          { backgroundColor: 'rgba(253,252,255,0.98)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 18, paddingTop: 0, maxHeight: '92%' },
+  handleRow:      { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
+  handle:         { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.08)' },
+
+  savedState:     { alignItems: 'center', paddingVertical: 32, gap: 10 },
+  savedIcon:      { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  savedTitle:     { fontSize: F.lg, fontWeight: '800', color: T.text },
+  savedSub:       { fontSize: F.sm, color: T.t3, textAlign: 'center' },
+
+  headerRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 10, marginBottom: 14 },
+  title:          { fontSize: 20, fontWeight: '800', color: T.text, letterSpacing: -0.6 },
+  subtitle:       { fontSize: 12, color: T.t3, marginTop: 2 },
+  closeBtn:       { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' },
+  closeBtnText:   { fontSize: 13, color: T.t3 },
+
+  inputWrap:      { borderRadius: 18, borderWidth: 2, marginBottom: 10, overflow: 'hidden' },
+  input:          { fontSize: 16, color: T.text, padding: 14, fontWeight: '400' },
+  typeBadge:      { position: 'absolute', right: 12, top: '50%', marginTop: -14, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
+  typeBadgeEmoji: { fontSize: 13 },
+  typeBadgeLabel: { fontSize: 11, fontWeight: '700' },
+
+  hintArea:       { minHeight: 40, marginBottom: 12 },
+  thinkingRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderRadius: 12, backgroundColor: T.brand + '07', borderWidth: 1, borderColor: T.brand + '14' },
+  thinkingText:   { fontSize: 12, color: T.brand, fontStyle: 'italic' },
+  hintCard:       { flexDirection: 'row', gap: 8, padding: 11, borderRadius: 14, borderWidth: 1 },
+  hintStar:       { fontSize: 14, marginTop: 1 },
+  hintWhy:        { fontSize: 13, color: T.t2, lineHeight: 19, fontStyle: 'italic', marginBottom: 6 },
+  hintDetail:     { flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.72)', padding: 6, borderRadius: 9 },
+  hintDetailLabel:{ fontSize: 11, fontWeight: '700' },
+  hintDetailText: { fontSize: 12, color: T.text, flex: 1, lineHeight: 16 },
+  promoRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  promoChip:      { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(108,92,231,0.06)', borderWidth: 1, borderColor: 'rgba(108,92,231,0.13)' },
+  promoChipText:  { fontSize: 12, color: T.t2 },
+
+  typeRow:        { marginBottom: 12 },
+  typeChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.03)' },
+  typeChipEmoji:  { fontSize: 14 },
+  typeChipLabel:  { fontSize: 12, fontWeight: '500', color: T.t3 },
+
+  extrasRow:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14, flexWrap: 'wrap' },
+  extraChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  extraChipLabel: { fontSize: 12, color: T.t3 },
+  extraChipEmpty: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
+  extraChipEmptyText: { fontSize: 12, color: T.t3 },
+
+  areaPicker:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
+  areaPickerHint: { width: '100%', fontSize: 11, fontWeight: '700', color: T.t3, marginBottom: 8, letterSpacing: 0.2 },
+  areaPickerBtn:  { width: '22%', alignItems: 'center', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: T.sep, backgroundColor: 'white', gap: 4 },
+  areaPickerLabel:{ fontSize: 9, color: T.t3, textAlign: 'center' },
+
+  saveBtn:        { borderRadius: 20, padding: 17, alignItems: 'center', justifyContent: 'center' },
+  saveBtnText:    { fontSize: 16, fontWeight: '700', color: 'white', letterSpacing: -0.3 },
+  cancelBtn:      { padding: 12, alignItems: 'center', marginTop: 6 },
+  cancelText:     { fontSize: 14, fontWeight: '600', color: T.t3 },
 });
