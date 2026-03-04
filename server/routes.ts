@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "node:http";
-import { aiAssist } from "./ai";
+import { aiAssist, getItemHint, generateProjectTasks, generateSubtasks } from "./ai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/ai/assist", async (req, res) => {
@@ -14,6 +14,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("AI assist route error:", error);
       return res.status(500).json({ error: "AI assist failed" });
+    }
+  });
+
+  app.post("/api/ai/hint", async (req, res) => {
+    try {
+      const { kind, title } = req.body;
+      if (!kind || !title) {
+        return res.status(400).json({ error: "kind and title are required" });
+      }
+      const hint = await getItemHint(kind, title);
+      return res.json({ hint });
+    } catch (error) {
+      console.error("AI hint route error:", error);
+      return res.status(500).json({ error: "AI hint failed" });
+    }
+  });
+
+  app.post("/api/ai/tasks", async (req, res) => {
+    try {
+      const { title, description } = req.body;
+      if (!title) {
+        return res.status(400).json({ error: "title is required" });
+      }
+      const tasks = await generateProjectTasks(title, description);
+      return res.json({ tasks });
+    } catch (error) {
+      console.error("AI tasks route error:", error);
+      return res.status(500).json({ error: "AI tasks failed" });
+    }
+  });
+
+  app.post("/api/ai/subtasks", async (req, res) => {
+    try {
+      const { stepTitle, projectTitle } = req.body;
+      if (!stepTitle || !projectTitle) {
+        return res.status(400).json({ error: "stepTitle and projectTitle are required" });
+      }
+      const subtasks = await generateSubtasks(stepTitle, projectTitle);
+      return res.json({ subtasks });
+    } catch (error) {
+      console.error("AI subtasks route error:", error);
+      return res.status(500).json({ error: "AI subtasks failed" });
     }
   });
 

@@ -1,6 +1,6 @@
 import { View, Text, TextInput, ScrollView, StyleSheet, Platform, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState, useRef, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -10,13 +10,15 @@ import { Badge } from '@/components/ui/Badge';
 import { ITEM_AREAS, KIND_CONFIG } from '@/constants/config';
 import { Item, ItemKind, TimeOfDay } from '@/types';
 import { generateId } from '@/utils/items';
-import { fetchAiSuggestion, AiSuggestion } from '@/lib/ai';
+import { fetchAiSuggestion, getLocalSuggestion, AiSuggestion } from '@/lib/ai';
+import { ProjectAddSheet } from '@/components/add/ProjectAddSheet';
 import Colors from '@/constants/colors';
 
 const TIME_OPTIONS: { key: TimeOfDay; label: string; icon: string }[] = [
   { key: 'morning', label: 'Morning', icon: 'sunny-outline' },
   { key: 'afternoon', label: 'Afternoon', icon: 'partly-sunny-outline' },
   { key: 'evening', label: 'Evening', icon: 'moon-outline' },
+  { key: 'anytime', label: 'Anytime', icon: 'time-outline' },
 ];
 
 const KIND_OPTIONS: { key: ItemKind; label: string; icon: string }[] = [
@@ -28,11 +30,12 @@ const KIND_OPTIONS: { key: ItemKind; label: string; icon: string }[] = [
 
 export default function AddScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ kind?: string }>();
   const { addItem } = useItems();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [area, setArea] = useState('');
-  const [kind, setKind] = useState<ItemKind>('action');
+  const [kind, setKind] = useState<ItemKind>((params.kind as ItemKind) || 'action');
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('morning');
   const [steps, setSteps] = useState<string[]>([]);
   const [newStep, setNewStep] = useState('');
@@ -43,6 +46,12 @@ export default function AddScreen() {
 
   const handleTitleChange = (text: string) => {
     setTitle(text);
+
+    if (text.length > 2) {
+      const local = getLocalSuggestion(text);
+      if (local.area) setArea(local.area);
+    }
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (text.length > 5) {
       debounceRef.current = setTimeout(() => {
@@ -258,6 +267,10 @@ export default function AddScreen() {
         {kind === 'project' && (
           <>
             <Text style={styles.sectionLabel}>STEPS</Text>
+            <ProjectAddSheet
+              projectTitle={title}
+              onTasksGenerated={(tasks) => setSteps(tasks)}
+            />
             <View style={styles.stepsContainer}>
               {steps.map((s, idx) => (
                 <View key={idx} style={styles.stepRow}>

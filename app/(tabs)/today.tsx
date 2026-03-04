@@ -6,10 +6,12 @@ import { useItems } from '@/lib/store';
 import { Card } from '@/components/ui/Card';
 import { ItemCard } from '@/components/items/ItemCard';
 import { Fab } from '@/components/Fab';
-import { getGreeting, getFormattedDate } from '@/utils/items';
+import { FabActionSheet } from '@/components/add/FabActionSheet';
+import { getGreeting, getFormattedDate, formatRecurrence } from '@/utils/items';
+import { isOverdue, formatDeadline } from '@/utils/dates';
 import Colors from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { Item } from '@/types';
+import { Item, ItemKind } from '@/types';
 
 function SectionHeader({ title, icon, count }: { title: string; icon: string; count: number }) {
   if (count === 0) return null;
@@ -52,6 +54,7 @@ export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const { getTodayItems, toggleDone, isLoading, refresh, getCompletedToday } = useItems();
   const [refreshing, setRefreshing] = useState(false);
+  const [showActionSheet, setShowActionSheet] = useState(false);
 
   const today = getTodayItems();
   const completedToday = getCompletedToday();
@@ -142,7 +145,12 @@ export default function TodayScreen() {
         )}
       </ScrollView>
 
-      <Fab onPress={() => router.push('/add')} />
+      <Fab onPress={() => setShowActionSheet(true)} />
+      <FabActionSheet
+        visible={showActionSheet}
+        onClose={() => setShowActionSheet(false)}
+        onSelect={(kind: ItemKind) => router.push({ pathname: '/add', params: { kind } })}
+      />
     </View>
   );
 }

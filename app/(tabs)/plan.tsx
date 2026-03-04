@@ -7,6 +7,7 @@ import { useItems } from '@/lib/store';
 import { Card } from '@/components/ui/Card';
 import { ItemCard } from '@/components/items/ItemCard';
 import { Fab } from '@/components/Fab';
+import { FabActionSheet } from '@/components/add/FabActionSheet';
 import { itemKind, ItemKind, ItemStatus, Item } from '@/types';
 import { KIND_CONFIG, STATUS_CONFIG } from '@/constants/config';
 import Colors from '@/constants/colors';
@@ -42,6 +43,7 @@ export default function PlanScreen() {
   const { items, toggleDone } = useItems();
   const [kindFilter, setKindFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('active');
+  const [showActionSheet, setShowActionSheet] = useState(false);
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
 
   const filteredItems = useMemo(() => {
@@ -114,7 +116,12 @@ export default function PlanScreen() {
         )}
       </ScrollView>
 
-      <Fab onPress={() => router.push('/add')} />
+      <Fab onPress={() => setShowActionSheet(true)} />
+      <FabActionSheet
+        visible={showActionSheet}
+        onClose={() => setShowActionSheet(false)}
+        onSelect={(kind: ItemKind) => router.push({ pathname: '/add', params: { kind } })}
+      />
     </View>
   );
 }
