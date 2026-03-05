@@ -7,8 +7,9 @@ import { router } from 'expo-router';
 import { T, S, F, R, shadow } from '../../constants/theme';
 import { ITEM_AREAS, KIND_CONFIG, PRG } from '../../constants/config';
 import { itemKind, projectProgress, formatRecurrence, formatDuration } from '../../utils/items';
-import { goalProgress, getUnlinkedItems } from '../../utils/scores';
+import { goalProgress, linkedItemProgress, getUnlinkedItems } from '../../utils/scores';
 import { formatDeadline, isOverdue } from '../../utils/dates';
+import { ProgressBar } from '../../components/items/ProgressBar';
 import { ItemEditSheet } from '../../components/plan/ItemEditSheet';
 import GoalDetailPage from '../../components/plan/GoalDetailPage';
 import { ProjectEditPage } from '../../components/plan/ProjectEditPage';
@@ -163,6 +164,16 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal }: {
     .map(id => items.find(i => i.id === id))
     .filter(Boolean) as Item[];
 
+  const deadlineStr = goal.deadline ? formatDeadline(goal.deadline) : null;
+  const overdue = goal.deadline ? isOverdue(goal.deadline) : false;
+
+  const ringSize = 42;
+  const ringStroke = 3;
+  const ringHalf = ringSize / 2;
+  const clamp = Math.max(0, Math.min(100, gpPct));
+  const rightDeg = clamp <= 50 ? (clamp / 50) * 180 - 180 : 0;
+  const leftDeg = clamp <= 50 ? -180 : ((clamp - 50) / 50) * 180 - 180;
+
   return (
     <View style={{ marginBottom: 10 }}>
       <Pressable
@@ -182,13 +193,27 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal }: {
           />
         </Pressable>
 
-        <View style={[styles.goalProgressRing, { borderColor: ac + '30' }]}>
-          <View style={[styles.goalProgressFillRing, {
-            borderColor: ac,
-            borderTopColor: gpPct > 25 ? ac : 'transparent',
-            borderRightColor: gpPct > 50 ? ac : 'transparent',
-            borderBottomColor: gpPct > 75 ? ac : 'transparent',
-          }]} />
+        <View style={{ width: ringSize, height: ringSize, borderRadius: ringHalf, borderWidth: ringStroke, borderColor: ac + '20', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={[StyleSheet.absoluteFill, { borderRadius: ringHalf, overflow: 'hidden' }]}>
+            <View style={{ position: 'absolute', top: 0, right: 0, width: ringHalf, height: ringSize, overflow: 'hidden' }}>
+              <View style={{
+                width: ringHalf, height: ringSize, borderTopRightRadius: ringHalf, borderBottomRightRadius: ringHalf,
+                borderWidth: ringStroke, borderLeftWidth: 0, borderColor: ac,
+                position: 'absolute', top: -ringStroke, right: -ringStroke,
+                transform: [{ rotate: `${rightDeg}deg` }],
+                transformOrigin: `${ringStroke}px ${ringHalf}px`,
+              }} />
+            </View>
+            <View style={{ position: 'absolute', top: 0, left: 0, width: ringHalf, height: ringSize, overflow: 'hidden' }}>
+              <View style={{
+                width: ringHalf, height: ringSize, borderTopLeftRadius: ringHalf, borderBottomLeftRadius: ringHalf,
+                borderWidth: ringStroke, borderRightWidth: 0, borderColor: ac,
+                position: 'absolute', top: -ringStroke, left: -ringStroke,
+                transform: [{ rotate: `${leftDeg}deg` }],
+                transformOrigin: `${ringHalf - ringStroke}px ${ringHalf}px`,
+              }} />
+            </View>
+          </View>
           <Text style={styles.goalEmoji}>{goal.emoji}</Text>
         </View>
 
@@ -200,8 +225,22 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal }: {
               ? <Text style={styles.goalLinkedText}> {linkedItems.length} linked  {gpPct}%</Text>
               : <Text style={[styles.goalLinkedText, { fontStyle: 'italic' as const }]}>Nothing linked yet</Text>
             }
+            {deadlineStr && (
+              <Text style={[styles.goalLinkedText, overdue && { color: T.red }]}> {deadlineStr}</Text>
+            )}
+          </View>
+          <View style={{ marginTop: 6 }}>
+            <ProgressBar progress={gp} color={ac} height={3} />
           </View>
         </View>
+
+        <Pressable
+          style={styles.goalAddBtn}
+          onPress={() => router.push(`/create?linkToGoal=${goal.id}`)}
+          hitSlop={6}
+        >
+          <Feather name="plus" size={14} color={ac} />
+        </Pressable>
 
         <Pressable
           style={styles.goalMenuBtn}
@@ -214,9 +253,21 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal }: {
       {expanded && (
         <View style={[styles.goalLinkedContainer, { backgroundColor: ac + '06', borderColor: ac + '15' }]}>
           {linkedItems.length > 0 ? (
-            linkedItems.map(li => (
-              <ItemRow key={li.id} item={li} indented onMenu={onMenu} />
-            ))
+            linkedItems.map(li => {
+              const liKind = itemKind(li);
+              const liKc = KIND_CONFIG[liKind];
+              const liArea = ITEM_AREAS[li.area];
+              const liColor = liArea?.c || liKc.color || T.t3;
+              const liPct = linkedItemProgress(li);
+              return (
+                <View key={li.id} style={styles.goalLinkedItem}>
+                  <ItemRow item={li} indented onMenu={onMenu} />
+                  <View style={styles.goalLinkedItemBar}>
+                    <ProgressBar progress={liPct} color={liColor} height={2} />
+                  </View>
+                </View>
+              );
+            })
           ) : (
             <View style={styles.goalLinkedEmpty}>
               <Text style={styles.goalLinkedEmptyText}>Nothing linked to this goal</Text>
@@ -720,6 +771,10 @@ const styles = StyleSheet.create({
   goalMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   goalAreaText: { fontSize: 11, color: T.t3 },
   goalLinkedText: { fontSize: 11, color: T.t3 },
+  goalAddBtn: {
+    width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
   goalMenuBtn: {
     width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
     marginRight: 8,
@@ -730,6 +785,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 16, borderBottomRightRadius: 16,
     padding: 10, paddingBottom: 12,
   },
+  goalLinkedItem: { position: 'relative' as const },
+  goalLinkedItemBar: { paddingHorizontal: 14, paddingBottom: 4 },
   goalLinkedEmpty: { padding: 14, alignItems: 'center' },
   goalLinkedEmptyText: { fontSize: 13, color: T.t3, fontWeight: '500' as const, marginBottom: 4 },
   goalLinkedEmptySub: { fontSize: 11, color: T.t3 },

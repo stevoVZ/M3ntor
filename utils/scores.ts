@@ -86,13 +86,19 @@ export function appScoreInsight(selfScore: number, appScore: number): { type: 'a
   return { type: 'undervalued', msg: `You're putting in more work than you give yourself credit for. ${Math.abs(gap).toFixed(1)} points of hidden effort.` };
 }
 
+export function linkedItemProgress(item: Item): number {
+  if (item.recurrence) return item.status === 'active' ? 0.5 : item.status === 'done' ? 1 : 0;
+  if ((item.steps?.length ?? 0) > 0) return projectProgress(item);
+  return item.status === 'done' ? 1 : 0;
+}
+
 export function goalProgress(
   goal: Item,
   items: Item[],
   journeyProgresses: JourneyProgress[],
   journeyCatalog: Journey[]
 ): number {
-  const linkedProjects = (goal.linked_items || [])
+  const linkedItems = (goal.linked_items || [])
     .map(id => items.find(i => i.id === id))
     .filter(Boolean) as Item[];
   const linkedJourneys = (goal.linked_journeys || [])
@@ -104,7 +110,7 @@ export function goalProgress(
     .filter(Boolean) as { progress: number }[];
 
   const allProgress = [
-    ...linkedProjects.map(p => projectProgress(p)),
+    ...linkedItems.map(p => linkedItemProgress(p)),
     ...linkedJourneys.map(j => j.progress),
   ];
   if (allProgress.length === 0) return 0;

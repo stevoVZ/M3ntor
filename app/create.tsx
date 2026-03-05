@@ -10,7 +10,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { T, S, F } from '@/constants/theme';
 import { ITEM_AREAS } from '@/constants/config';
 import type { Priority, Effort } from '@/types';
@@ -79,9 +79,14 @@ export default function CreateScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
   const webBottomInset = Platform.OS === 'web' ? 34 : 0;
-  const { userId, addItem, profile } = useStore();
+  const { userId, addItem, updateItem: storeUpdateItem, items: allItems, profile } = useStore();
   const effectiveUserId = userId ?? 'guest';
   const countryName = profile?.country ? getCountryByCode(profile.country)?.name : undefined;
+
+  const params = useLocalSearchParams<{ linkToGoal?: string; suggestType?: string }>();
+  const linkToGoalId = params.linkToGoal ?? null;
+  const suggestType = params.suggestType ?? null;
+  const linkGoal = linkToGoalId ? allItems.find(i => i.id === linkToGoalId) : null;
 
   const [text, setText]                 = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -127,6 +132,12 @@ export default function CreateScreen() {
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 300);
+    if (suggestType && ['action', 'habit', 'goal', 'project'].includes(suggestType)) {
+      setSelectedType(suggestType);
+    }
+    if (linkGoal?.area && !area) {
+      setArea(linkGoal.area);
+    }
   }, []);
 
   const inferredType = useMemo(() => inferType(text), [text]);
@@ -250,6 +261,14 @@ export default function CreateScreen() {
     });
 
     addItem(item);
+
+    if (linkToGoalId && linkGoal) {
+      const existingLinked = linkGoal.linked_items || [];
+      if (!existingLinked.includes(itemId)) {
+        storeUpdateItem(linkToGoalId, { linked_items: [...existingLinked, itemId] });
+      }
+    }
+
     setSaved(true);
     setTimeout(() => { setSaved(false); router.back(); }, 850);
   }
@@ -284,6 +303,15 @@ export default function CreateScreen() {
           <Feather name="x" size={14} color={T.t3} />
         </Pressable>
       </View>
+
+      {linkGoal && (
+        <View style={styles.linkGoalBanner}>
+          <Feather name="link" size={12} color={T.brand} />
+          <Text style={styles.linkGoalText} numberOfLines={1}>
+            Linking to: {linkGoal.emoji} {linkGoal.title}
+          </Text>
+        </View>
+      )}
 
       <View style={[styles.inputWrap, {
         borderColor: typeConf ? typeConf.color + '35' : 'rgba(0,0,0,0.09)',
@@ -593,6 +621,9 @@ const styles = StyleSheet.create({
   savedIcon:      { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   savedTitle:     { fontSize: F.lg, fontWeight: '800', color: T.text },
   savedSub:       { fontSize: F.sm, color: T.t3, textAlign: 'center' },
+
+  linkGoalBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#5856D6' + '0A', borderWidth: 1, borderColor: '#5856D6' + '18', marginBottom: 10 },
+  linkGoalText:   { fontSize: 12, fontWeight: '600' as const, color: '#5856D6', flex: 1 },
 
   headerRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, marginBottom: 12, gap: 8 },
   title:          { fontSize: 19, fontWeight: '800', color: T.text, letterSpacing: -0.5 },

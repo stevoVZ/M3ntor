@@ -21,7 +21,7 @@ Preferred communication style: Simple, everyday language.
 - **NLP Utilities**: `utils/nlp.ts` provides instant local area suggestion and type inference from text
 - **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers
 - **Item Utilities**: `utils/items.ts` provides `itemKind()`, `createItem()`, `createStep()` factories, progress calculations, recurrence helpers
-- **Score Utilities**: `utils/scores.ts` provides `computeAppScore()` (multi-area weighted scoring), `goalProgress()`, `areaWeight()`, `journeyAreaWeight()`, `appScoreInsight()`, `getUnlinkedItems()`
+- **Score Utilities**: `utils/scores.ts` provides `computeAppScore()` (multi-area weighted scoring), `goalProgress()`, `linkedItemProgress()`, `areaWeight()`, `journeyAreaWeight()`, `appScoreInsight()`, `getUnlinkedItems()`
 - **Today Utilities**: `utils/today.ts` provides `getTodayActions()`, `groupByTimeOfDay()`, `pickSessionActions()`, `sortedTimeSlots` for action generation and grouping
 - **Design System**: `constants/theme.ts` exports `T` (colors/tokens — indigo `#5856D6` brand), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows)
 - **Config**: `constants/config.ts` exports `ITEM_AREAS`, `AREAS` (10 Wheel of Life areas), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog), `MOODS` (5-point numeric scale), `DIFF` (difficulty labels/colors), `JOURNEY_ICONS`, `HISTORY` (historical scores), `PEOPLE`, `DEFAULT_USER`
@@ -102,7 +102,7 @@ app/
 ### Key Screens & Features
 
 - **Today**: Time-of-day grouped actions (morning/afternoon/evening/anytime), journey cards with session mode (briefing→mood→action deck→undo→completion→summary), quick-complete checkboxes, streak display
-- **Plan**: Dual view (hierarchy/list), goal cards with progress, linked/unlinked items, action menus (edit/pause/resume/delete), goal detail page, project edit page with step/subtask CRUD and AI generation
+- **Plan**: Dual view (hierarchy/list), goal cards with smooth progress rings + progress bars + target date display + quick-create "+" button, linked/unlinked items with per-item progress bars in expanded view, action menus (edit/pause/resume/delete), goal detail page (progress ring, progress breakdown per linked item, target date editing, priority/effort chips, link modal with create buttons, expandable project steps with checkbox/today toggles), project edit page with step/subtask CRUD and AI generation
 - **Discover**: Journey catalog, AI Coach chat for recommendations
 - **My Life**: Wheel of Life with self + app scores, wheel/list view toggle, insights (strongest/focus area), time comparison (now/week/month/start), area detail with linked items/journeys, profile screen
 
