@@ -145,7 +145,6 @@ export default function TabsLayout() {
 
       {showAdd && addMode === 'sheet' && (
         <FabActionSheet
-          onProject={(text) => { setPrefill(text); setAddMode('project'); }}
           onClose={() => setShowAdd(false)}
         />
       )}

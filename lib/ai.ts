@@ -31,13 +31,14 @@ export interface AiHint {
 }
 
 export async function getItemHint(text: string, type: string, country?: string): Promise<AiHint> {
-  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples, platforms, and references.` : '';
+  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples.` : '';
+  const noApps = `\nNever recommend apps, websites, software, or third-party services. Only suggest actions the user can do themselves.`;
   const typeInfer = `\nAlso suggest the best item type for this. Reply with "suggestedType":"action|habit|goal|project" and "typeReason":"one short sentence explaining why this type fits".`;
   const prompts: Record<string, string> = {
-    action:  `Task: "${text}"${countryCtx}${typeInfer}\nReply JSON only: {"why":"one short sentence why this matters","effort":"quick|medium|deep","suggestedType":"...","typeReason":"..."}`,
-    habit:   `Habit: "${text}"${countryCtx}${typeInfer}\nReply JSON only: {"why":"one short sentence life impact","tip":"one practical tip to make it stick","suggestedType":"...","typeReason":"..."}`,
-    goal:    `Goal: "${text}"${countryCtx}${typeInfer}\nReply JSON only: {"why":"one emotional sentence why this goal matters","firstStep":"single best first action","suggestedType":"...","typeReason":"..."}`,
-    project: `Project: "${text}"${countryCtx}${typeInfer}\nReply JSON only: {"why":"one sentence why this matters","firstStep":"the very first task to start","suggestedType":"...","typeReason":"..."}`,
+    action:  `Task: "${text}"${countryCtx}${noApps}${typeInfer}\nReply JSON only: {"why":"one short sentence why this matters","effort":"quick|medium|deep","suggestedType":"...","typeReason":"..."}`,
+    habit:   `Habit: "${text}"${countryCtx}${noApps}${typeInfer}\nReply JSON only: {"why":"one short sentence life impact","tip":"one practical tip to make it stick","suggestedType":"...","typeReason":"..."}`,
+    goal:    `Goal: "${text}"${countryCtx}${noApps}${typeInfer}\nReply JSON only: {"why":"one emotional sentence why this goal matters","firstStep":"single best first action","suggestedType":"...","typeReason":"..."}`,
+    project: `Project: "${text}"${countryCtx}${noApps}${typeInfer}\nReply JSON only: {"why":"one sentence why this matters","firstStep":"the very first task to start","suggestedType":"...","typeReason":"..."}`,
   };
   try {
     const raw   = await aiAssist(prompts[type] ?? prompts.action);
@@ -55,10 +56,11 @@ export interface AiTasks {
 }
 
 export async function generateProjectTasks(title: string, existing: string[] = [], country?: string): Promise<AiTasks> {
-  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant platforms, services, and references (e.g. local classifieds, local banks, local services).` : '';
+  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples.` : '';
+  const noApps = `\nNever recommend apps, websites, software, or third-party services. Only suggest actions the user can do themselves.`;
   const prompt = existing.length
-    ? `Project: "${title}"${countryCtx}\nExisting tasks: ${existing.join(', ')}\nGenerate 3-5 MORE missing tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji"}`
-    : `Project: "${title}"${countryCtx}\nGenerate 5-7 concrete actionable tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji","why":"one sentence"}`;
+    ? `Project: "${title}"${countryCtx}${noApps}\nExisting tasks: ${existing.join(', ')}\nGenerate 3-5 MORE missing tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji"}`
+    : `Project: "${title}"${countryCtx}${noApps}\nGenerate 5-7 concrete actionable tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji","why":"one sentence"}`;
   try {
     const raw    = await aiAssist(prompt);
     const clean  = raw.replace(/```json|```/g, '').trim();
@@ -90,8 +92,9 @@ export interface AiGoalSuggestion {
 }
 
 export async function generateGoal(description: string, country?: string): Promise<AiGoalSuggestion> {
-  const countryCtx = country ? `\nThe user is based in ${country}. Tailor suggestions to their region.` : '';
-  const prompt = `Goal: "${description}"${countryCtx}\nEnrich this goal. Reply JSON only: {"title":"polished goal title","emoji":"single relevant emoji","area":"one of: health, career, finance, learning, relationships, fun, life, spirituality","why":"one emotional sentence about why this matters","journeyHints":["suggested journey/program name 1","name 2"],"firstSteps":["first concrete action","second action"]}`;
+  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples.` : '';
+  const noApps = `\nNever recommend apps, websites, software, or third-party services. Only suggest actions the user can do themselves.`;
+  const prompt = `Goal: "${description}"${countryCtx}${noApps}\nEnrich this goal. Reply JSON only: {"title":"polished goal title","emoji":"single relevant emoji","area":"one of: health, career, finance, learning, relationships, fun, life, spirituality","why":"one emotional sentence about why this matters","journeyHints":["suggested journey/program name 1","name 2"],"firstSteps":["first concrete action","second action"]}`;
   try {
     const raw   = await aiAssist(prompt);
     const clean = raw.replace(/```json|```/g, '').trim();
