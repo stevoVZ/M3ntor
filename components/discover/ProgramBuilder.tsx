@@ -8,6 +8,7 @@ import { T, S, F, R, shadow } from '../../constants/theme';
 import { AREAS } from '../../constants/config';
 import { useStore } from '../../lib/store';
 import { generateJourneyPlan } from '../../lib/ai';
+import { getCountryByCode } from '../../constants/countries';
 import * as Crypto from 'expo-crypto';
 
 type WizardStep = 'goal' | 'details' | 'generating' | 'review' | 'saved';
@@ -61,6 +62,8 @@ export default function ProgramBuilder({ onClose, onSave }: ProgramBuilderProps)
   const [editTitle, setEditTitle] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const enrollJourney = useStore(s => s.enrollJourney);
+  const profile = useStore(s => s.profile);
+  const countryName = profile?.country ? getCountryByCode(profile.country)?.name : undefined;
 
   const areasCatalog = AREAS.map(a => `${a.id}: ${a.n}`).join(', ');
 
@@ -72,6 +75,7 @@ export default function ProgramBuilder({ onClose, onSave }: ProgramBuilderProps)
       weeks,
       minsPerDay,
       areasCatalog,
+      country: countryName,
     });
     const parsed: GeneratedProgram = result;
     setProgram(parsed);

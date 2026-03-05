@@ -73,6 +73,7 @@ function convertCommittedToJourney(c: CommittedEntry): JourneyProgress {
 
 const COMPLETION_LOG_KEY = 'm3ntor_completion_log';
 const MOOD_LOG_KEY = 'm3ntor_mood_log';
+const COUNTRY_KEY = 'm3ntor_country';
 
 async function saveCompletionLogToStorage(log: CompletionLog) {
   try {
@@ -120,6 +121,7 @@ interface AppState {
 
   setUserId:       (id: string | null) => void;
   setProfile:      (p: Profile | null) => void;
+  setCountry:      (country: string | null) => void;
   loadAll:         (userId: string) => Promise<void>;
 
   addItem:         (item: Item) => void;
@@ -176,6 +178,18 @@ export const useStore = create<AppState>((set, get) => ({
 
   setUserId:  (id) => set({ userId: id }),
   setProfile: (p)  => set({ profile: p }),
+  setCountry: (country) => {
+    set(s => ({
+      profile: s.profile ? { ...s.profile, country: country ?? undefined } : null,
+    }));
+    AsyncStorage.setItem(COUNTRY_KEY, country ?? '').catch(console.error);
+    const uid = get().userId;
+    if (uid && uid !== 'guest' && isSupabaseConfigured && supabase) {
+      supabase.from('profiles').update({ country }).eq('id', uid).then(({ error }) => {
+        if (error) console.error('Failed to save country:', error);
+      });
+    }
+  },
 
   loadAll: async (userId) => {
     set({ loading: true, error: null });
@@ -183,9 +197,10 @@ export const useStore = create<AppState>((set, get) => ({
       const effectiveUserId = userId ?? 'guest';
       const isGuest = effectiveUserId === 'guest';
 
-      const [localCompletionLog, localMoodLog] = await Promise.all([
+      const [localCompletionLog, localMoodLog, savedCountry] = await Promise.all([
         loadCompletionLogFromStorage(),
         loadMoodLogFromStorage(),
+        AsyncStorage.getItem(COUNTRY_KEY).catch(() => null),
       ]);
 
       if (isGuest) {
@@ -196,6 +211,7 @@ export const useStore = create<AppState>((set, get) => ({
         set({
           items: sampleItems,
           journeys: sampleJourneys,
+          profile: { id: 'guest', created_at: new Date().toISOString(), country: savedCountry || undefined },
           completionLog: localCompletionLog,
           moodLog: localMoodLog,
           loading: false,

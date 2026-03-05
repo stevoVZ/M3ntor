@@ -4,7 +4,9 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are M3NTOR, an AI life coach and productivity assistant. You help users organize their life into actionable items across these areas: Health, Career, Finance, Relationships, Growth, Creativity, Home, Fun.
+function buildSystemPrompt(country?: string): string {
+  const countryCtx = country ? `\nThe user is based in ${country}. Tailor all advice, examples, platforms, financial systems, and cultural references to their region. Use locally relevant services and terminology.` : '';
+  return `You are M3NTOR, an AI life coach and productivity assistant. You help users organize their life into actionable items across these areas: Health, Career, Finance, Relationships, Growth, Creativity, Home, Fun.${countryCtx}
 
 When the user describes something they want to do, you analyze it and return a JSON object with your suggestions:
 
@@ -17,8 +19,9 @@ When the user describes something they want to do, you analyze it and return a J
 }
 
 Be concise and practical. Return ONLY valid JSON, no extra text.`;
+}
 
-export async function aiAssist(prompt: string): Promise<{
+export async function aiAssist(prompt: string, country?: string): Promise<{
   area?: string;
   kind?: string;
   description?: string;
@@ -29,7 +32,7 @@ export async function aiAssist(prompt: string): Promise<{
     const msg = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 600,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(country),
       messages: [{ role: 'user', content: prompt }],
     });
 

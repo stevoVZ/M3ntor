@@ -21,19 +21,23 @@ export async function aiAssist(prompt: string): Promise<string> {
 // ── Typed AI helpers ──────────────────────────────────────
 
 export interface AiHint {
-  why?:       string;
-  effort?:    string;
-  tip?:       string;
-  firstStep?: string;
-  timeline?:  string;
+  why?:           string;
+  effort?:        string;
+  tip?:           string;
+  firstStep?:     string;
+  timeline?:      string;
+  suggestedType?: string;
+  typeReason?:    string;
 }
 
-export async function getItemHint(text: string, type: string): Promise<AiHint> {
+export async function getItemHint(text: string, type: string, country?: string): Promise<AiHint> {
+  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples, platforms, and references.` : '';
+  const typeInfer = `\nAlso suggest the best item type for this. Reply with "suggestedType":"action|habit|goal|project" and "typeReason":"one short sentence explaining why this type fits".`;
   const prompts: Record<string, string> = {
-    action:  `Task: "${text}"\nReply JSON only: {"why":"one short sentence why this matters","effort":"quick|medium|deep"}`,
-    habit:   `Habit: "${text}"\nReply JSON only: {"why":"one short sentence life impact","tip":"one practical tip to make it stick"}`,
-    goal:    `Goal: "${text}"\nReply JSON only: {"why":"one emotional sentence why this goal matters","firstStep":"single best first action"}`,
-    project: `Project: "${text}"\nReply JSON only: {"why":"one sentence why this matters","firstStep":"the very first task to start"}`,
+    action:  `Task: "${text}"${countryCtx}${typeInfer}\nReply JSON only: {"why":"one short sentence why this matters","effort":"quick|medium|deep","suggestedType":"...","typeReason":"..."}`,
+    habit:   `Habit: "${text}"${countryCtx}${typeInfer}\nReply JSON only: {"why":"one short sentence life impact","tip":"one practical tip to make it stick","suggestedType":"...","typeReason":"..."}`,
+    goal:    `Goal: "${text}"${countryCtx}${typeInfer}\nReply JSON only: {"why":"one emotional sentence why this goal matters","firstStep":"single best first action","suggestedType":"...","typeReason":"..."}`,
+    project: `Project: "${text}"${countryCtx}${typeInfer}\nReply JSON only: {"why":"one sentence why this matters","firstStep":"the very first task to start","suggestedType":"...","typeReason":"..."}`,
   };
   try {
     const raw   = await aiAssist(prompts[type] ?? prompts.action);
@@ -50,10 +54,11 @@ export interface AiTasks {
   why?:   string;
 }
 
-export async function generateProjectTasks(title: string, existing: string[] = []): Promise<AiTasks> {
+export async function generateProjectTasks(title: string, existing: string[] = [], country?: string): Promise<AiTasks> {
+  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant platforms, services, and references (e.g. local classifieds, local banks, local services).` : '';
   const prompt = existing.length
-    ? `Project: "${title}"\nExisting tasks: ${existing.join(', ')}\nGenerate 3-5 MORE missing tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji"}`
-    : `Project: "${title}"\nGenerate 5-7 concrete actionable tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji","why":"one sentence"}`;
+    ? `Project: "${title}"${countryCtx}\nExisting tasks: ${existing.join(', ')}\nGenerate 3-5 MORE missing tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji"}`
+    : `Project: "${title}"${countryCtx}\nGenerate 5-7 concrete actionable tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji","why":"one sentence"}`;
   try {
     const raw    = await aiAssist(prompt);
     const clean  = raw.replace(/```json|```/g, '').trim();
@@ -84,8 +89,9 @@ export interface AiGoalSuggestion {
   firstSteps?: string[];
 }
 
-export async function generateGoal(description: string): Promise<AiGoalSuggestion> {
-  const prompt = `Goal: "${description}"\nEnrich this goal. Reply JSON only: {"title":"polished goal title","emoji":"single relevant emoji","area":"one of: health, career, finance, learning, relationships, fun, life, spirituality","why":"one emotional sentence about why this matters","journeyHints":["suggested journey/program name 1","name 2"],"firstSteps":["first concrete action","second action"]}`;
+export async function generateGoal(description: string, country?: string): Promise<AiGoalSuggestion> {
+  const countryCtx = country ? `\nThe user is based in ${country}. Tailor suggestions to their region.` : '';
+  const prompt = `Goal: "${description}"${countryCtx}\nEnrich this goal. Reply JSON only: {"title":"polished goal title","emoji":"single relevant emoji","area":"one of: health, career, finance, learning, relationships, fun, life, spirituality","why":"one emotional sentence about why this matters","journeyHints":["suggested journey/program name 1","name 2"],"firstSteps":["first concrete action","second action"]}`;
   try {
     const raw   = await aiAssist(prompt);
     const clean = raw.replace(/```json|```/g, '').trim();
@@ -128,10 +134,11 @@ export interface JourneyPlanResult {
 
 export async function generateJourneyPlan(
   goal: string,
-  options: { area?: string | null; weeks?: number; minsPerDay?: number; areasCatalog?: string }
+  options: { area?: string | null; weeks?: number; minsPerDay?: number; areasCatalog?: string; country?: string }
 ): Promise<JourneyPlanResult> {
-  const { area, weeks = 4, minsPerDay = 15, areasCatalog = '' } = options;
-  const prompt = `You are an AI journey designer. Create a structured self-improvement journey based on the user's goal.\n\nAvailable life areas: ${areasCatalog}\n\nUser preferences: ${area ? `Area: ${area}` : 'Auto-detect best area'}, Duration: ${weeks} weeks, Time commitment: ${minsPerDay} min/day.\n\nRespond ONLY with valid JSON, no markdown backticks:\n{\n  "title": "Journey title (concise, action-oriented)",\n  "area": "area_id from list above",\n  "description": "1-2 sentence description",\n  "weeks": ${weeks},\n  "minutesPerDay": ${minsPerDay},\n  "weekPlan": [\n    {\n      "week": 1,\n      "focus": "Week theme (2-3 words)",\n      "actions": [\n        {"title": "Action name", "duration": "X minutes", "description": "Brief how-to"}\n      ]\n    }\n  ]\n}\n\nEach week should have 3-4 daily actions. Make actions specific, actionable, and progressive. Never use em dashes.\n\nMy goal: ${goal}`;
+  const { area, weeks = 4, minsPerDay = 15, areasCatalog = '', country } = options;
+  const countryCtx = country ? `\nThe user is based in ${country}. Tailor advice, examples, financial systems, platforms, and cultural references to their region.` : '';
+  const prompt = `You are an AI journey designer. Create a structured self-improvement journey based on the user's goal.\n\nAvailable life areas: ${areasCatalog}${countryCtx}\n\nUser preferences: ${area ? `Area: ${area}` : 'Auto-detect best area'}, Duration: ${weeks} weeks, Time commitment: ${minsPerDay} min/day.\n\nRespond ONLY with valid JSON, no markdown backticks:\n{\n  "title": "Journey title (concise, action-oriented)",\n  "area": "area_id from list above",\n  "description": "1-2 sentence description",\n  "weeks": ${weeks},\n  "minutesPerDay": ${minsPerDay},\n  "weekPlan": [\n    {\n      "week": 1,\n      "focus": "Week theme (2-3 words)",\n      "actions": [\n        {"title": "Action name", "duration": "X minutes", "description": "Brief how-to"}\n      ]\n    }\n  ]\n}\n\nEach week should have 3-4 daily actions. Make actions specific, actionable, and progressive. Never use em dashes.\n\nMy goal: ${goal}`;
 
   try {
     const raw  = await aiAssist(prompt);

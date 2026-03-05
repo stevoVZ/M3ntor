@@ -14,9 +14,10 @@ import { T, S, F } from '../../constants/theme';
 import { ITEM_AREAS } from '../../constants/config';
 import type { Priority, Effort } from '../../types';
 import { suggestArea, inferType } from '../../utils/nlp';
-import { getItemHint, generateGoal } from '../../lib/ai';
-import { createItem } from '../../utils/items';
+import { getItemHint, generateGoal, generateProjectTasks } from '../../lib/ai';
+import { createItem, createStep } from '../../utils/items';
 import { useStore } from '../../lib/store';
+import { getCountryByCode } from '../../constants/countries';
 import { AreaPicker } from './AreaPicker';
 
 interface Props {
@@ -70,8 +71,9 @@ const EFFORT_CONFIG: Record<string, { icon: 'zap' | 'clock'; label: string; colo
 export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const { userId, addItem } = useStore();
+  const { userId, addItem, profile } = useStore();
   const effectiveUserId = userId ?? 'guest';
+  const countryName = profile?.country ? getCountryByCode(profile.country)?.name : undefined;
 
   const [text, setText]                 = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -81,12 +83,15 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const [effort, setEffort]             = useState<Effort>('medium');
   const [deadline, setDeadline]         = useState('');
   const [showExtras, setShowExtras]     = useState(false);
-  const [aiHint, setAiHint]             = useState<{ why?: string; firstStep?: string; tip?: string; effort?: string } | null>(null);
+  const [aiHint, setAiHint]             = useState<{ why?: string; firstStep?: string; tip?: string; effort?: string; suggestedType?: string; typeReason?: string } | null>(null);
   const [aiLoading, setAiLoading]       = useState(false);
   const [saved, setSaved]               = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [goalSuggestion, setGoalSuggestion] = useState<{ why?: string; journeyHints?: string[]; firstSteps?: string[] } | null>(null);
   const [goalEnrichLoading, setGoalEnrichLoading] = useState(false);
+  const [breakdownSteps, setBreakdownSteps] = useState<{ id: string; text: string }[]>([]);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
 
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,7 +104,8 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   }, []);
 
   const inferredType = useMemo(() => inferType(text), [text]);
-  const activeType   = selectedType ?? (text.trim() ? inferredType : null);
+  const [pinnedAiType, setPinnedAiType] = useState<string | null>(null);
+  const activeType   = selectedType ?? (pinnedAiType && text.trim() ? pinnedAiType : (text.trim() ? inferredType : null));
   const typeConf     = activeType ? TYPE_OPTIONS.find(t => t.id === activeType) : null;
 
   useEffect(() => {
@@ -114,8 +120,22 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
 
     debounceRef.current = setTimeout(async () => {
       setAiLoading(true);
-      const hint = await getItemHint(text, activeType ?? 'action');
+      const hint = await getItemHint(text, activeType ?? 'action', countryName);
       setAiHint(hint);
+      if (hint.suggestedType && !selectedType) {
+        setPinnedAiType(hint.suggestedType);
+        if (hint.suggestedType === 'project' && breakdownSteps.length === 0) {
+          setBreakdownLoading(true);
+          const result = await generateProjectTasks(text, [], countryName);
+          if (result.tasks.length > 0) {
+            setBreakdownSteps(result.tasks.map(t => ({
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+              text: t,
+            })));
+          }
+          setBreakdownLoading(false);
+        }
+      }
       setAiLoading(false);
     }, 900);
 
@@ -127,18 +147,33 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
 
   function handleTypeSelect(id: string) {
     if (id === 'journey')                    { onJourney?.(); return; }
-    if (id === 'project' && text.trim())     { onProject(text); return; }
-    setSelectedType(prev => prev === id ? null : id);
+    const newVal = selectedType === id ? null : id;
+    setSelectedType(newVal);
+    setPinnedAiType(null);
     setAiHint(null);
+    if (newVal === 'project' && text.trim() && breakdownSteps.length === 0) {
+      setBreakdownLoading(true);
+      generateProjectTasks(text, [], countryName).then(result => {
+        if (result.tasks.length > 0) {
+          setBreakdownSteps(result.tasks.map(t => ({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+            text: t,
+          })));
+        }
+        setBreakdownLoading(false);
+      });
+    }
+    if (newVal !== 'project') {
+      setBreakdownSteps([]);
+    }
   }
 
   async function handleSave() {
     if (!canSave) return;
     const type = activeType ?? 'action';
-    if (type === 'project') { onProject(text); return; }
     if (type === 'journey') { onJourney?.(); return; }
 
-    let enrichedEmoji = type === 'habit' ? '🔄' : type === 'goal' ? '🎯' : '✓';
+    let enrichedEmoji = type === 'habit' ? '🔄' : type === 'goal' ? '🎯' : type === 'project' ? '📁' : '✓';
     let enrichedArea = area ?? suggestArea(text) ?? 'life';
     let description: string | undefined;
     let linkedJourneys: string[] | undefined;
@@ -146,7 +181,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
     if (type === 'goal') {
       setGoalEnrichLoading(true);
       try {
-        const suggestion = await generateGoal(text.trim());
+        const suggestion = await generateGoal(text.trim(), countryName);
         if (suggestion.emoji) enrichedEmoji = suggestion.emoji;
         if (suggestion.area) enrichedArea = suggestion.area;
         if (suggestion.why) description = suggestion.why;
@@ -160,7 +195,14 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
       setGoalEnrichLoading(false);
     }
 
+    const itemId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const filteredSteps = breakdownSteps.filter(s => s.text.trim());
+    const steps = type === 'project' && filteredSteps.length > 0
+      ? filteredSteps.map((s, idx) => createStep(itemId, { title: s.text.trim(), sort_order: idx }))
+      : undefined;
+
     const item = createItem(effectiveUserId, {
+      id:                itemId,
       title:             text.trim(),
       area:              enrichedArea,
       status:            type === 'goal' ? 'someday' : 'active',
@@ -172,6 +214,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
       effort,
       deadline:          deadline.trim() || undefined,
       linked_journeys:   linkedJourneys,
+      steps,
     });
 
     addItem(item);
@@ -179,9 +222,11 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
     setTimeout(() => { setSaved(false); onClose(); }, 850);
   }
 
+  const validStepCount = breakdownSteps.filter(s => s.text.trim()).length;
   const saveBtnLabel = !text.trim()                     ? 'Type something to start'
     : activeType === 'goal' && !area                    ? 'Pick a life area first'
-    : activeType === 'project'                          ? 'Set up project'
+    : activeType === 'project' && validStepCount > 0    ? `Create project with ${validStepCount} steps`
+    : activeType === 'project'                          ? 'Create project'
     : activeType === 'habit'                            ? 'Start this habit'
     : activeType === 'goal'                             ? 'Save to goals'
     :                                                     'Add it';
@@ -314,7 +359,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
 
               <View style={styles.typeRow}>
                 {TYPE_OPTIONS.map(t => {
-                  const on = selectedType === t.id || (!selectedType && inferredType === t.id && !!text.trim());
+                  const on = activeType === t.id && !!text.trim();
                   return (
                     <Pressable key={t.id} style={[styles.typeChip, on && {
                       backgroundColor: t.color + '12',
@@ -328,6 +373,62 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                   );
                 })}
               </View>
+
+              {aiHint?.typeReason && pinnedAiType && !selectedType && (
+                <View style={styles.typeReasonRow}>
+                  <Feather name="cpu" size={11} color={T.brand} />
+                  <Text style={styles.typeReasonText}>{aiHint.typeReason}</Text>
+                </View>
+              )}
+
+              {activeType === 'project' && (breakdownSteps.length > 0 || breakdownLoading) && (
+                <View style={styles.breakdownSection}>
+                  <View style={styles.breakdownHeader}>
+                    <Feather name="list" size={13} color={T.brand} />
+                    <Text style={styles.breakdownTitle}>Steps</Text>
+                    {breakdownLoading && <ActivityIndicator size="small" color={T.brand} />}
+                  </View>
+                  {breakdownSteps.map((step) => (
+                    <View key={step.id} style={styles.breakdownRow}>
+                      <View style={styles.breakdownDot} />
+                      {editingStepId === step.id ? (
+                        <TextInput
+                          style={styles.breakdownStepInput}
+                          value={step.text}
+                          autoFocus
+                          onChangeText={(v) => setBreakdownSteps(prev =>
+                            prev.map(s => s.id === step.id ? { ...s, text: v } : s)
+                          )}
+                          onBlur={() => setEditingStepId(null)}
+                          onSubmitEditing={() => setEditingStepId(null)}
+                          returnKeyType="done"
+                        />
+                      ) : (
+                        <Pressable style={{ flex: 1 }} onPress={() => setEditingStepId(step.id)}>
+                          <Text style={styles.breakdownStepText} numberOfLines={2}>{step.text}</Text>
+                        </Pressable>
+                      )}
+                      <Pressable
+                        hitSlop={8}
+                        onPress={() => setBreakdownSteps(prev => prev.filter(s => s.id !== step.id))}
+                      >
+                        <Feather name="x" size={13} color={T.t3} />
+                      </Pressable>
+                    </View>
+                  ))}
+                  <Pressable
+                    style={styles.addStepRow}
+                    onPress={() => {
+                      const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                      setBreakdownSteps(prev => [...prev, { id: newId, text: '' }]);
+                      setEditingStepId(newId);
+                    }}
+                  >
+                    <Feather name="plus" size={13} color={T.brand} />
+                    <Text style={styles.addStepText}>Add step</Text>
+                  </Pressable>
+                </View>
+              )}
 
               {text.trim() && activeType !== 'project' && activeType !== 'journey' && (
                 <>
@@ -515,10 +616,23 @@ const styles = StyleSheet.create({
   promoChip:      { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(108,92,231,0.06)', borderWidth: 1, borderColor: 'rgba(108,92,231,0.13)' },
   promoChipText:  { fontSize: 12, color: T.t2 },
 
-  typeRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 12 },
+  typeRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 6 },
   typeChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.03)' },
   typeChipEmoji:  { fontSize: 14 },
   typeChipLabel:  { fontSize: 12, fontWeight: '500', color: T.t3 },
+
+  typeReasonRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, marginBottom: 10 },
+  typeReasonText: { fontSize: 11, color: T.brand, fontStyle: 'italic', flex: 1 },
+
+  breakdownSection: { backgroundColor: T.brand + '06', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: T.brand + '14' },
+  breakdownHeader:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  breakdownTitle:   { fontSize: 13, fontWeight: '700', color: T.brand, flex: 1 },
+  breakdownRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
+  breakdownDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: T.brand + '40' },
+  breakdownStepText:{ fontSize: 13, color: T.text, flex: 1, lineHeight: 18 },
+  breakdownStepInput:{ fontSize: 13, color: T.text, flex: 1, lineHeight: 18, padding: 0, borderBottomWidth: 1, borderBottomColor: T.brand + '40' },
+  addStepRow:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5, marginTop: 4 },
+  addStepText:      { fontSize: 12, color: T.brand, fontWeight: '600' },
 
   extrasRow:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14, flexWrap: 'wrap' },
   extraChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(0,0,0,0.09)' },

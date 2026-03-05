@@ -5,11 +5,11 @@ import { aiAssist, getItemHint, generateProjectTasks, generateSubtasks } from ".
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/ai/assist", async (req, res) => {
     try {
-      const { prompt } = req.body;
+      const { prompt, country } = req.body;
       if (!prompt || typeof prompt !== "string") {
         return res.status(400).json({ error: "prompt is required" });
       }
-      const result = await aiAssist(prompt);
+      const result = await aiAssist(prompt, country);
       return res.json(result);
     } catch (error) {
       console.error("AI assist route error:", error);

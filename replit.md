@@ -57,9 +57,12 @@ components/
 ### AI Integration
 
 - **Provider**: Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk`
-- **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`, `generateGoal()`, `generateProjectFromGoal()`, `generateJourneyPlan()`
-- **AI Coach**: Chat-style interface for journey recommendations using server endpoint with fallback keyword matching
-- **Program Builder**: AI-generated custom journey programs via `generateJourneyPlan()` — all AI generation centralized in `lib/ai.ts`
+- **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`, `generateGoal()`, `generateProjectFromGoal()`, `generateJourneyPlan()` — all accept optional `country` param for region-aware responses
+- **AI Coach**: Chat-style interface for journey recommendations using server endpoint with fallback keyword matching; filters PRG catalog by user's country (global always shown, regional only when country matches)
+- **Program Builder**: AI-generated custom journey programs via `generateJourneyPlan()` — passes country context for region-appropriate content
+- **Smart Type Suggestion**: `getItemHint()` returns `suggestedType` and `typeReason`; FabActionSheet auto-selects the AI-suggested type chip (pinned until user overrides)
+- **Auto-Breakdown**: When type is "project" (AI-suggested or user-selected), auto-calls `generateProjectTasks()` to show inline editable step breakdown in FAB sheet
+- **Country/Region**: `constants/countries.ts` has curated country list; PRG entries have `scope` (global/regional) and `regions`; ProfileScreen has searchable country picker
 - **Env var**: Requires `EXPO_PUBLIC_ANTHROPIC_KEY` on the client
 - **Graceful degradation**: All AI functions catch errors and return safe defaults/fallback templates
 
@@ -70,9 +73,9 @@ components/
 - `Step`: Sub-tasks within a project item, with blocked_by, assignees, subtasks
 - `Subtask`: Individual sub-items within a step
 - `Recurrence`: Supports daily, weekdays, specific_days, interval, monthly
-- `Profile`: User profile with name, avatar_url
+- `Profile`: User profile with name, avatar_url, country (2-letter ISO code)
 - `JourneyProgress`: Tracks user progress through curated journey programs
-- `Journey`: Static catalog entry for expert-curated programs
+- `Journey`: Static catalog entry for expert-curated programs with `scope` (global/regional) and optional `regions` (country codes)
 - `CompletionLog`: Daily completion tracking (date→{done,skipped,total})
 - `MoodEntry`: Mood recording with timestamp; `MoodValue` is numeric 1-5 scale
 - `TodayAction`: Unified action type for Today screen (journey|habit|project|action)
@@ -153,6 +156,6 @@ All tables have Row Level Security (RLS) policies ensuring users can only access
 
 ### Data Persistence
 
-- **Guest mode**: Sample data auto-seeded on boot via `loadAll('guest')`; completion/mood logs persisted to AsyncStorage only
+- **Guest mode**: Sample data auto-seeded on boot via `loadAll('guest')`; completion/mood logs and country persisted to AsyncStorage only
 - **Authenticated mode**: Items/journeys stored in Supabase with realtime sync; completion/mood logs persisted to both AsyncStorage (local cache) and Supabase (cloud sync)
 - **AsyncStorage keys**: `m3ntor_completion_log`, `m3ntor_mood_log`

@@ -96,6 +96,7 @@ export interface Profile {
   id: string;
   name?: string;
   avatar_url?: string;
+  country?: string;
   created_at: string;
 }
 
@@ -113,6 +114,8 @@ export interface Journey {
   f?: boolean;
   ds: string;
   wp: string[];
+  scope?: 'global' | 'regional';
+  regions?: string[];
 }
 
 export interface TodayAction {

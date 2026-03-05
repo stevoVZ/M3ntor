@@ -83,8 +83,16 @@ export default function AICoach({ onClose }: AICoachProps) {
   const [results, setResults] = useState<AiResult | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const scrollRef = useRef<ScrollView>(null);
+  const country = useStore(s => s.profile?.country);
 
-  const programCatalog = PRG.map(p => `${p.id}: "${p.t}" (${ITEM_AREAS[p.a]?.n ?? p.a}) - ${p.ds}`).join('\n');
+  const visiblePRG = PRG.filter(p =>
+    p.scope !== 'regional' || !country || (p.regions ?? []).includes(country)
+  );
+
+  const programCatalog = visiblePRG.map(p => {
+    const regional = p.scope === 'regional' ? ' [Regional]' : '';
+    return `${p.id}: "${p.t}" (${ITEM_AREAS[p.a]?.n ?? p.a}) - ${p.ds}${regional}`;
+  }).join('\n');
 
   const areasWithPrograms = AREAS.filter(a => PRG.some(p => p.a === a.id));
 
@@ -123,7 +131,8 @@ export default function AICoach({ onClose }: AICoachProps) {
     scrollToEnd();
 
     try {
-      const prompt = `You are an AI helping users find the right self-improvement journeys. Here is the full journey catalog:\n\n${programCatalog}\n\nThe user will describe a goal, problem, or aspiration. Respond with:\n1. A brief 1-2 sentence empathetic acknowledgement of their goal\n2. 2-4 recommended journey IDs from the catalog that best match, with a short reason for each\n\nRespond ONLY with valid JSON, no markdown backticks:\n{"intro":"your acknowledgement","programs":[{"id":"program_id","reason":"why this helps"}]}\n\nUser message: ${userMsg}`;
+      const countryCtx = country ? `\nThe user is based in a country with code "${country}". Prefer global journeys but also include region-specific ones if they match. When giving reasons, mention local relevance for regional programs.` : '';
+      const prompt = `You are an AI helping users find the right self-improvement journeys. Here is the full journey catalog:\n\n${programCatalog}${countryCtx}\n\nThe user will describe a goal, problem, or aspiration. Respond with:\n1. A brief 1-2 sentence empathetic acknowledgement of their goal\n2. 2-4 recommended journey IDs from the catalog that best match, with a short reason for each\n\nRespond ONLY with valid JSON, no markdown backticks:\n{"intro":"your acknowledgement","programs":[{"id":"program_id","reason":"why this helps"}]}\n\nUser message: ${userMsg}`;
 
       const res = await apiRequest('POST', '/api/ai/assist', { prompt });
       const raw = await res.text();
@@ -133,7 +142,7 @@ export default function AICoach({ onClose }: AICoachProps) {
       setMessages(prev => [...prev, { role: 'assistant', text: parsed.intro }]);
     } catch {
       const lower = userMsg.toLowerCase();
-      const matched = PRG.filter(p =>
+      const matched = visiblePRG.filter(p =>
         p.t.toLowerCase().includes(lower) || p.ds.toLowerCase().includes(lower) ||
         (ITEM_AREAS[p.a]?.n ?? '').toLowerCase().includes(lower)
       ).slice(0, 3);
@@ -141,8 +150,8 @@ export default function AICoach({ onClose }: AICoachProps) {
         intro: matched.length > 0
           ? 'Here are some journeys that could help with what you are looking for.'
           : 'I could not find an exact match, but here are some popular journeys to explore.',
-        programs: (matched.length > 0 ? matched : PRG.filter(p => p.f)).map(p => ({
-          id: p.id, reason: p.ds,
+        programs: (matched.length > 0 ? matched : visiblePRG.filter(p => p.f)).map(p => ({
+          id: p.id, reason: p.scope === 'regional' ? `${p.ds} (Recommended in your region)` : p.ds,
         })),
       };
       setResults(fallback);

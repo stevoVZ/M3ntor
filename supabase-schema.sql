@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name        TEXT,
   avatar_url  TEXT,
+  country     TEXT,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
