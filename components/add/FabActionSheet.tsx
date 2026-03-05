@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  Platform, ActivityIndicator,
+  Platform, ActivityIndicator, KeyboardAvoidingView,
   useWindowDimensions,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, {
   SlideInDown, SlideOutDown,
 } from 'react-native-reanimated';

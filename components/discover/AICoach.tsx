@@ -1,9 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Pressable, TextInput,
-  Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { T, S, F, R, shadow } from '../../constants/theme';
 import { ITEM_AREAS, PRG, AREAS } from '../../constants/config';
