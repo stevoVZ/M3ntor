@@ -6,13 +6,14 @@ import {
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { T, S, F, R, shadow } from '../../constants/theme';
+import { Feather } from '@expo/vector-icons';
+import { T, S, F, shadow } from '../../constants/theme';
 import { ITEM_AREAS } from '../../constants/config';
 import { suggestArea } from '../../utils/nlp';
 import { generateProjectTasks } from '../../lib/ai';
 import { createItem, createStep } from '../../utils/items';
 import { useStore } from '../../lib/store';
-import { upsertStep } from '../../lib/supabase';
+import { AreaPicker } from './AreaPicker';
 
 const EMOJIS = ['📁','🏗️','💡','🎯','🚀','📊','🔧','🎨','📝','🏃','💪','🌱','🏠','✈️','💰','📚'];
 
@@ -39,7 +40,6 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
   const inputRef = useRef<TextInput>(null);
   const stepRef  = useRef<TextInput>(null);
 
-  // NLP area from title
   useEffect(() => {
     if (title.length >= 3 && !areaConfirmed) {
       const s = suggestArea(title);
@@ -51,7 +51,6 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
     setTimeout(() => inputRef.current?.focus(), 200);
   }, []);
 
-  // Auto-generate if opened with prefill
   useEffect(() => {
     if (prefillText.trim().length > 3 && !autoRan) {
       setAutoRan(true);
@@ -95,7 +94,6 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
       status: 'active',
     });
 
-    // Attach steps to item (for local state)
     const fullSteps = steps.map((s, i) => createStep(item.id, {
       title:      s.title,
       sort_order: i,
@@ -103,11 +101,6 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
     item.steps = fullSteps;
 
     addItem(item);
-
-    // Persist steps to Supabase in background
-    fullSteps.forEach(step => {
-      upsertStep(step as unknown as Record<string, unknown>).catch(console.error);
-    });
 
     setSaved(true);
     setTimeout(() => onClose(), 1100);
@@ -125,7 +118,7 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
         <Animated.View
           entering={SlideInDown.springify().damping(30).stiffness(320)}
           exiting={SlideOutDown.springify().damping(28)}
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 16, 32) }]}>
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 16, Platform.OS === 'web' ? 34 : 28) }]}>
 
           <View style={styles.handleRow}>
             <View style={styles.handle} />
@@ -141,18 +134,16 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {/* Header */}
               <View style={styles.headerRow}>
                 <View>
                   <Text style={styles.sheetTitle}>New Project</Text>
                   <Text style={styles.sheetSub}>A plan with steps and a finish line</Text>
                 </View>
-                <Pressable style={styles.closeBtn} onPress={onClose}>
-                  <Text style={styles.closeBtnText}>✕</Text>
+                <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={8}>
+                  <Feather name="x" size={14} color={T.t3} />
                 </Pressable>
               </View>
 
-              {/* Emoji + title */}
               <View style={styles.titleRow}>
                 <View style={[styles.emojiBox, areaConf && { backgroundColor: areaConf.c + '12', borderColor: areaConf.c + '20' }]}>
                   <Text style={{ fontSize: 26 }}>{emoji}</Text>
@@ -169,7 +160,6 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
                 />
               </View>
 
-              {/* Emoji picker */}
               <View style={styles.emojiPicker}>
                 {EMOJIS.map(e => (
                   <Pressable key={e} style={[styles.emojiBtn, emoji === e && styles.emojiBtnActive]}
@@ -179,14 +169,16 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
                 ))}
               </View>
 
-              {/* Area */}
               <View style={styles.areaSection}>
                 {area && !expandArea ? (
                   <View style={styles.areaRow}>
                     <View style={[styles.areaSelected, { backgroundColor: areaConf?.c + '10', borderColor: areaConf?.c + '25' }]}>
                       <Text style={{ fontSize: 20 }}>{areaConf?.e}</Text>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.areaSelectedName, { color: areaConf?.c }]}>{areaConf?.n}</Text>
+                        <View style={styles.areaNameRow}>
+                          <Text style={[styles.areaSelectedName, { color: areaConf?.c }]}>{areaConf?.n}</Text>
+                          <Feather name="check" size={16} color={areaConf?.c} />
+                        </View>
                         <Text style={styles.areaSelectedHint}>Suggested from title</Text>
                       </View>
                     </View>
@@ -195,22 +187,13 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
                     </Pressable>
                   </View>
                 ) : (
-                  <View style={styles.areaPicker}>
-                    {Object.entries(ITEM_AREAS).map(([id, a]) => (
-                      <Pressable key={id}
-                        style={[styles.areaPickerBtn, area === id && { backgroundColor: a.c + '12', borderColor: a.c }]}
-                        onPress={() => { setArea(id); setAreaConfirmed(true); setExpandArea(false); }}>
-                        <Text style={{ fontSize: 18 }}>{a.e}</Text>
-                        <Text style={[styles.areaPickerLabel, area === id && { color: a.c, fontWeight: '700' }]}>
-                          {a.n.split(' ')[0]}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
+                  <AreaPicker
+                    selected={area}
+                    onSelect={(id) => { setArea(id); setAreaConfirmed(true); setExpandArea(false); }}
+                  />
                 )}
               </View>
 
-              {/* AI Generate button */}
               <Pressable
                 onPress={() => runGenerate()}
                 disabled={!title.trim() || aiLoading}
@@ -218,7 +201,7 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
                 <View style={[styles.aiBtnIcon, title.trim() ? styles.aiBtnIconActive : {}]}>
                   {aiLoading
                     ? <ActivityIndicator size="small" color="white" />
-                    : <Text style={{ fontSize: 14 }}>⭐</Text>
+                    : <Feather name="star" size={14} color={title.trim() ? 'white' : T.t3} />
                   }
                 </View>
                 <View>
@@ -231,10 +214,9 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
                 </View>
               </Pressable>
 
-              {/* Steps list */}
               <View style={styles.stepsSection}>
                 <Text style={styles.stepsSectionTitle}>
-                  Tasks {steps.length > 0 && <Text style={{ fontWeight: '400', color: T.t3 }}>({steps.length})</Text>}
+                  Tasks {steps.length > 0 && <Text style={{ fontWeight: '400' as const, color: T.t3 }}>({steps.length})</Text>}
                 </Text>
 
                 {steps.map((s, i) => (
@@ -243,13 +225,12 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
                       <Text style={styles.stepNumText}>{i + 1}</Text>
                     </View>
                     <Text style={styles.stepTitle} numberOfLines={2}>{s.title}</Text>
-                    <Pressable style={styles.stepRemove} onPress={() => removeStep(s.id)}>
-                      <Text style={{ color: T.red, fontSize: 14 }}>✕</Text>
+                    <Pressable style={styles.stepRemove} onPress={() => removeStep(s.id)} hitSlop={6}>
+                      <Feather name="x" size={9} color={T.red} />
                     </Pressable>
                   </View>
                 ))}
 
-                {/* Manual add */}
                 <View style={styles.addStepRow}>
                   <TextInput
                     ref={stepRef}
@@ -262,14 +243,13 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
                     returnKeyType="done"
                   />
                   <Pressable
-                    style={[styles.addStepBtn, newStep.trim() && styles.addStepBtnActive]}
+                    style={[styles.addStepBtn, newStep.trim() ? styles.addStepBtnActive : null]}
                     onPress={addStep}>
-                    <Text style={[styles.addStepBtnText, newStep.trim() && { color: 'white' }]}>+</Text>
+                    <Feather name="plus" size={14} color={newStep.trim() ? 'white' : T.t3} />
                   </Pressable>
                 </View>
               </View>
 
-              {/* Save */}
               <Pressable onPress={handleSave} disabled={!canSave} style={{ marginTop: S.sm }}>
                 <LinearGradient
                   colors={canSave
@@ -309,7 +289,6 @@ const styles = StyleSheet.create({
   sheetTitle: { fontSize: 20, fontWeight: '800', color: T.text, letterSpacing: -0.6 },
   sheetSub:   { fontSize: 12, color: T.t3, marginTop: 2 },
   closeBtn:   { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' },
-  closeBtnText: { fontSize: 13, color: T.t3 },
 
   titleRow:    { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 14 },
   emojiBox:    { width: 52, height: 52, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.05)', borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' },
@@ -322,13 +301,11 @@ const styles = StyleSheet.create({
   areaSection:      { marginBottom: 14 },
   areaRow:          { flexDirection: 'row', gap: 8, alignItems: 'center' },
   areaSelected:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 12, borderWidth: 1.5 },
+  areaNameRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
   areaSelectedName: { fontSize: 13, fontWeight: '700' },
   areaSelectedHint: { fontSize: 10, color: T.t3 },
   areaChangeBtn:    { padding: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(0,0,0,0.09)', backgroundColor: 'white' },
   areaChangeBtnText:{ fontSize: 12, fontWeight: '600', color: T.t2 },
-  areaPicker:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  areaPickerBtn:    { width: '22%', alignItems: 'center', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: T.sep, backgroundColor: 'white', gap: 4 },
-  areaPickerLabel:  { fontSize: 9, color: T.t3, textAlign: 'center' },
 
   aiBtn:         { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, borderRadius: 16, backgroundColor: T.brand + '0C', borderWidth: 1.5, borderColor: T.brand + '22', marginBottom: 14 },
   aiBtnDisabled: { opacity: 0.5 },
@@ -349,7 +326,6 @@ const styles = StyleSheet.create({
   addStepInput:  { flex: 1, padding: 11, borderRadius: 14, backgroundColor: 'white', borderWidth: 1, borderColor: 'rgba(0,0,0,0.09)', fontSize: 14, color: T.text },
   addStepBtn:    { width: 42, height: 42, borderRadius: 13, backgroundColor: 'rgba(0,0,0,0.05)', alignItems: 'center', justifyContent: 'center' },
   addStepBtnActive: { backgroundColor: T.brand },
-  addStepBtnText:{ fontSize: 20, color: T.t3, fontWeight: '300' },
 
   saveBtn:     { borderRadius: 20, padding: 17, alignItems: 'center' },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: 'white', letterSpacing: -0.3 },

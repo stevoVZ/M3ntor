@@ -21,11 +21,11 @@ Preferred communication style: Simple, everyday language.
 - **NLP Utilities**: `utils/nlp.ts` provides instant local area suggestion and type inference from text
 - **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers
 - **Item Utilities**: `utils/items.ts` provides `itemKind()` (derive type from properties), `createItem()` and `createStep()` factories, progress calculations, recurrence helpers
-- **Design System**: `constants/theme.ts` exports `T` (colors/tokens using M3NTOR brand palette — indigo `#5856D6` brand, iOS system accent colors, white `#FFFFFF` background, dark `#141419` for login/splash), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows). Legacy `constants/colors.ts` still exists and is used by older UI components
+- **Design System**: `constants/theme.ts` exports `T` (colors/tokens using M3NTOR brand palette — indigo `#5856D6` brand, iOS system accent colors, white `#FFFFFF` background, dark `#141419` for login/splash), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows)
 - **Config**: `constants/config.ts` exports `ITEM_AREAS` (Record<string, {n,c,e}>), `AREAS` (10 Wheel of Life areas with id, name, color, score, icon, description), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog). Also exports `normalizeAreaId()`, `resolveArea()`, `scoreLabel()`, `scoreTier()` for bridging between ITEM_AREAS and AREAS systems
 - **Animations**: `react-native-reanimated` for smooth transitions and spring animations. `expo-haptics` for tactile feedback
 - **Fonts**: Inter font family loaded via `@expo-google-fonts/inter`
-- **UI Components**: Custom reusable components in `components/ui/` (Button, Card), `components/items/` (ItemCard, TaskRow, ProgressBar), `components/add/` (FabActionSheet, ProjectAddSheet), `components/WheelOfLife.tsx` (SVG Wheel of Life visualization using react-native-svg), `components/WheelAreaDetail.tsx` (tappable area detail panel)
+- **UI Components**: Custom reusable components in `components/ui/` (Badge), `components/items/` (ItemCard, TaskRow, ProgressBar), `components/add/` (FabActionSheet, ProjectAddSheet, AreaPicker — shared responsive 4-column area grid), `components/WheelOfLife.tsx` (SVG Wheel of Life visualization using react-native-svg), `components/WheelAreaDetail.tsx` (tappable area detail panel). All UI icons use Feather from `@expo/vector-icons`
 
 ### Backend Architecture
 
@@ -66,7 +66,6 @@ app/
     mylife.tsx         # My Life — Wheel of Life SVG visualization, area scoring, glass-card design, insight cards
     discover.tsx       # Journey/program discovery
     plan.tsx           # Full item list with filters
-  add.tsx              # Add item modal sheet
   item/[id].tsx        # Item detail modal sheet
 ```
 

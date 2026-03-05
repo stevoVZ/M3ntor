@@ -4,21 +4,23 @@ import {
   Modal, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, withTiming,
-  runOnJS, SlideInDown, SlideOutDown,
+  SlideInDown, SlideOutDown,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { T, S, F, R, shadow } from '../../constants/theme';
+import { Feather } from '@expo/vector-icons';
+import { T, S, F } from '../../constants/theme';
 import { ITEM_AREAS } from '../../constants/config';
 import { suggestArea, inferType } from '../../utils/nlp';
 import { getItemHint } from '../../lib/ai';
 import { createItem } from '../../utils/items';
 import { useStore } from '../../lib/store';
+import { AreaPicker } from './AreaPicker';
 
 interface Props {
-  onProject: (text: string) => void;
-  onClose:   () => void;
+  onProject:  (text: string) => void;
+  onJourney?: () => void;
+  onClose:    () => void;
 }
 
 const TYPE_OPTIONS = [
@@ -39,12 +41,18 @@ const PROMOS = [
 ];
 
 const TOD_OPTIONS = [
-  { id: 'morning',   label: 'AM'  },
-  { id: 'afternoon', label: 'PM'  },
-  { id: 'evening',   label: 'Eve' },
+  { id: 'morning',   label: 'AM',  icon: 'sun'   as const },
+  { id: 'afternoon', label: 'PM',  icon: 'cloud' as const },
+  { id: 'evening',   label: 'Eve', icon: 'moon'  as const },
 ];
 
-export function FabActionSheet({ onProject, onClose }: Props) {
+const EFFORT_CONFIG: Record<string, { icon: 'zap' | 'clock'; label: string; color: string }> = {
+  quick:  { icon: 'zap',   label: 'Quick win',      color: T.green  },
+  medium: { icon: 'clock', label: 'Medium effort',   color: T.orange },
+  deep:   { icon: 'zap',   label: 'Deep work',       color: T.brand  },
+};
+
+export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const { userId, addItem } = useStore();
 
@@ -52,7 +60,7 @@ export function FabActionSheet({ onProject, onClose }: Props) {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [area, setArea]                 = useState<string | null>(null);
   const [tod, setTod]                   = useState<string | null>(null);
-  const [aiHint, setAiHint]             = useState<{ why?: string; firstStep?: string; tip?: string } | null>(null);
+  const [aiHint, setAiHint]             = useState<{ why?: string; firstStep?: string; tip?: string; effort?: string } | null>(null);
   const [aiLoading, setAiLoading]       = useState(false);
   const [saved, setSaved]               = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
@@ -64,19 +72,16 @@ export function FabActionSheet({ onProject, onClose }: Props) {
     setTimeout(() => inputRef.current?.focus(), 200);
   }, []);
 
-  // NLP type inference
   const inferredType = useMemo(() => inferType(text), [text]);
   const activeType   = selectedType ?? (text.trim() ? inferredType : null);
   const typeConf     = activeType ? TYPE_OPTIONS.find(t => t.id === activeType) : null;
 
-  // NLP area suggestion
   useEffect(() => {
     if (activeType === 'goal') return;
     const s = suggestArea(text);
     if (s && !area) setArea(s);
   }, [text]);
 
-  // Debounced AI hint (900ms after last keystroke)
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!text.trim() || text.trim().length < 5) { setAiHint(null); return; }
@@ -95,7 +100,7 @@ export function FabActionSheet({ onProject, onClose }: Props) {
   const canSave  = text.trim().length > 0 && (activeType !== 'goal' || !!area);
 
   function handleTypeSelect(id: string) {
-    if (id === 'journey')                    { /* navigate to discover */ return; }
+    if (id === 'journey')                    { onJourney?.(); return; }
     if (id === 'project' && text.trim())     { onProject(text); return; }
     setSelectedType(prev => prev === id ? null : id);
     setAiHint(null);
@@ -105,13 +110,14 @@ export function FabActionSheet({ onProject, onClose }: Props) {
     if (!canSave || !userId) return;
     const type = activeType ?? 'action';
     if (type === 'project') { onProject(text); return; }
+    if (type === 'journey') { onJourney?.(); return; }
 
     const item = createItem(userId, {
       title:             text.trim(),
       area:              area ?? suggestArea(text) ?? 'life',
       status:            type === 'goal' ? 'someday' : 'active',
       emoji:             type === 'habit' ? '🔄' : type === 'goal' ? '🎯' : '✓',
-      habit_time_of_day: tod as any ?? undefined,
+      habit_time_of_day: (tod as 'morning' | 'afternoon' | 'evening') ?? undefined,
       recurrence:        type === 'habit' ? { type: 'daily' } : undefined,
     });
 
@@ -122,7 +128,7 @@ export function FabActionSheet({ onProject, onClose }: Props) {
 
   const saveBtnLabel = !text.trim()                     ? 'Type something to start'
     : activeType === 'goal' && !area                    ? 'Pick a life area first'
-    : activeType === 'project'                          ? 'Set up project →'
+    : activeType === 'project'                          ? 'Set up project'
     : activeType === 'habit'                            ? 'Start this habit'
     : activeType === 'goal'                             ? 'Save to goals'
     :                                                     'Add it';
@@ -132,45 +138,39 @@ export function FabActionSheet({ onProject, onClose }: Props) {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.overlay}>
-        {/* Backdrop */}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
           <View style={styles.backdrop} />
         </Pressable>
 
-        {/* Sheet */}
         <Animated.View
           entering={SlideInDown.springify().damping(32).stiffness(360)}
           exiting={SlideOutDown.springify().damping(28)}
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 16, 28) }]}>
+          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 16, Platform.OS === 'web' ? 34 : 28) }]}>
 
-          {/* Handle */}
           <View style={styles.handleRow}>
             <View style={styles.handle} />
           </View>
 
-          {/* ── Saved confirmation ── */}
           {saved ? (
             <View style={styles.savedState}>
               <View style={[styles.savedIcon, { backgroundColor: (typeConf?.color ?? T.green) + '14' }]}>
-                <Text style={{ fontSize: 24 }}>✓</Text>
+                <Feather name="check" size={26} color={typeConf?.color ?? T.green} />
               </View>
               <Text style={styles.savedTitle}>Added!</Text>
               <Text style={styles.savedSub}>"{text}"</Text>
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {/* Header */}
               <View style={styles.headerRow}>
                 <View>
                   <Text style={styles.title}>What's next?</Text>
                   <Text style={styles.subtitle}>Type your idea — AI shapes it as you write</Text>
                 </View>
-                <Pressable style={styles.closeBtn} onPress={onClose}>
-                  <Text style={styles.closeBtnText}>✕</Text>
+                <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={8}>
+                  <Feather name="x" size={14} color={T.t3} />
                 </Pressable>
               </View>
 
-              {/* Main input */}
               <View style={[styles.inputWrap, {
                 borderColor: typeConf ? typeConf.color + '35' : 'rgba(0,0,0,0.09)',
                 backgroundColor: typeConf ? typeConf.color + '04' : 'white',
@@ -193,15 +193,19 @@ export function FabActionSheet({ onProject, onClose }: Props) {
                 )}
               </View>
 
-              {/* AI hint strip */}
               <View style={styles.hintArea}>
                 {aiLoading && (
                   <View style={styles.thinkingRow}>
-                    <ActivityIndicator size="small" color={T.brand} />
-                    <Text style={styles.thinkingText}>Thinking…</Text>
+                    <View style={styles.thinkingIconBox}>
+                      <ActivityIndicator size="small" color={T.brand} />
+                    </View>
+                    <View>
+                      <Text style={styles.thinkingLine1}>AI is thinking…</Text>
+                      <Text style={styles.thinkingLine2}>Getting a personalised insight</Text>
+                    </View>
                   </View>
                 )}
-                {!aiLoading && aiHint && (aiHint.why || aiHint.firstStep || aiHint.tip) && (
+                {!aiLoading && aiHint && (aiHint.why || aiHint.firstStep || aiHint.tip || aiHint.effort) && (
                   <View style={[styles.hintCard, {
                     backgroundColor: (typeConf?.color ?? T.brand) + '09',
                     borderColor:     (typeConf?.color ?? T.brand) + '1A',
@@ -221,6 +225,18 @@ export function FabActionSheet({ onProject, onClose }: Props) {
                           </Text>
                         </View>
                       )}
+                      {aiHint.effort && EFFORT_CONFIG[aiHint.effort] && (
+                        <View style={[styles.hintDetail, { marginTop: 4 }]}>
+                          <Feather
+                            name={EFFORT_CONFIG[aiHint.effort].icon}
+                            size={11}
+                            color={EFFORT_CONFIG[aiHint.effort].color}
+                          />
+                          <Text style={[styles.hintDetailLabel, { color: EFFORT_CONFIG[aiHint.effort].color }]}>
+                            {EFFORT_CONFIG[aiHint.effort].label}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 )}
@@ -236,26 +252,23 @@ export function FabActionSheet({ onProject, onClose }: Props) {
                 )}
               </View>
 
-              {/* Type chips */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                style={styles.typeRow} contentContainerStyle={{ gap: 5, paddingVertical: 2 }}>
+              <View style={styles.typeRow}>
                 {TYPE_OPTIONS.map(t => {
-                  const on = selectedType === t.id || (!selectedType && inferredType === t.id && text.trim());
+                  const on = selectedType === t.id || (!selectedType && inferredType === t.id && !!text.trim());
                   return (
                     <Pressable key={t.id} style={[styles.typeChip, on && {
                       backgroundColor: t.color + '12',
                       borderColor:     t.color + '40',
                     }]} onPress={() => handleTypeSelect(t.id)}>
                       <Text style={styles.typeChipEmoji}>{t.emoji}</Text>
-                      <Text style={[styles.typeChipLabel, on && { color: t.color, fontWeight: '700' }]}>
+                      <Text style={[styles.typeChipLabel, on && { color: t.color, fontWeight: '700' as const }]}>
                         {t.label}
                       </Text>
                     </Pressable>
                   );
                 })}
-              </ScrollView>
+              </View>
 
-              {/* Area + time chips */}
               {text.trim() && activeType !== 'project' && activeType !== 'journey' && (
                 <View style={styles.extrasRow}>
                   {areaConf ? (
@@ -263,7 +276,7 @@ export function FabActionSheet({ onProject, onClose }: Props) {
                       onPress={() => setShowAreaPicker(!showAreaPicker)}>
                       <Text>{areaConf.e}</Text>
                       <Text style={[styles.extraChipLabel, { color: areaConf.c }]}>{areaConf.n.split(' ')[0]}</Text>
-                      <Text style={{ color: areaConf.c, fontSize: 10 }}>▾</Text>
+                      <Feather name="chevron-down" size={10} color={areaConf.c} />
                     </Pressable>
                   ) : (
                     <Pressable style={styles.extraChipEmpty} onPress={() => setShowAreaPicker(true)}>
@@ -277,7 +290,8 @@ export function FabActionSheet({ onProject, onClose }: Props) {
                         backgroundColor: (typeConf?.color ?? T.brand) + '10',
                         borderColor:     (typeConf?.color ?? T.brand) + '30',
                       }]} onPress={() => setTod(prev => prev === o.id ? null : o.id)}>
-                        <Text style={[styles.extraChipLabel, on && { color: typeConf?.color ?? T.brand, fontWeight: '700' }]}>
+                        <Feather name={o.icon} size={12} color={on ? (typeConf?.color ?? T.brand) : T.t3} />
+                        <Text style={[styles.extraChipLabel, on && { color: typeConf?.color ?? T.brand, fontWeight: '700' as const }]}>
                           {o.label}
                         </Text>
                       </Pressable>
@@ -286,44 +300,31 @@ export function FabActionSheet({ onProject, onClose }: Props) {
                 </View>
               )}
 
-              {/* Area picker */}
               {showAreaPicker && (
-                <View style={styles.areaPicker}>
-                  {Object.entries(ITEM_AREAS).map(([id, a]) => (
-                    <Pressable key={id}
-                      style={[styles.areaPickerBtn, area === id && { backgroundColor: a.c + '12', borderColor: a.c }]}
-                      onPress={() => { setArea(id); setShowAreaPicker(false); }}>
-                      <Text style={{ fontSize: 18 }}>{a.e}</Text>
-                      <Text style={[styles.areaPickerLabel, area === id && { color: a.c, fontWeight: '700' }]}>
-                        {a.n.split(' ')[0]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <AreaPicker
+                  selected={area}
+                  onSelect={(id) => { setArea(id); setShowAreaPicker(false); }}
+                />
               )}
 
-              {/* Goal: require area */}
               {activeType === 'goal' && !area && text.trim() && (
-                <View style={styles.areaPicker}>
-                  <Text style={styles.areaPickerHint}>Which area of your life?</Text>
-                  {Object.entries(ITEM_AREAS).map(([id, a]) => (
-                    <Pressable key={id}
-                      style={[styles.areaPickerBtn, area === id && { backgroundColor: a.c + '12', borderColor: a.c }]}
-                      onPress={() => setArea(id)}>
-                      <Text style={{ fontSize: 18 }}>{a.e}</Text>
-                      <Text style={[styles.areaPickerLabel, area === id && { color: a.c }]}>{a.n.split(' ')[0]}</Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <AreaPicker
+                  selected={area}
+                  onSelect={setArea}
+                  label="Which area of your life?"
+                  required
+                />
               )}
 
-              {/* Save button */}
               <Pressable onPress={handleSave} disabled={!canSave} style={{ marginTop: S.md }}>
                 <LinearGradient
                   colors={canSave ? (typeConf ? [typeConf.color, typeConf.color + 'BB'] : T.gradColors) : [T.sep, T.sep]}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.saveBtn}>
-                  <Text style={[styles.saveBtnText, !canSave && { color: T.t3 }]}>{saveBtnLabel}</Text>
+                  <View style={styles.saveBtnInner}>
+                    {canSave && <Feather name="chevron-right" size={16} color="white" />}
+                    <Text style={[styles.saveBtnText, !canSave && { color: T.t3 }]}>{saveBtnLabel}</Text>
+                  </View>
                 </LinearGradient>
               </Pressable>
 
@@ -354,7 +355,6 @@ const styles = StyleSheet.create({
   title:          { fontSize: 20, fontWeight: '800', color: T.text, letterSpacing: -0.6 },
   subtitle:       { fontSize: 12, color: T.t3, marginTop: 2 },
   closeBtn:       { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' },
-  closeBtnText:   { fontSize: 13, color: T.t3 },
 
   inputWrap:      { borderRadius: 18, borderWidth: 2, marginBottom: 10, overflow: 'hidden' },
   input:          { fontSize: 16, color: T.text, padding: 14, fontWeight: '400' },
@@ -363,8 +363,10 @@ const styles = StyleSheet.create({
   typeBadgeLabel: { fontSize: 11, fontWeight: '700' },
 
   hintArea:       { minHeight: 40, marginBottom: 12 },
-  thinkingRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderRadius: 12, backgroundColor: T.brand + '07', borderWidth: 1, borderColor: T.brand + '14' },
-  thinkingText:   { fontSize: 12, color: T.brand, fontStyle: 'italic' },
+  thinkingRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, paddingHorizontal: 14, borderRadius: 14, backgroundColor: T.brand + '0A', borderWidth: 1, borderColor: T.brand + '18' },
+  thinkingIconBox:{ width: 28, height: 28, borderRadius: 9, backgroundColor: T.brand + '12', alignItems: 'center', justifyContent: 'center' },
+  thinkingLine1:  { fontSize: 13, fontWeight: '600', color: T.brand },
+  thinkingLine2:  { fontSize: 11, color: T.t3, marginTop: 1 },
   hintCard:       { flexDirection: 'row', gap: 8, padding: 11, borderRadius: 14, borderWidth: 1 },
   hintStar:       { fontSize: 14, marginTop: 1 },
   hintWhy:        { fontSize: 13, color: T.t2, lineHeight: 19, fontStyle: 'italic', marginBottom: 6 },
@@ -375,7 +377,7 @@ const styles = StyleSheet.create({
   promoChip:      { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(108,92,231,0.06)', borderWidth: 1, borderColor: 'rgba(108,92,231,0.13)' },
   promoChipText:  { fontSize: 12, color: T.t2 },
 
-  typeRow:        { marginBottom: 12 },
+  typeRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 12 },
   typeChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.03)' },
   typeChipEmoji:  { fontSize: 14 },
   typeChipLabel:  { fontSize: 12, fontWeight: '500', color: T.t3 },
@@ -386,12 +388,8 @@ const styles = StyleSheet.create({
   extraChipEmpty: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
   extraChipEmptyText: { fontSize: 12, color: T.t3 },
 
-  areaPicker:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
-  areaPickerHint: { width: '100%', fontSize: 11, fontWeight: '700', color: T.t3, marginBottom: 8, letterSpacing: 0.2 },
-  areaPickerBtn:  { width: '22%', alignItems: 'center', paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: T.sep, backgroundColor: 'white', gap: 4 },
-  areaPickerLabel:{ fontSize: 9, color: T.t3, textAlign: 'center' },
-
   saveBtn:        { borderRadius: 20, padding: 17, alignItems: 'center', justifyContent: 'center' },
+  saveBtnInner:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
   saveBtnText:    { fontSize: 16, fontWeight: '700', color: 'white', letterSpacing: -0.3 },
   cancelBtn:      { padding: 12, alignItems: 'center', marginTop: 6 },
   cancelText:     { fontSize: 14, fontWeight: '600', color: T.t3 },

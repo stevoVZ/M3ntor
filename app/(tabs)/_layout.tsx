@@ -132,6 +132,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       {showAdd && addMode === 'sheet' && (
         <FabActionSheet
           onProject={(text) => { setPrefill(text); setAddMode('project'); }}
+          onJourney={() => { setShowAdd(false); navigation.navigate('discover'); }}
           onClose={() => setShowAdd(false)}
         />
       )}
