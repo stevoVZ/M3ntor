@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { View } from 'react-native';
-import Svg, { Path, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Path, Ellipse, Defs, LinearGradient, Stop } from 'react-native-svg';
 import Animated, {
   useSharedValue,
   useAnimatedProps,
@@ -11,38 +11,53 @@ import Animated, {
 } from 'react-native-reanimated';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 
 interface Props {
   size?: number;
   variant?: 'color' | 'white';
 }
 
-const ARC_LENGTH = 160;
+const ARC_LENGTH = 175;
 
-const LEAF_PATHS = [
-  { d: 'M 38 68 C 36 52 32 40 28 32 C 34 38 42 48 44 64 Z', color: '#FF8C00' },
-  { d: 'M 42 62 C 38 46 36 32 38 20 C 42 32 46 46 46 58 Z', color: '#32CD32' },
-  { d: 'M 47 56 C 48 40 50 26 50 16 C 52 26 52 40 53 56 Z', color: '#00A890' },
-  { d: 'M 54 58 C 54 46 58 32 62 20 C 64 32 62 46 58 62 Z', color: '#8B5CF6' },
-  { d: 'M 56 64 C 58 48 66 38 72 32 C 68 40 64 52 62 68 Z', color: '#4169E1' },
+const PETAL_PATHS = [
+  {
+    d: 'M 44 72 C 36 62 28 44 30 30 C 34 28 38 30 40 34 C 46 46 48 60 48 72 Z',
+    gradient: 'petalGrad1',
+    colors: ['#8BC34A', '#4CAF50'],
+  },
+  {
+    d: 'M 48 72 C 44 58 42 40 44 24 C 48 22 52 24 54 28 C 56 42 54 58 52 72 Z',
+    gradient: 'petalGrad2',
+    colors: ['#26A69A', '#00897B'],
+  },
+  {
+    d: 'M 52 72 C 50 56 52 38 58 24 C 62 22 66 26 66 30 C 64 44 58 58 54 72 Z',
+    gradient: 'petalGrad3',
+    colors: ['#AB47BC', '#7B1FA2'],
+  },
+  {
+    d: 'M 54 72 C 56 58 62 44 70 34 C 74 32 76 36 74 40 C 68 52 60 64 56 72 Z',
+    gradient: 'petalGrad4',
+    colors: ['#42A5F5', '#1565C0'],
+  },
 ];
 
 export function M3ntorIconStatic({ size = 48, fill = 'white' }: { size?: number; fill?: string }) {
   return (
     <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Svg width={size} height={size} viewBox="0 0 100 90">
         <Path
-          d="M 15 72 A 40 40 0 0 1 85 72"
+          d="M 18 78 A 38 38 0 0 1 82 78"
           fill="none"
           stroke={fill}
-          strokeWidth={6}
+          strokeWidth={7}
           strokeLinecap="round"
         />
-        {LEAF_PATHS.map((l, i) => (
+        {PETAL_PATHS.map((l, i) => (
           <Path key={i} d={l.d} fill={fill} />
         ))}
-        <Circle cx={50} cy={70} r={3} fill={fill} />
+        <Ellipse cx={50} cy={74} rx={4} ry={5} fill={fill} />
       </Svg>
     </View>
   );
@@ -52,38 +67,36 @@ export default function M3ntorIcon({ size = 48, variant = 'color' }: Props) {
   const isWhite = variant === 'white';
 
   const arcProgress = useSharedValue(isWhite ? 1 : 0);
-  const leafOpacity1 = useSharedValue(isWhite ? 1 : 0);
-  const leafOpacity2 = useSharedValue(isWhite ? 1 : 0);
-  const leafOpacity3 = useSharedValue(isWhite ? 1 : 0);
-  const leafOpacity4 = useSharedValue(isWhite ? 1 : 0);
-  const leafOpacity5 = useSharedValue(isWhite ? 1 : 0);
-  const dotRadius = useSharedValue(isWhite ? 3 : 0);
+  const petalOp1 = useSharedValue(isWhite ? 1 : 0);
+  const petalOp2 = useSharedValue(isWhite ? 1 : 0);
+  const petalOp3 = useSharedValue(isWhite ? 1 : 0);
+  const petalOp4 = useSharedValue(isWhite ? 1 : 0);
+  const dotScale = useSharedValue(isWhite ? 1 : 0);
 
   useEffect(() => {
     if (isWhite) return;
     arcProgress.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) });
-    leafOpacity1.value = withDelay(200, withTiming(1, { duration: 300 }));
-    leafOpacity2.value = withDelay(300, withTiming(1, { duration: 300 }));
-    leafOpacity3.value = withDelay(400, withTiming(1, { duration: 300 }));
-    leafOpacity4.value = withDelay(500, withTiming(1, { duration: 300 }));
-    leafOpacity5.value = withDelay(600, withTiming(1, { duration: 300 }));
-    dotRadius.value = withDelay(750, withSpring(3, { damping: 10, stiffness: 260 }));
+    petalOp1.value = withDelay(250, withTiming(1, { duration: 300 }));
+    petalOp2.value = withDelay(400, withTiming(1, { duration: 300 }));
+    petalOp3.value = withDelay(550, withTiming(1, { duration: 300 }));
+    petalOp4.value = withDelay(700, withTiming(1, { duration: 300 }));
+    dotScale.value = withDelay(850, withSpring(1, { damping: 10, stiffness: 260 }));
   }, []);
 
   const arcProps = useAnimatedProps(() => ({
     strokeDashoffset: ARC_LENGTH * (1 - arcProgress.value),
   }));
 
-  const l1Props = useAnimatedProps(() => ({ opacity: leafOpacity1.value }));
-  const l2Props = useAnimatedProps(() => ({ opacity: leafOpacity2.value }));
-  const l3Props = useAnimatedProps(() => ({ opacity: leafOpacity3.value }));
-  const l4Props = useAnimatedProps(() => ({ opacity: leafOpacity4.value }));
-  const l5Props = useAnimatedProps(() => ({ opacity: leafOpacity5.value }));
-  const leafAnimProps = [l1Props, l2Props, l3Props, l4Props, l5Props];
+  const p1Props = useAnimatedProps(() => ({ opacity: petalOp1.value }));
+  const p2Props = useAnimatedProps(() => ({ opacity: petalOp2.value }));
+  const p3Props = useAnimatedProps(() => ({ opacity: petalOp3.value }));
+  const p4Props = useAnimatedProps(() => ({ opacity: petalOp4.value }));
+  const petalAnimProps = [p1Props, p2Props, p3Props, p4Props];
 
   const dotProps = useAnimatedProps(() => ({
-    opacity: dotRadius.value > 0 ? 1 : 0,
-    r: dotRadius.value,
+    opacity: dotScale.value,
+    rx: 4 * dotScale.value,
+    ry: 5 * dotScale.value,
   }));
 
   if (isWhite) {
@@ -92,36 +105,55 @@ export default function M3ntorIcon({ size = 48, variant = 'color' }: Props) {
 
   return (
     <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Svg width={size} height={size} viewBox="0 0 100 90">
         <Defs>
           <LinearGradient id="arcGrad" x1="0" y1="0.5" x2="1" y2="0.5">
-            <Stop offset="0" stopColor="#FF8C00" />
-            <Stop offset="0.2" stopColor="#FFD700" />
-            <Stop offset="0.4" stopColor="#32CD32" />
-            <Stop offset="0.6" stopColor="#00CED1" />
-            <Stop offset="0.8" stopColor="#4169E1" />
-            <Stop offset="1" stopColor="#8B5CF6" />
+            <Stop offset="0" stopColor="#E53935" />
+            <Stop offset="0.15" stopColor="#FF6F00" />
+            <Stop offset="0.3" stopColor="#FDD835" />
+            <Stop offset="0.45" stopColor="#43A047" />
+            <Stop offset="0.6" stopColor="#00ACC1" />
+            <Stop offset="0.75" stopColor="#1E88E5" />
+            <Stop offset="0.9" stopColor="#5E35B1" />
+            <Stop offset="1" stopColor="#6A1B9A" />
+          </LinearGradient>
+          {PETAL_PATHS.map((p, i) => (
+            <LinearGradient key={i} id={p.gradient} x1="0.5" y1="0" x2="0.5" y2="1">
+              <Stop offset="0" stopColor={p.colors[0]} />
+              <Stop offset="1" stopColor={p.colors[1]} />
+            </LinearGradient>
+          ))}
+          <LinearGradient id="dotGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+            <Stop offset="0" stopColor="#FF8F00" />
+            <Stop offset="1" stopColor="#E65100" />
           </LinearGradient>
         </Defs>
 
         <AnimatedPath
-          d="M 15 72 A 40 40 0 0 1 85 72"
+          d="M 18 78 A 38 38 0 0 1 82 78"
           fill="none"
           stroke="url(#arcGrad)"
-          strokeWidth={6}
+          strokeWidth={7}
           strokeLinecap="round"
           strokeDasharray={`${ARC_LENGTH}`}
           animatedProps={arcProps}
         />
 
-        {LEAF_PATHS.map((l, i) => (
-          <AnimatedPath key={i} d={l.d} fill={l.color} animatedProps={leafAnimProps[i]} />
+        {PETAL_PATHS.map((p, i) => (
+          <AnimatedPath
+            key={i}
+            d={p.d}
+            fill={`url(#${p.gradient})`}
+            animatedProps={petalAnimProps[i]}
+          />
         ))}
 
-        <AnimatedCircle
+        <AnimatedEllipse
           cx={50}
-          cy={70}
-          fill="#FF8C00"
+          cy={74}
+          rx={4}
+          ry={5}
+          fill="url(#dotGrad)"
           animatedProps={dotProps}
         />
       </Svg>
