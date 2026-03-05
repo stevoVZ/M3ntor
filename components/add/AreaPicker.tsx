@@ -100,8 +100,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
+    paddingHorizontal: 2,
     borderRadius: 12,
     gap: 3,
+    flexShrink: 1,
   },
   emoji: { fontSize: 18 },
   name: {

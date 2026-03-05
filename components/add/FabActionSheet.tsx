@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Modal, KeyboardAvoidingView, Platform, ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, {
   SlideInDown, SlideOutDown,
@@ -11,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { T, S, F } from '../../constants/theme';
 import { ITEM_AREAS } from '../../constants/config';
+import type { Priority, Effort } from '../../types';
 import { suggestArea, inferType } from '../../utils/nlp';
 import { getItemHint } from '../../lib/ai';
 import { createItem } from '../../utils/items';
@@ -46,6 +48,19 @@ const TOD_OPTIONS = [
   { id: 'evening',   label: 'Eve', icon: 'moon'  as const },
 ];
 
+const PRIORITY_OPTIONS = [
+  { id: 'urgent', label: 'Urgent', icon: 'alert-triangle' as const, color: '#E53E3E' },
+  { id: 'high',   label: 'High',   icon: 'arrow-up' as const,       color: '#DD6B20' },
+  { id: 'normal', label: 'Normal', icon: 'minus' as const,          color: T.t3      },
+  { id: 'low',    label: 'Low',    icon: 'arrow-down' as const,     color: '#718096'  },
+] as const;
+
+const EFFORT_OPTIONS = [
+  { id: 'quick',  label: 'Quick',  icon: 'zap' as const,   color: T.green  },
+  { id: 'medium', label: 'Medium', icon: 'clock' as const,  color: T.orange },
+  { id: 'deep',   label: 'Deep',   icon: 'layers' as const, color: T.brand  },
+] as const;
+
 const EFFORT_CONFIG: Record<string, { icon: 'zap' | 'clock'; label: string; color: string }> = {
   quick:  { icon: 'zap',   label: 'Quick win',      color: T.green  },
   medium: { icon: 'clock', label: 'Medium effort',   color: T.orange },
@@ -54,12 +69,17 @@ const EFFORT_CONFIG: Record<string, { icon: 'zap' | 'clock'; label: string; colo
 
 export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const { userId, addItem } = useStore();
 
   const [text, setText]                 = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [area, setArea]                 = useState<string | null>(null);
   const [tod, setTod]                   = useState<string | null>(null);
+  const [priority, setPriority]         = useState<Priority>('normal');
+  const [effort, setEffort]             = useState<Effort>('medium');
+  const [deadline, setDeadline]         = useState('');
+  const [showExtras, setShowExtras]     = useState(false);
   const [aiHint, setAiHint]             = useState<{ why?: string; firstStep?: string; tip?: string; effort?: string } | null>(null);
   const [aiLoading, setAiLoading]       = useState(false);
   const [saved, setSaved]               = useState(false);
@@ -67,6 +87,9 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
 
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isCompact = screenWidth < 380;
+  const horizontalPad = isCompact ? 14 : 18;
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 200);
@@ -119,6 +142,9 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
       emoji:             type === 'habit' ? '🔄' : type === 'goal' ? '🎯' : '✓',
       habit_time_of_day: (tod as 'morning' | 'afternoon' | 'evening') ?? undefined,
       recurrence:        type === 'habit' ? { type: 'daily' } : undefined,
+      priority,
+      effort,
+      deadline:          deadline.trim() || undefined,
     });
 
     addItem(item);
@@ -145,7 +171,10 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
         <Animated.View
           entering={SlideInDown.springify().damping(32).stiffness(360)}
           exiting={SlideOutDown.springify().damping(28)}
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 16, Platform.OS === 'web' ? 34 : 28) }]}>
+          style={[styles.sheet, {
+            paddingHorizontal: horizontalPad,
+            paddingBottom: Math.max(insets.bottom + 16, Platform.OS === 'web' ? 34 : 28),
+          }]}>
 
           <View style={styles.handleRow}>
             <View style={styles.handle} />
@@ -162,8 +191,8 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={styles.headerRow}>
-                <View>
-                  <Text style={styles.title}>What's next?</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.title, isCompact && { fontSize: 18 }]}>What's next?</Text>
                   <Text style={styles.subtitle}>Type your idea — AI shapes it as you write</Text>
                 </View>
                 <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={8}>
@@ -199,7 +228,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                     <View style={styles.thinkingIconBox}>
                       <ActivityIndicator size="small" color={T.brand} />
                     </View>
-                    <View>
+                    <View style={{ flex: 1 }}>
                       <Text style={styles.thinkingLine1}>AI is thinking…</Text>
                       <Text style={styles.thinkingLine2}>Getting a personalised insight</Text>
                     </View>
@@ -260,8 +289,8 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                       backgroundColor: t.color + '12',
                       borderColor:     t.color + '40',
                     }]} onPress={() => handleTypeSelect(t.id)}>
-                      <Text style={styles.typeChipEmoji}>{t.emoji}</Text>
-                      <Text style={[styles.typeChipLabel, on && { color: t.color, fontWeight: '700' as const }]}>
+                      <Text style={[styles.typeChipEmoji, isCompact && { fontSize: 12 }]}>{t.emoji}</Text>
+                      <Text style={[styles.typeChipLabel, isCompact && { fontSize: 11 }, on && { color: t.color, fontWeight: '700' as const }]}>
                         {t.label}
                       </Text>
                     </Pressable>
@@ -270,34 +299,98 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
               </View>
 
               {text.trim() && activeType !== 'project' && activeType !== 'journey' && (
-                <View style={styles.extrasRow}>
-                  {areaConf ? (
-                    <Pressable style={[styles.extraChip, { backgroundColor: areaConf.c + '10', borderColor: areaConf.c + '28' }]}
-                      onPress={() => setShowAreaPicker(!showAreaPicker)}>
-                      <Text>{areaConf.e}</Text>
-                      <Text style={[styles.extraChipLabel, { color: areaConf.c }]}>{areaConf.n.split(' ')[0]}</Text>
-                      <Feather name="chevron-down" size={10} color={areaConf.c} />
-                    </Pressable>
-                  ) : (
-                    <Pressable style={styles.extraChipEmpty} onPress={() => setShowAreaPicker(true)}>
-                      <Text style={styles.extraChipEmptyText}>＋ area</Text>
-                    </Pressable>
-                  )}
-                  {activeType !== 'goal' && TOD_OPTIONS.map(o => {
-                    const on = tod === o.id;
-                    return (
-                      <Pressable key={o.id} style={[styles.extraChip, on && {
-                        backgroundColor: (typeConf?.color ?? T.brand) + '10',
-                        borderColor:     (typeConf?.color ?? T.brand) + '30',
-                      }]} onPress={() => setTod(prev => prev === o.id ? null : o.id)}>
-                        <Feather name={o.icon} size={12} color={on ? (typeConf?.color ?? T.brand) : T.t3} />
-                        <Text style={[styles.extraChipLabel, on && { color: typeConf?.color ?? T.brand, fontWeight: '700' as const }]}>
-                          {o.label}
-                        </Text>
+                <>
+                  <View style={styles.extrasRow}>
+                    {areaConf ? (
+                      <Pressable style={[styles.extraChip, { backgroundColor: areaConf.c + '10', borderColor: areaConf.c + '28' }]}
+                        onPress={() => setShowAreaPicker(!showAreaPicker)}>
+                        <Text>{areaConf.e}</Text>
+                        <Text style={[styles.extraChipLabel, { color: areaConf.c }]}>{areaConf.n.split(' ')[0]}</Text>
+                        <Feather name="chevron-down" size={10} color={areaConf.c} />
                       </Pressable>
-                    );
-                  })}
-                </View>
+                    ) : (
+                      <Pressable style={styles.extraChipEmpty} onPress={() => setShowAreaPicker(true)}>
+                        <Text style={styles.extraChipEmptyText}>＋ area</Text>
+                      </Pressable>
+                    )}
+                    {activeType !== 'goal' && TOD_OPTIONS.map(o => {
+                      const on = tod === o.id;
+                      return (
+                        <Pressable key={o.id} style={[styles.extraChip, on && {
+                          backgroundColor: (typeConf?.color ?? T.brand) + '10',
+                          borderColor:     (typeConf?.color ?? T.brand) + '30',
+                        }]} onPress={() => setTod(prev => prev === o.id ? null : o.id)}>
+                          <Feather name={o.icon} size={12} color={on ? (typeConf?.color ?? T.brand) : T.t3} />
+                          <Text style={[styles.extraChipLabel, on && { color: typeConf?.color ?? T.brand, fontWeight: '700' as const }]}>
+                            {o.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+
+                    <Pressable
+                      style={[styles.extraChip, showExtras && {
+                        backgroundColor: T.brand + '10',
+                        borderColor: T.brand + '30',
+                      }]}
+                      onPress={() => setShowExtras(!showExtras)}>
+                      <Feather name="sliders" size={12} color={showExtras ? T.brand : T.t3} />
+                      <Text style={[styles.extraChipLabel, showExtras && { color: T.brand, fontWeight: '700' as const }]}>
+                        More
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  {showExtras && (
+                    <View style={styles.moreSection}>
+                      <Text style={styles.moreSectionLabel}>PRIORITY</Text>
+                      <View style={styles.optionRow}>
+                        {PRIORITY_OPTIONS.map(p => {
+                          const on = priority === p.id;
+                          return (
+                            <Pressable key={p.id} style={[styles.optionChip, on && {
+                              backgroundColor: p.color + '12',
+                              borderColor: p.color + '40',
+                            }]} onPress={() => setPriority(p.id as Priority)}>
+                              <Feather name={p.icon} size={11} color={on ? p.color : T.t3} />
+                              <Text style={[styles.optionChipLabel, on && { color: p.color, fontWeight: '700' as const }]}>
+                                {p.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+
+                      <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>EFFORT</Text>
+                      <View style={styles.optionRow}>
+                        {EFFORT_OPTIONS.map(e => {
+                          const on = effort === e.id;
+                          return (
+                            <Pressable key={e.id} style={[styles.optionChip, on && {
+                              backgroundColor: e.color + '12',
+                              borderColor: e.color + '40',
+                            }]} onPress={() => setEffort(e.id as Effort)}>
+                              <Feather name={e.icon} size={11} color={on ? e.color : T.t3} />
+                              <Text style={[styles.optionChipLabel, on && { color: e.color, fontWeight: '700' as const }]}>
+                                {e.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+
+                      <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>DEADLINE</Text>
+                      <TextInput
+                        value={deadline}
+                        onChangeText={setDeadline}
+                        placeholder="e.g. 2026-03-15"
+                        placeholderTextColor={T.t3}
+                        style={styles.deadlineInput}
+                        returnKeyType="done"
+                      />
+                    </View>
+                  )}
+                </>
               )}
 
               {showAreaPicker && (
@@ -342,7 +435,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
 const styles = StyleSheet.create({
   overlay:        { flex: 1, justifyContent: 'flex-end' },
   backdrop:       { flex: 1, backgroundColor: 'rgba(10,8,22,0.52)' },
-  sheet:          { backgroundColor: 'rgba(253,252,255,0.98)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 18, paddingTop: 0, maxHeight: '92%' },
+  sheet:          { backgroundColor: 'rgba(253,252,255,0.98)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 0, maxHeight: '92%' },
   handleRow:      { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
   handle:         { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.08)' },
 
@@ -351,10 +444,10 @@ const styles = StyleSheet.create({
   savedTitle:     { fontSize: F.lg, fontWeight: '800', color: T.text },
   savedSub:       { fontSize: F.sm, color: T.t3, textAlign: 'center' },
 
-  headerRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 10, marginBottom: 14 },
+  headerRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 10, marginBottom: 14, gap: 8 },
   title:          { fontSize: 20, fontWeight: '800', color: T.text, letterSpacing: -0.6 },
   subtitle:       { fontSize: 12, color: T.t3, marginTop: 2 },
-  closeBtn:       { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' },
+  closeBtn:       { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   inputWrap:      { borderRadius: 18, borderWidth: 2, marginBottom: 10, overflow: 'hidden' },
   input:          { fontSize: 16, color: T.text, padding: 14, fontWeight: '400' },
@@ -383,10 +476,17 @@ const styles = StyleSheet.create({
   typeChipLabel:  { fontSize: 12, fontWeight: '500', color: T.t3 },
 
   extrasRow:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14, flexWrap: 'wrap' },
-  extraChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  extraChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(0,0,0,0.09)' },
   extraChipLabel: { fontSize: 12, color: T.t3 },
   extraChipEmpty: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
   extraChipEmptyText: { fontSize: 12, color: T.t3 },
+
+  moreSection:    { backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
+  moreSectionLabel: { fontSize: 10, fontWeight: '700', color: T.t3, letterSpacing: 0.5, marginBottom: 6 },
+  optionRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  optionChip:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.03)' },
+  optionChipLabel:{ fontSize: 12, fontWeight: '500', color: T.t3 },
+  deadlineInput:  { padding: 10, borderRadius: 12, backgroundColor: 'white', borderWidth: 1, borderColor: 'rgba(0,0,0,0.09)', fontSize: 14, color: T.text, marginTop: 2 },
 
   saveBtn:        { borderRadius: 20, padding: 17, alignItems: 'center', justifyContent: 'center' },
   saveBtnInner:   { flexDirection: 'row', alignItems: 'center', gap: 6 },

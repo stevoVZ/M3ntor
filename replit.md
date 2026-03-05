@@ -26,6 +26,7 @@ Preferred communication style: Simple, everyday language.
 - **Animations**: `react-native-reanimated` for smooth transitions and spring animations. `expo-haptics` for tactile feedback
 - **Fonts**: Inter font family loaded via `@expo-google-fonts/inter`
 - **UI Components**: Custom reusable components in `components/ui/` (Badge), `components/items/` (ItemCard, TaskRow, ProgressBar), `components/add/` (FabActionSheet, ProjectAddSheet, AreaPicker — shared responsive 4-column area grid), `components/WheelOfLife.tsx` (SVG Wheel of Life visualization using react-native-svg), `components/WheelAreaDetail.tsx` (tappable area detail panel). All UI icons use Feather from `@expo/vector-icons`
+- **Responsive Add Sheets**: FabActionSheet and ProjectAddSheet use `useWindowDimensions` to adapt layout for compact screens (<380px). Both sheets support setting priority (urgent/high/normal/low), effort (quick/medium/deep), and deadline via expandable "More" / "Priority, effort & deadline" toggles. ProjectAddSheet also supports a description field. Attribute chips use Feather icons for visual indicators.
 
 ### Backend Architecture
 
