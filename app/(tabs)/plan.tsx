@@ -157,7 +157,7 @@ export default function PlanScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }]} edges={['top']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
 
@@ -236,7 +236,7 @@ export default function PlanScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: T.bg, ...(Platform.OS === 'web' ? { paddingTop: 67 } : {}) },
+  safe:    { flex: 1, backgroundColor: T.bg },
   scroll:  { flex: 1 },
   content: { paddingHorizontal: S.md },
 

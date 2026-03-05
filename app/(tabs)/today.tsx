@@ -99,7 +99,7 @@ export default function TodayScreen() {
   const isEmpty  = activeItems.length === 0;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }]} edges={['top']}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -154,7 +154,7 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: T.bg, ...(Platform.OS === 'web' ? { paddingTop: 67 } : {}) },
+  safe:        { flex: 1, backgroundColor: T.bg },
   scroll:      { flex: 1 },
   scrollContent: { paddingHorizontal: S.md },
 
