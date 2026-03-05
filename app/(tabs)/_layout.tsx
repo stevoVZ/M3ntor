@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Pressable, Text, StyleSheet, Platform, Keyboard, Modal } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,11 +54,8 @@ function TabIcon({ name, active }: { name: string; active: boolean }) {
 }
 
 // ── Custom tab bar with centre FAB ────────────────────────
-function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
+function CustomTabBar({ state, navigation, onFabPress }: { state: any; navigation: any; onFabPress: () => void }) {
   const insets = useSafeAreaInsets();
-  const [showAdd, setShowAdd]         = useState(false);
-  const [addMode, setAddMode]         = useState<'sheet' | 'project' | 'journey'>('sheet');
-  const [prefill, setPrefill]         = useState('');
   const fabScale = useSharedValue(1);
 
   const fabStyle = useAnimatedStyle(() => ({
@@ -72,65 +69,82 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
     fabScale.value = withSpring(0.88, {}, () => {
       fabScale.value = withSpring(1);
     });
-    setAddMode('sheet');
-    setShowAdd(true);
+    onFabPress();
   }
 
   return (
-    <>
-      {/* ── Tab bar container ── */}
-      <View style={[styles.tabBar, { paddingBottom: Math.max(Platform.OS === 'web' ? 34 : insets.bottom, 8) }]}>
-        {/* Glass background */}
-        <View style={StyleSheet.absoluteFill}>
-          <View style={styles.tabGlass} />
-        </View>
-
-        {TAB_ROUTES.slice(0, 2).map((route) => {
-          const idx    = state.routes.findIndex((r: any) => r.name === route);
-          const active = state.index === idx;
-          return (
-            <Pressable key={route} style={[styles.tabItem, active && styles.tabItemActive]}
-              onPress={() => navigation.navigate(route)}>
-              <TabIcon name={route} active={active} />
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
-                {route === 'today' ? 'Today' : 'My Life'}
-              </Text>
-            </Pressable>
-          );
-        })}
-
-        {/* ── Centre FAB ── */}
-        <View style={styles.fabSlot}>
-          <Animated.View style={[styles.fabWrap, fabStyle]}>
-            <Pressable onPress={handleFabPress}>
-              <LinearGradient
-                colors={T.gradColors}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={styles.fab}>
-                <View style={styles.fabIcon}>
-                  <Text style={styles.fabPlus}>+</Text>
-                </View>
-              </LinearGradient>
-            </Pressable>
-          </Animated.View>
-        </View>
-
-        {TAB_ROUTES.slice(2).map((route) => {
-          const idx    = state.routes.findIndex((r: any) => r.name === route);
-          const active = state.index === idx;
-          return (
-            <Pressable key={route} style={[styles.tabItem, active && styles.tabItemActive]}
-              onPress={() => navigation.navigate(route)}>
-              <TabIcon name={route} active={active} />
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
-                {route === 'discover' ? 'Discover' : 'Plan'}
-              </Text>
-            </Pressable>
-          );
-        })}
+    <View style={[styles.tabBar, { paddingBottom: Math.max(Platform.OS === 'web' ? 34 : insets.bottom, 8) }]}>
+      <View style={StyleSheet.absoluteFill}>
+        <View style={styles.tabGlass} />
       </View>
 
-      {/* ── Add sheets ── */}
+      {TAB_ROUTES.slice(0, 2).map((route) => {
+        const idx    = state.routes.findIndex((r: any) => r.name === route);
+        const active = state.index === idx;
+        return (
+          <Pressable key={route} style={[styles.tabItem, active && styles.tabItemActive]}
+            onPress={() => navigation.navigate(route)}>
+            <TabIcon name={route} active={active} />
+            <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+              {route === 'today' ? 'Today' : 'My Life'}
+            </Text>
+          </Pressable>
+        );
+      })}
+
+      <View style={styles.fabSlot}>
+        <Animated.View style={[styles.fabWrap, fabStyle]}>
+          <Pressable onPress={handleFabPress}>
+            <LinearGradient
+              colors={T.gradColors}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.fab}>
+              <View style={styles.fabIcon}>
+                <Text style={styles.fabPlus}>+</Text>
+              </View>
+            </LinearGradient>
+          </Pressable>
+        </Animated.View>
+      </View>
+
+      {TAB_ROUTES.slice(2).map((route) => {
+        const idx    = state.routes.findIndex((r: any) => r.name === route);
+        const active = state.index === idx;
+        return (
+          <Pressable key={route} style={[styles.tabItem, active && styles.tabItemActive]}
+            onPress={() => navigation.navigate(route)}>
+            <TabIcon name={route} active={active} />
+            <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+              {route === 'discover' ? 'Discover' : 'Plan'}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export default function TabsLayout() {
+  const [showAdd, setShowAdd] = useState(false);
+  const [addMode, setAddMode] = useState<'sheet' | 'project' | 'journey'>('sheet');
+  const [prefill, setPrefill] = useState('');
+
+  const handleFabPress = useCallback(() => {
+    setAddMode('sheet');
+    setShowAdd(true);
+  }, []);
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Tabs
+        tabBar={(props) => <CustomTabBar {...props} onFabPress={handleFabPress} />}
+        screenOptions={{ headerShown: false }}>
+        <Tabs.Screen name="today"    />
+        <Tabs.Screen name="mylife"   />
+        <Tabs.Screen name="discover" />
+        <Tabs.Screen name="plan"     />
+      </Tabs>
+
       {showAdd && addMode === 'sheet' && (
         <FabActionSheet
           onProject={(text) => { setPrefill(text); setAddMode('project'); }}
@@ -151,20 +165,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
           />
         </Modal>
       )}
-    </>
-  );
-}
-
-export default function TabsLayout() {
-  return (
-    <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="today"    />
-      <Tabs.Screen name="mylife"   />
-      <Tabs.Screen name="discover" />
-      <Tabs.Screen name="plan"     />
-    </Tabs>
+    </View>
   );
 }
 

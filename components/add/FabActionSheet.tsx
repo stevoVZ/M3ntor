@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  Modal, Platform, ActivityIndicator,
+  Platform, ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -188,7 +188,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
     :                                                     'Add it';
 
   return (
-    <Modal transparent animationType="none" onRequestClose={onClose}>
+    <View style={styles.fullOverlay}>
       <KeyboardAvoidingView
         behavior="padding"
         keyboardVerticalOffset={0}
@@ -473,11 +473,12 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
           )}
         </Animated.View>
       </KeyboardAvoidingView>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  fullOverlay:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 },
   overlay:        { flex: 1, justifyContent: 'flex-end' },
   backdrop:       { flex: 1, backgroundColor: 'rgba(10,8,22,0.52)' },
   sheet:          { backgroundColor: 'rgba(253,252,255,0.98)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 0, maxHeight: '92%' },
