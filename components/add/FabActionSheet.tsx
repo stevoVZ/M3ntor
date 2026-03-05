@@ -290,9 +290,9 @@ export function FabActionSheet({ onClose }: Props) {
             paddingHorizontal: horizontalPad,
             paddingBottom: kbHeight > 0 ? 12 : (Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 16)),
             marginBottom: kbHeight,
-            maxHeight: kbHeight > 0
-              ? screenHeight - kbHeight - (insets.top || 44)
-              : screenHeight * 0.92,
+            ...(kbHeight > 0
+              ? { height: screenHeight - kbHeight - (insets.top || 44) }
+              : { maxHeight: screenHeight * 0.92 }),
           }]}>
 
           <View style={styles.handleRow}>
@@ -309,6 +309,7 @@ export function FabActionSheet({ onClose }: Props) {
             </View>
           ) : (
             <ScrollView
+              style={{ flex: 1 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingBottom: 20 }}>
