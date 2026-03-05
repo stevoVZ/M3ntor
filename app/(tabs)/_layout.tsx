@@ -8,6 +8,7 @@ import { T, shadow, R } from '../../constants/theme';
 import { FabActionSheet } from '../../components/add/FabActionSheet';
 import { ProjectAddSheet } from '../../components/add/ProjectAddSheet';
 import ProgramBuilder from '../../components/discover/ProgramBuilder';
+import { M3ntorIconStatic } from '../../components/M3ntorIcon';
 
 // ── Tab icon SVG paths ────────────────────────────────────
 function TabIcon({ name, active }: { name: string; active: boolean }) {
@@ -100,7 +101,7 @@ function CustomTabBar({ state, navigation, onFabPress }: { state: any; navigatio
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={styles.fab}>
               <View style={styles.fabIcon}>
-                <Text style={styles.fabPlus}>+</Text>
+                <M3ntorIconStatic size={26} fill="white" />
               </View>
             </LinearGradient>
           </Pressable>
@@ -226,13 +227,6 @@ const styles = StyleSheet.create({
   fabIcon: {
     alignItems:     'center',
     justifyContent: 'center',
-  },
-  fabPlus: {
-    fontSize:   28,
-    color:      'white',
-    fontWeight: '300',
-    lineHeight: 30,
-    marginTop:  -2,
   },
   // Small icon helpers
   iconBox: {
