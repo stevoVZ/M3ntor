@@ -320,7 +320,7 @@ export function FabActionSheet({ onProject, onClose }: Props) {
               {/* Save button */}
               <Pressable onPress={handleSave} disabled={!canSave} style={{ marginTop: S.md }}>
                 <LinearGradient
-                  colors={canSave ? (typeConf ? [typeConf.color, typeConf.color + 'BB'] : T.gradColors) : ['#E8E4F4','#E8E4F4']}
+                  colors={canSave ? (typeConf ? [typeConf.color, typeConf.color + 'BB'] : T.gradColors) : [T.sep, T.sep]}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.saveBtn}>
                   <Text style={[styles.saveBtnText, !canSave && { color: T.t3 }]}>{saveBtnLabel}</Text>

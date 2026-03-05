@@ -1,37 +1,31 @@
 import { Platform } from 'react-native';
 
-// ─────────────────────────────────────────────────────────
-// M3NTOR theme — ported from prototype T object
-// ─────────────────────────────────────────────────────────
-
 export const T = {
-  brand:   '#6C5CE7',
-  green:   '#00B894',
-  orange:  '#FDCB6E',
-  red:     '#E17055',
-  blue:    '#0984E3',
-  purple:  '#9B59B6',
+  brand:   '#5856D6',
+  green:   '#34C759',
+  orange:  '#FF9500',
+  red:     '#FF3B30',
+  blue:    '#007AFF',
+  purple:  '#AF52DE',
 
-  text:    '#1A1A2E',
-  t2:      '#4A4A6A',
-  t3:      '#9090B0',
+  text:    '#1C1C1E',
+  t2:      '#48484A',
+  t3:      '#8E8E93',
 
-  sep:     '#E8E4F4',
-  fill:    '#F4F2FF',
-  bg:      '#F4F2FF',
+  sep:     '#E5E5EA',
+  fill:    '#F2F2F7',
+  bg:      '#FFFFFF',
 
-  // Gradient colours (use with expo-linear-gradient)
-  gradStart: '#6C5CE7',
-  gradEnd:   '#8E78FF',
-  gradColors: ['#6C5CE7', '#8E78FF'] as const,
+  gradStart: '#5856D6',
+  gradEnd:   '#7B79E8',
+  gradColors: ['#5856D6', '#7B79E8'] as const,
 
-  // Glass effect background
-  glass:     'rgba(255,255,255,0.72)',
+  glass:     'rgba(242,242,247,0.72)',
   glassHeavy:'rgba(255,255,255,0.94)',
+
+  dark:    '#141419',
 } as const;
 
-// ── Shadows ───────────────────────────────────────────────
-// React Native shadows (replaces CSS box-shadow)
 export const shadow = {
   xs: Platform.select({
     ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 2,  elevation: 1 },
@@ -60,7 +54,6 @@ export const shadow = {
   }),
 } as const;
 
-// ── Spacing ───────────────────────────────────────────────
 export const S = {
   xs:  4,
   sm:  8,
@@ -70,7 +63,6 @@ export const S = {
   xxl: 48,
 } as const;
 
-// ── Border radii ──────────────────────────────────────────
 export const R = {
   xs:  6,
   sm:  10,
@@ -80,7 +72,6 @@ export const R = {
   pill:99,
 } as const;
 
-// ── Typography sizes ──────────────────────────────────────
 export const F = {
   xs:  11,
   sm:  13,

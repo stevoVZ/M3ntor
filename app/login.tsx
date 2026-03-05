@@ -65,7 +65,7 @@ export default function LoginScreen() {
 
         {/* Brand hero */}
         <LinearGradient
-          colors={['#16103A', '#261D5A']}
+          colors={[T.dark, '#1E1E2A']}
           style={styles.hero}>
           <Text style={styles.heroLogo}>M3NTOR</Text>
           <Text style={styles.heroTagline}>Build the life you actually want</Text>
@@ -170,7 +170,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: '#16103A' },
+  safe:     { flex: 1, backgroundColor: T.dark },
   kav:      { flex: 1 },
 
   hero:        { paddingTop: 56, paddingBottom: 40, paddingHorizontal: 32, alignItems: 'center' },

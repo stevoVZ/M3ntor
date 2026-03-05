@@ -50,7 +50,7 @@ export default function RootLayout() {
 
   if (booting) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#16103A', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: '#141419', alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={T.brand} size="large" />
       </View>
     );

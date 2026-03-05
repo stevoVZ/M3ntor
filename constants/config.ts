@@ -5,15 +5,15 @@ import type { Journey } from '../types';
 // ITEM_AREAS — life areas with display config
 // ─────────────────────────────────────────────────────────
 export const ITEM_AREAS: Record<string, { n: string; c: string; e: string }> = {
-  health:        { n: 'Health & Fitness',  c: '#FF6B6B', e: '❤️' },
-  home:          { n: 'Home & Living',     c: '#E17055', e: '🏠' },
-  career:        { n: 'Career & Work',     c: '#0984E3', e: '💼' },
-  finance:       { n: 'Finance',           c: '#00B894', e: '💰' },
-  learning:      { n: 'Learning & Growth', c: '#6C5CE7', e: '📚' },
-  relationships: { n: 'Relationships',     c: '#E84393', e: '💜' },
-  fun:           { n: 'Fun & Adventure',   c: '#FDCB6E', e: '✨' },
-  life:          { n: 'Life Tasks',        c: '#636E72', e: '📌' },
-  spirituality:  { n: 'Mind & Spirit',     c: '#A29BFE', e: '🌿' },
+  health:        { n: 'Health & Fitness',  c: '#34C759', e: '❤️' },
+  home:          { n: 'Home & Living',     c: '#FF9500', e: '🏠' },
+  career:        { n: 'Career & Work',     c: '#007AFF', e: '💼' },
+  finance:       { n: 'Finance',           c: '#FFCC00', e: '💰' },
+  learning:      { n: 'Learning & Growth', c: '#5856D6', e: '📚' },
+  relationships: { n: 'Relationships',     c: '#FF2D55', e: '💜' },
+  fun:           { n: 'Fun & Adventure',   c: '#FF9500', e: '✨' },
+  life:          { n: 'Life Tasks',        c: '#8E8E93', e: '📌' },
+  spirituality:  { n: 'Mind & Spirit',     c: '#AF52DE', e: '🌿' },
 };
 
 // ─────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ export const KIND_CONFIG = {
   journey: { label: 'Journey', color: T.brand,   icon: 'compass', order: 1 },
   project: { label: 'Project', color: T.green,   icon: 'folder',  order: 2 },
   action:  { label: 'To-Do',   color: T.t3,      icon: 'check',   order: 3 },
-  goal:    { label: 'Goal',    color: '#9B59B6',  icon: 'target',  order: 4 },
+  goal:    { label: 'Goal',    color: '#AF52DE',  icon: 'target',  order: 4 },
 } as const;
 
 // ─────────────────────────────────────────────────────────

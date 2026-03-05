@@ -274,7 +274,7 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
                 <LinearGradient
                   colors={canSave
                     ? (areaConf ? [areaConf.c, areaConf.c + 'BB'] : T.gradColors)
-                    : ['#E8E4F4', '#E8E4F4']}
+                    : [T.sep, T.sep]}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.saveBtn}>
                   <Text style={[styles.saveBtnText, !canSave && { color: T.t3 }]}>

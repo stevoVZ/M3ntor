@@ -21,7 +21,7 @@ Preferred communication style: Simple, everyday language.
 - **NLP Utilities**: `utils/nlp.ts` provides instant local area suggestion and type inference from text
 - **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers
 - **Item Utilities**: `utils/items.ts` provides `itemKind()` (derive type from properties), `createItem()` and `createStep()` factories, progress calculations, recurrence helpers
-- **Design System**: `constants/theme.ts` exports `T` (colors/tokens), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows). Legacy `constants/colors.ts` still exists and is used by older UI components
+- **Design System**: `constants/theme.ts` exports `T` (colors/tokens using M3NTOR brand palette — indigo `#5856D6` brand, iOS system accent colors, white `#FFFFFF` background, dark `#141419` for login/splash), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows). Legacy `constants/colors.ts` still exists and is used by older UI components
 - **Config**: `constants/config.ts` exports `ITEM_AREAS` (Record<string, {n,c,e}>), `AREAS` (10 Wheel of Life areas with id, name, color, score, icon, description), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog). Also exports `normalizeAreaId()`, `resolveArea()`, `scoreLabel()`, `scoreTier()` for bridging between ITEM_AREAS and AREAS systems
 - **Animations**: `react-native-reanimated` for smooth transitions and spring animations. `expo-haptics` for tactile feedback
 - **Fonts**: Inter font family loaded via `@expo-google-fonts/inter`
