@@ -94,19 +94,13 @@ function CustomTabBar({ state, navigation, onFabPress }: { state: any; navigatio
 
       <View style={styles.fabSlot}>
         <Animated.View style={[styles.fabWrap, fabStyle]}>
-          <Pressable onPress={handleFabPress}>
-            <LinearGradient
-              colors={T.gradColors}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.fab}>
-              <View style={styles.fabIcon}>
-                <Image
-                  source={require('../../assets/images/m3ntor-icon-mark.png')}
-                  style={{ width: 34, height: 22, tintColor: 'white' }}
-                  resizeMode="contain"
-                />
-              </View>
-            </LinearGradient>
+          <Pressable onPress={handleFabPress} style={styles.fabBtn}>
+            <Image
+              source={require('../../assets/images/m3ntor-icon-mark.png')}
+              style={styles.fabImg}
+              resizeMode="contain"
+            />
+            <Text style={styles.fabLabel}>Create</Text>
           </Pressable>
         </Animated.View>
       </View>
@@ -211,25 +205,26 @@ const styles = StyleSheet.create({
   fabSlot: {
     flex:            1,
     alignItems:      'center',
-    justifyContent:  'flex-end',
-    paddingBottom:   4,
+    justifyContent:  'center',
   },
   fabWrap: {
-    marginBottom: 6,
-    ...shadow.fab,
   },
-  fab: {
-    width:          56,
-    height:         56,
-    borderRadius:   18,
+  fabBtn: {
     alignItems:     'center',
     justifyContent: 'center',
-    borderWidth:    2.5,
-    borderColor:    'rgba(255,255,255,0.85)',
+    paddingVertical: 4,
+    gap:             2,
   },
-  fabIcon: {
-    alignItems:     'center',
-    justifyContent: 'center',
+  fabImg: {
+    width:  40,
+    height: 26,
+  },
+  fabLabel: {
+    fontSize:    10,
+    fontWeight:  '600' as const,
+    color:       T.brand,
+    letterSpacing: -0.2,
+    lineHeight:  12,
   },
   // Small icon helpers
   iconBox: {

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -396,11 +396,6 @@ export default function TodayScreen() {
         <View style={styles.hero}>
           <Text style={styles.heroDate}>{dateStr.toUpperCase()}</Text>
           <View style={styles.heroRow}>
-            <Image
-              source={require('../../assets/images/m3ntor-icon-mark.png')}
-              style={{ width: 44, height: 28 }}
-              resizeMode="contain"
-            />
             <View style={{ flex: 1 }}>
               <Text style={styles.heroGreeting}>{greeting},</Text>
               <Text style={styles.heroName}>Ready to go.</Text>
