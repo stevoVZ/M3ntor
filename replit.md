@@ -22,10 +22,10 @@ Preferred communication style: Simple, everyday language.
 - **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers
 - **Item Utilities**: `utils/items.ts` provides `itemKind()` (derive type from properties), `createItem()` and `createStep()` factories, progress calculations, recurrence helpers
 - **Design System**: `constants/theme.ts` exports `T` (colors/tokens), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows). Legacy `constants/colors.ts` still exists and is used by older UI components
-- **Config**: `constants/config.ts` exports `ITEM_AREAS` (Record<string, {n,c,e}>), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog)
+- **Config**: `constants/config.ts` exports `ITEM_AREAS` (Record<string, {n,c,e}>), `AREAS` (10 Wheel of Life areas with id, name, color, score, icon, description), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog). Also exports `normalizeAreaId()`, `resolveArea()`, `scoreLabel()`, `scoreTier()` for bridging between ITEM_AREAS and AREAS systems
 - **Animations**: `react-native-reanimated` for smooth transitions and spring animations. `expo-haptics` for tactile feedback
 - **Fonts**: Inter font family loaded via `@expo-google-fonts/inter`
-- **UI Components**: Custom reusable components in `components/ui/` (Button, Card), `components/items/` (ItemCard, TaskRow, ProgressBar), and `components/add/` (FabActionSheet, ProjectAddSheet)
+- **UI Components**: Custom reusable components in `components/ui/` (Button, Card), `components/items/` (ItemCard, TaskRow, ProgressBar), `components/add/` (FabActionSheet, ProjectAddSheet), `components/WheelOfLife.tsx` (SVG Wheel of Life visualization using react-native-svg), `components/WheelAreaDetail.tsx` (tappable area detail panel)
 
 ### Backend Architecture
 
@@ -63,7 +63,7 @@ app/
     _layout.tsx        # Tab bar configuration
     index.tsx          # Redirects to today
     today.tsx          # Today's active items
-    mylife.tsx         # Items organized by life area
+    mylife.tsx         # My Life — Wheel of Life SVG visualization, area scoring, glass-card design, insight cards
     discover.tsx       # Journey/program discovery
     plan.tsx           # Full item list with filters
   add.tsx              # Add item modal sheet

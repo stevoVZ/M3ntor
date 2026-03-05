@@ -17,6 +17,68 @@ export const ITEM_AREAS: Record<string, { n: string; c: string; e: string }> = {
 };
 
 // ─────────────────────────────────────────────────────────
+// AREAS — Wheel of Life areas (10 life dimensions)
+// ─────────────────────────────────────────────────────────
+export interface LifeArea {
+  id: string;
+  n: string;
+  c: string;
+  score: number;
+  start: number;
+  icon: string;
+  desc: string;
+}
+
+export const AREAS: LifeArea[] = [
+  { id: 'health',        n: 'Health',          c: '#34C759', score: 3, start: 5, icon: 'heart',     desc: 'Your physical wellbeing — energy levels, sleep quality, exercise habits, nutrition, and how your body feels day to day.' },
+  { id: 'career',        n: 'Career',          c: '#007AFF', score: 4, start: 3, icon: 'briefcase', desc: 'Your professional life — job satisfaction, growth opportunities, skills development, work-life balance, and sense of purpose at work.' },
+  { id: 'finances',      n: 'Finances',        c: '#FF9500', score: 5, start: 4, icon: 'dollar',    desc: 'Your financial health — income, savings, debt management, spending habits, and confidence in your financial future.' },
+  { id: 'relationships', n: 'Relationships',   c: '#FF2D55', score: 7, start: 6, icon: 'people',    desc: 'Your close connections — quality of friendships, communication with family, trust, boundaries, and feeling supported.' },
+  { id: 'personal',      n: 'Personal Growth', c: '#AF52DE', score: 6, start: 5, icon: 'star',      desc: 'Your self-development — habits, mindset, learning, confidence, self-awareness, and progress toward becoming who you want to be.' },
+  { id: 'social',        n: 'Social',          c: '#5AC8FA', score: 5, start: 5, icon: 'chat',      desc: 'Your social life — community, belonging, social activities, meeting new people, and the richness of your social connections.' },
+  { id: 'love',          n: 'Love',            c: '#FF375F', score: 8, start: 8, icon: 'heart2',    desc: 'Your romantic life — intimacy, partnership quality, emotional connection, shared goals, and feeling loved and valued.' },
+  { id: 'fun',           n: 'Fun',             c: '#FF6B2C', score: 4, start: 3, icon: 'zap',       desc: 'Your joy and play — hobbies, creativity, adventure, laughter, and making time for things that light you up.' },
+  { id: 'environment',   n: 'Environment',     c: '#30D158', score: 6, start: 5, icon: 'home',      desc: 'Your physical spaces — home comfort, workspace setup, organization, surroundings that support your goals and calm your mind.' },
+  { id: 'spirituality',  n: 'Spirituality',    c: '#BF5AF2', score: 5, start: 4, icon: 'sun',       desc: 'Your inner life — mindfulness, meditation, sense of meaning, gratitude, connection to something bigger, and inner peace.' },
+];
+
+export const getArea = (id: string): LifeArea | undefined => AREAS.find((a) => a.id === id);
+
+// ─────────────────────────────────────────────────────────
+// AREA_BRIDGE — maps Wheel area IDs to ITEM_AREAS IDs
+// ─────────────────────────────────────────────────────────
+const AREA_BRIDGE: Record<string, string> = {
+  finances: 'finance',
+  personal: 'learning',
+  environment: 'home',
+};
+
+export function normalizeAreaId(id: string): string {
+  return AREA_BRIDGE[id] || id;
+}
+
+export function resolveArea(id: string): { c: string; n: string; e: string } {
+  const normalized = normalizeAreaId(id);
+  const ia = ITEM_AREAS[normalized];
+  const la = getArea(id);
+  return { c: ia?.c || la?.c || T.brand, n: ia?.n || la?.n || id, e: ia?.e || '' };
+}
+
+export function scoreLabel(score: number): string {
+  if (score <= 3) return 'Needs focus';
+  if (score <= 5) return 'Building';
+  if (score <= 7) return 'Growing';
+  return 'Strong';
+}
+
+export function scoreTier(score: number): { label: string; color: string } {
+  if (score <= 3) return { label: 'Needs focus', color: '#FF3B30' };
+  if (score <= 5) return { label: 'Building', color: '#FF9500' };
+  if (score <= 7) return { label: 'Growing', color: '#34C759' };
+  return { label: 'Strong', color: '#007AFF' };
+}
+
+// ─────────────────────────────────────────────────────────
 // KIND_CONFIG — display config per item kind
 // ─────────────────────────────────────────────────────────
 export const KIND_CONFIG = {
