@@ -27,11 +27,10 @@ interface Props {
 }
 
 const TYPE_OPTIONS = [
-  { id: 'action',  label: 'Action',  emoji: '✓',  color: T.green   },
-  { id: 'habit',   label: 'Habit',   emoji: '🔄', color: T.orange  },
-  { id: 'goal',    label: 'Goal',    emoji: '🎯', color: '#9B59B6' },
-  { id: 'project', label: 'Project', emoji: '📁', color: T.brand   },
-  { id: 'journey', label: 'Journey', emoji: '🧭', color: '#007AFF' },
+  { id: 'action',  label: 'Action',  sub: 'One-off task',       icon: 'check'  as const, color: T.green   },
+  { id: 'habit',   label: 'Habit',   sub: 'Daily or recurring', icon: 'repeat' as const, color: T.orange  },
+  { id: 'goal',    label: 'Goal',    sub: 'Big aspiration',     icon: 'target' as const, color: '#9B59B6' },
+  { id: 'project', label: 'Project', sub: 'Multi-step plan',   icon: 'layers' as const, color: T.brand   },
 ] as const;
 
 const PROMOS = [
@@ -105,7 +104,9 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
 
   const inferredType = useMemo(() => inferType(text), [text]);
   const [pinnedAiType, setPinnedAiType] = useState<string | null>(null);
-  const activeType   = selectedType ?? (pinnedAiType && text.trim() ? pinnedAiType : (text.trim() ? inferredType : null));
+  const validTypes = new Set(['action', 'habit', 'goal', 'project']);
+  const safePinnedType = pinnedAiType && validTypes.has(pinnedAiType) ? pinnedAiType : null;
+  const activeType   = selectedType ?? (safePinnedType && text.trim() ? safePinnedType : (text.trim() ? inferredType : null));
   const typeConf     = activeType ? TYPE_OPTIONS.find(t => t.id === activeType) : null;
 
   useEffect(() => {
@@ -146,7 +147,6 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const canSave  = text.trim().length > 0 && (activeType !== 'goal' || !!area);
 
   function handleTypeSelect(id: string) {
-    if (id === 'journey')                    { onJourney?.(); return; }
     const newVal = selectedType === id ? null : id;
     setSelectedType(newVal);
     setPinnedAiType(null);
@@ -171,7 +171,6 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   async function handleSave() {
     if (!canSave) return;
     const type = activeType ?? 'action';
-    if (type === 'journey') { onJourney?.(); return; }
 
     let enrichedEmoji = type === 'habit' ? '🔄' : type === 'goal' ? '🎯' : type === 'project' ? '📁' : '✓';
     let enrichedArea = area ?? suggestArea(text) ?? 'life';
@@ -292,7 +291,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                 />
                 {typeConf && (
                   <View style={[styles.typeBadge, { backgroundColor: typeConf.color + '14' }]}>
-                    <Text style={styles.typeBadgeEmoji}>{typeConf.emoji}</Text>
+                    <Feather name={typeConf.icon} size={12} color={typeConf.color} />
                     <Text style={[styles.typeBadgeLabel, { color: typeConf.color }]}>{typeConf.label}</Text>
                   </View>
                 )}
@@ -357,17 +356,20 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                 )}
               </View>
 
-              <View style={styles.typeRow}>
+              <View style={styles.typeGrid}>
                 {TYPE_OPTIONS.map(t => {
                   const on = activeType === t.id && !!text.trim();
                   return (
-                    <Pressable key={t.id} style={[styles.typeChip, on && {
-                      backgroundColor: t.color + '12',
+                    <Pressable key={t.id} style={[styles.typeCard, on && {
+                      backgroundColor: t.color + '10',
                       borderColor:     t.color + '40',
                     }]} onPress={() => handleTypeSelect(t.id)}>
-                      <Text style={[styles.typeChipEmoji, isCompact && { fontSize: 12 }]}>{t.emoji}</Text>
-                      <Text style={[styles.typeChipLabel, isCompact && { fontSize: 11 }, on && { color: t.color, fontWeight: '700' as const }]}>
+                      <Feather name={t.icon} size={16} color={on ? t.color : T.t3} />
+                      <Text style={[styles.typeCardLabel, on && { color: t.color }]}>
                         {t.label}
+                      </Text>
+                      <Text style={[styles.typeCardSub, on && { color: t.color + 'AA' }]}>
+                        {t.sub}
                       </Text>
                     </Pressable>
                   );
@@ -430,7 +432,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                 </View>
               )}
 
-              {text.trim() && activeType !== 'project' && activeType !== 'journey' && (
+              {text.trim() && activeType !== 'project' && (
                 <>
                   <View style={styles.extrasRow}>
                     {areaConf ? (
@@ -598,7 +600,6 @@ const styles = StyleSheet.create({
   inputWrap:      { borderRadius: 18, borderWidth: 2, marginBottom: 10, overflow: 'hidden' },
   input:          { fontSize: 16, color: T.text, padding: 14, fontWeight: '400' },
   typeBadge:      { position: 'absolute', right: 12, top: '50%', marginTop: -14, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
-  typeBadgeEmoji: { fontSize: 13 },
   typeBadgeLabel: { fontSize: 11, fontWeight: '700' },
 
   hintArea:       { minHeight: 40, marginBottom: 12 },
@@ -616,10 +617,10 @@ const styles = StyleSheet.create({
   promoChip:      { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(108,92,231,0.06)', borderWidth: 1, borderColor: 'rgba(108,92,231,0.13)' },
   promoChipText:  { fontSize: 12, color: T.t2 },
 
-  typeRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 6 },
-  typeChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.03)' },
-  typeChipEmoji:  { fontSize: 14 },
-  typeChipLabel:  { fontSize: 12, fontWeight: '500', color: T.t3 },
+  typeGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  typeCard:       { width: '47%' as unknown as number, alignItems: 'center', gap: 2, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.025)' },
+  typeCardLabel:  { fontSize: 13, fontWeight: '700' as const, color: T.t2, marginTop: 2 },
+  typeCardSub:    { fontSize: 10, color: T.t3, textAlign: 'center' as const },
 
   typeReasonRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, marginBottom: 10 },
   typeReasonText: { fontSize: 11, color: T.brand, fontStyle: 'italic', flex: 1 },
