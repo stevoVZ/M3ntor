@@ -94,6 +94,49 @@ export async function generateProjectTasks(title: string, existing: string[] = [
   }
 }
 
+export interface AiHabitPlan {
+  schedule?: string;
+  tip?: string;
+  why?: string;
+  emoji?: string;
+  area?: string;
+}
+
+export async function generateHabitPlan(title: string, context?: string, country?: string): Promise<AiHabitPlan> {
+  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples.` : '';
+  const noApps = `\nNever recommend apps, websites, software, or third-party services. Only suggest actions the user can do themselves.`;
+  const contextCtx = context ? `\nAdditional context from the user:\n${context}` : '';
+  const prompt = `Habit: "${title}"${countryCtx}${noApps}${contextCtx}\nHelp plan this habit. Reply JSON only: {"schedule":"a brief recommended schedule, e.g. 'Every morning for 10 minutes'","tip":"one practical tip for building this habit consistently","why":"one motivational sentence about why this habit matters","emoji":"single relevant emoji","area":"one of: health, career, finance, learning, relationships, fun, life, spirituality"}`;
+  try {
+    const raw = await aiAssist(prompt);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean) as AiHabitPlan;
+  } catch {
+    return {};
+  }
+}
+
+export interface AiActionPlan {
+  tip?: string;
+  bestTime?: string;
+  emoji?: string;
+  area?: string;
+}
+
+export async function generateActionPlan(title: string, context?: string, country?: string): Promise<AiActionPlan> {
+  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples.` : '';
+  const noApps = `\nNever recommend apps, websites, software, or third-party services. Only suggest actions the user can do themselves.`;
+  const contextCtx = context ? `\nAdditional context from the user:\n${context}` : '';
+  const prompt = `Action: "${title}"${countryCtx}${noApps}${contextCtx}\nHelp plan this action. Reply JSON only: {"tip":"one practical tip for completing this effectively","bestTime":"morning|afternoon|evening","emoji":"single relevant emoji","area":"one of: health, career, finance, learning, relationships, fun, life, spirituality"}`;
+  try {
+    const raw = await aiAssist(prompt);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean) as AiActionPlan;
+  } catch {
+    return {};
+  }
+}
+
 export async function generateSubtasks(taskTitle: string, projectTitle: string): Promise<string[]> {
   const prompt = `Break down this task into 3-4 subtasks:\n"${taskTitle}"\nProject context: "${projectTitle}"\nReply JSON only: {"subtasks":["subtask 1","subtask 2"]}`;
   try {

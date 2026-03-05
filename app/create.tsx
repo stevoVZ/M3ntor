@@ -15,7 +15,8 @@ import { T, S, F } from '@/constants/theme';
 import { ITEM_AREAS } from '@/constants/config';
 import type { Priority, Effort } from '@/types';
 import { suggestArea, inferType } from '@/utils/nlp';
-import { getItemHint, generateGoal, generateProjectTasks, assessProjectComplexity } from '@/lib/ai';
+import { getItemHint, generateGoal, generateProjectTasks, assessProjectComplexity, generateHabitPlan, generateActionPlan } from '@/lib/ai';
+import type { AiHabitPlan, AiActionPlan } from '@/lib/ai';
 import { createItem, createStep } from '@/utils/items';
 import { useStore } from '@/lib/store';
 import { getCountryByCode } from '@/constants/countries';
@@ -74,6 +75,56 @@ const EFFORT_CONFIG: Record<string, { icon: 'zap' | 'clock'; label: string; sub:
   deep:   { icon: 'zap',   label: 'Deep work',       sub: 'Half day+',  color: T.brand  },
 };
 
+type CreationMode = 'ai' | 'manual' | null;
+
+const RECURRENCE_OPTIONS = [
+  { id: 'daily',    label: 'Every day',     icon: 'sun'      as const },
+  { id: 'weekdays', label: 'Weekdays',      icon: 'briefcase' as const },
+  { id: 'weekly',   label: 'Once a week',   icon: 'calendar' as const },
+  { id: 'custom',   label: '3x per week',   icon: 'repeat'   as const },
+] as const;
+
+interface FollowUpQuestion {
+  id: string;
+  label: string;
+  type: 'chips' | 'text';
+  options?: { id: string; label: string; icon?: string }[];
+  placeholder?: string;
+}
+
+const FOLLOWUP_BY_TYPE: Record<string, FollowUpQuestion[]> = {
+  action: [
+    { id: 'when', label: 'When do you want to do this?', type: 'chips', options: [
+      { id: 'today', label: 'Today' }, { id: 'tomorrow', label: 'Tomorrow' },
+      { id: 'this_week', label: 'This week' }, { id: 'no_rush', label: 'No rush' },
+    ]},
+    { id: 'duration', label: 'How long will it take?', type: 'chips', options: [
+      { id: 'quick', label: '< 15 min' }, { id: 'medium', label: '~1\u20132 hrs' }, { id: 'deep', label: 'Half day+' },
+    ]},
+  ],
+  habit: [
+    { id: 'frequency', label: 'How often?', type: 'chips', options: [
+      { id: 'daily', label: 'Every day' }, { id: 'weekdays', label: 'Weekdays' },
+      { id: 'weekly', label: 'Once a week' }, { id: '3x', label: '3x per week' },
+    ]},
+    { id: 'time', label: 'Best time of day?', type: 'chips', options: [
+      { id: 'morning', label: 'Morning', icon: 'sun' }, { id: 'afternoon', label: 'Afternoon', icon: 'sunrise' },
+      { id: 'evening', label: 'Evening', icon: 'moon' }, { id: 'anytime', label: 'Anytime', icon: 'clock' },
+    ]},
+    { id: 'experience', label: 'Your experience with this?', type: 'chips', options: [
+      { id: 'new', label: 'Brand new' }, { id: 'tried', label: 'Tried before' }, { id: 'restarting', label: 'Getting back to it' },
+    ]},
+  ],
+  goal: [
+    { id: 'timeline', label: 'When do you want to achieve this?', type: 'chips', options: [
+      { id: '1month', label: '1 month' }, { id: '3months', label: '3 months' },
+      { id: '6months', label: '6 months' }, { id: '1year', label: '1 year' },
+    ]},
+    { id: 'success', label: 'What does success look like?', type: 'text', placeholder: 'e.g. Complete my first marathon' },
+  ],
+  project: [],
+};
+
 export default function CreateScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
@@ -95,7 +146,6 @@ export default function CreateScreen() {
   const [priority, setPriority]         = useState<Priority>('normal');
   const [effort, setEffort]             = useState<Effort>('medium');
   const [deadline, setDeadline]         = useState('');
-  const [showExtras, setShowExtras]     = useState(false);
   const [aiHint, setAiHint]             = useState<{ why?: string; firstStep?: string; tip?: string; effort?: string; suggestedType?: string; typeReason?: string } | null>(null);
   const [aiLoading, setAiLoading]       = useState(false);
   const [aiPending, setAiPending]       = useState(false);
@@ -111,6 +161,12 @@ export default function CreateScreen() {
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<number, string>>({});
   const [clarifyLoading, setClarifyLoading] = useState(false);
   const [showClarify, setShowClarify] = useState(false);
+  const [creationMode, setCreationMode] = useState<CreationMode>(null);
+  const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
+  const [aiGenResult, setAiGenResult] = useState<{ habitPlan?: AiHabitPlan; actionPlan?: AiActionPlan } | null>(null);
+  const [aiGenLoading, setAiGenLoading] = useState(false);
+  const [manualRecurrence, setManualRecurrence] = useState('daily');
+  const [manualDescription, setManualDescription] = useState('');
 
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -181,28 +237,6 @@ export default function CreateScreen() {
       setAiHint(hint);
       if (hint.suggestedType && !selectedType) {
         setPinnedAiType(hint.suggestedType);
-        if (hint.suggestedType === 'project' && breakdownSteps.length === 0 && !showClarify) {
-          setClarifyLoading(true);
-          const complexity = await assessProjectComplexity(text, countryName);
-          if (complexity.complex && complexity.questions.length > 0) {
-            setClarifyQuestions(complexity.questions);
-            setClarifyAnswers({});
-            setShowClarify(true);
-            setClarifyLoading(false);
-          } else {
-            setClarifyLoading(false);
-            setBreakdownLoading(true);
-            const result = await generateProjectTasks(text, [], countryName);
-            if (result.tasks.length > 0) {
-              setBreakdownSteps(result.tasks.map(t => ({
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                text: t.title,
-                effort: t.effort,
-              })));
-            }
-            setBreakdownLoading(false);
-          }
-        }
       }
       setAiLoading(false);
       setAiPending(false);
@@ -213,16 +247,31 @@ export default function CreateScreen() {
 
   const areaConf = area ? ITEM_AREAS[area] : null;
   const canSave  = text.trim().length > 0 && (activeType !== 'goal' || !!area);
+  const hasFollowUps = activeType ? (FOLLOWUP_BY_TYPE[activeType]?.length ?? 0) > 0 : false;
+  const followUpsAnswered = hasFollowUps && Object.keys(followUpAnswers).length > 0;
+  const needsFollowUp = creationMode === 'ai' && hasFollowUps && !followUpsAnswered && !aiGenResult && activeType !== 'project';
+  const canSaveFinal = canSave && !!creationMode && !needsFollowUp;
 
   function handleTypeSelect(id: string) {
     const newVal = selectedType === id ? null : id;
     setSelectedType(newVal);
+    setCreationMode(null);
+    setFollowUpAnswers({});
+    setAiGenResult(null);
+    setAiGenLoading(false);
     if (newVal !== 'project') {
       setShowClarify(false);
       setClarifyQuestions([]);
       setClarifyAnswers({});
+      setBreakdownSteps([]);
     }
-    if (newVal === 'project' && text.trim() && breakdownSteps.length === 0 && !showClarify) {
+  }
+
+  function handleModeSelect(mode: CreationMode) {
+    setCreationMode(mode);
+    setFollowUpAnswers({});
+    setAiGenResult(null);
+    if (mode === 'ai' && activeType === 'project' && text.trim() && breakdownSteps.length === 0 && !showClarify) {
       setClarifyLoading(true);
       assessProjectComplexity(text, countryName).then(complexity => {
         if (complexity.complex && complexity.questions.length > 0) {
@@ -248,6 +297,47 @@ export default function CreateScreen() {
     }
   }
 
+  async function handleFollowUpGenerate() {
+    if (!activeType || !text.trim()) return;
+    const contextParts = Object.entries(followUpAnswers)
+      .filter(([_, v]) => v)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('\n');
+    setAiGenLoading(true);
+    if (activeType === 'habit') {
+      const plan = await generateHabitPlan(text.trim(), contextParts, countryName);
+      setAiGenResult({ habitPlan: plan });
+      if (plan.area && !area) setArea(plan.area);
+      const freqAnswer = followUpAnswers['frequency'];
+      if (freqAnswer === 'daily') setManualRecurrence('daily');
+      else if (freqAnswer === 'weekdays') setManualRecurrence('weekdays');
+      else if (freqAnswer === 'weekly') setManualRecurrence('weekly');
+      else if (freqAnswer === '3x') setManualRecurrence('custom');
+      const timeAnswer = followUpAnswers['time'];
+      if (timeAnswer && timeAnswer !== 'anytime') setTod(timeAnswer);
+    } else if (activeType === 'action') {
+      const plan = await generateActionPlan(text.trim(), contextParts, countryName);
+      setAiGenResult({ actionPlan: plan });
+      if (plan.area && !area) setArea(plan.area);
+      if (plan.bestTime) setTod(plan.bestTime);
+      const durAnswer = followUpAnswers['duration'];
+      if (durAnswer === 'quick') setEffort('quick');
+      else if (durAnswer === 'medium') setEffort('medium');
+      else if (durAnswer === 'deep') setEffort('deep');
+    } else if (activeType === 'goal') {
+      const timelineAnswer = followUpAnswers['timeline'];
+      if (timelineAnswer) {
+        const now = new Date();
+        if (timelineAnswer === '1month') now.setMonth(now.getMonth() + 1);
+        else if (timelineAnswer === '3months') now.setMonth(now.getMonth() + 3);
+        else if (timelineAnswer === '6months') now.setMonth(now.getMonth() + 6);
+        else if (timelineAnswer === '1year') now.setFullYear(now.getFullYear() + 1);
+        setDeadline(now.toISOString().slice(0, 10));
+      }
+    }
+    setAiGenLoading(false);
+  }
+
   async function handleClarifyGenerate() {
     const contextParts = clarifyQuestions.map((q, i) =>
       `Q: ${q}\nA: ${clarifyAnswers[i] || '(not answered)'}`
@@ -266,7 +356,7 @@ export default function CreateScreen() {
   }
 
   async function handleSave() {
-    if (!canSave) return;
+    if (!canSaveFinal) return;
     const type = activeType ?? 'action';
 
     let enrichedEmoji = type === 'habit' ? '🔄' : type === 'goal' ? '🎯' : type === 'project' ? '📁' : '✓';
@@ -274,10 +364,16 @@ export default function CreateScreen() {
     let description: string | undefined;
     let linkedJourneys: string[] | undefined;
 
+    if (aiGenResult?.habitPlan?.emoji) enrichedEmoji = aiGenResult.habitPlan.emoji;
+    if (aiGenResult?.actionPlan?.emoji) enrichedEmoji = aiGenResult.actionPlan.emoji;
+    if (aiGenResult?.habitPlan?.why) description = aiGenResult.habitPlan.why;
+    if (manualDescription.trim()) description = manualDescription.trim();
+
     if (type === 'goal') {
       setGoalEnrichLoading(true);
       try {
-        const suggestion = await generateGoal(text.trim(), countryName);
+        const successCtx = followUpAnswers['success'] ? `\nSuccess looks like: ${followUpAnswers['success']}` : '';
+        const suggestion = await generateGoal(text.trim() + successCtx, countryName);
         if (suggestion.emoji) enrichedEmoji = suggestion.emoji;
         if (suggestion.area) enrichedArea = suggestion.area;
         if (suggestion.why) description = suggestion.why;
@@ -301,6 +397,19 @@ export default function CreateScreen() {
         }))
       : undefined;
 
+    let recurrence: { type: string } | undefined;
+    if (type === 'habit') {
+      if (creationMode === 'manual') {
+        recurrence = { type: manualRecurrence };
+      } else {
+        const freq = followUpAnswers['frequency'];
+        if (freq === 'weekdays') recurrence = { type: 'weekdays' };
+        else if (freq === 'weekly') recurrence = { type: 'weekly' };
+        else if (freq === '3x') recurrence = { type: 'custom' };
+        else recurrence = { type: 'daily' };
+      }
+    }
+
     const item = createItem(effectiveUserId, {
       id:                itemId,
       title:             text.trim(),
@@ -309,7 +418,7 @@ export default function CreateScreen() {
       emoji:             enrichedEmoji,
       description,
       habit_time_of_day: (tod as 'morning' | 'afternoon' | 'evening') ?? undefined,
-      recurrence:        type === 'habit' ? { type: 'daily' } : undefined,
+      recurrence:        recurrence as any,
       priority,
       effort,
       deadline:          deadline.trim() || undefined,
@@ -332,12 +441,15 @@ export default function CreateScreen() {
 
   const validStepCount = breakdownSteps.filter(s => s.text.trim()).length;
   const saveBtnLabel = !text.trim()                     ? 'Type something to start'
-    : activeType === 'goal' && !area                    ? 'Pick a life area first'
-    : activeType === 'project' && validStepCount > 0    ? `Create project with ${validStepCount} steps`
-    : activeType === 'project'                          ? 'Create project'
-    : activeType === 'habit'                            ? 'Start this habit'
-    : activeType === 'goal'                             ? 'Save to goals'
-    :                                                     'Add it';
+    : !activeType                                        ? 'Pick a type'
+    : !creationMode                                      ? 'Choose how to create'
+    : activeType === 'goal' && !area                     ? 'Pick a life area first'
+    : needsFollowUp                                      ? 'Answer the questions above'
+    : activeType === 'project' && validStepCount > 0     ? `Create project with ${validStepCount} steps`
+    : activeType === 'project'                           ? 'Create project'
+    : activeType === 'habit'                             ? 'Start this habit'
+    : activeType === 'goal'                              ? 'Save to goals'
+    :                                                      'Add it';
 
   const content = saved ? (
     <View style={styles.savedState}>
@@ -502,7 +614,281 @@ export default function CreateScreen() {
         )}
       </View>
 
-      {activeType === 'project' && showClarify && clarifyQuestions.length > 0 && (
+      {activeType && text.trim() && (
+        <View style={styles.modeSection}>
+          <Text style={styles.modeSectionLabel}>How would you like to set this up?</Text>
+          <View style={styles.modeRow}>
+            <Pressable
+              style={[styles.modeCard, creationMode === 'ai' && {
+                backgroundColor: T.brand + '10', borderColor: T.brand + '40',
+              }]}
+              onPress={() => handleModeSelect('ai')}
+            >
+              <View style={[styles.modeIconWrap, { backgroundColor: (creationMode === 'ai' ? T.brand : T.t3) + '12' }]}>
+                <Feather name="zap" size={14} color={creationMode === 'ai' ? T.brand : T.t3} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modeCardLabel, creationMode === 'ai' && { color: T.brand }]}>M3NTOR plans it</Text>
+                <Text style={[styles.modeCardSub, creationMode === 'ai' && { color: T.brand + 'AA' }]}>Answer a few questions, get a tailored plan</Text>
+              </View>
+              {creationMode === 'ai' && <Feather name="check" size={14} color={T.brand} />}
+            </Pressable>
+            <Pressable
+              style={[styles.modeCard, creationMode === 'manual' && {
+                backgroundColor: T.green + '10', borderColor: T.green + '40',
+              }]}
+              onPress={() => handleModeSelect('manual')}
+            >
+              <View style={[styles.modeIconWrap, { backgroundColor: (creationMode === 'manual' ? T.green : T.t3) + '12' }]}>
+                <Feather name="edit-2" size={14} color={creationMode === 'manual' ? T.green : T.t3} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modeCardLabel, creationMode === 'manual' && { color: T.green }]}>I'll set it up</Text>
+                <Text style={[styles.modeCardSub, creationMode === 'manual' && { color: T.green + 'AA' }]}>Configure everything yourself</Text>
+              </View>
+              {creationMode === 'manual' && <Feather name="check" size={14} color={T.green} />}
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {creationMode === 'ai' && activeType && activeType !== 'project' && !aiGenResult && !aiGenLoading && (
+        <View style={styles.followUpSection}>
+          <View style={styles.followUpHeader}>
+            <Feather name="help-circle" size={13} color={T.brand} />
+            <Text style={styles.followUpTitle}>A few quick questions</Text>
+          </View>
+          <Text style={styles.followUpSubtext}>Help M3NTOR create a better plan for you</Text>
+          {(FOLLOWUP_BY_TYPE[activeType] ?? []).map((q) => (
+            <View key={q.id} style={styles.followUpQRow}>
+              <Text style={styles.followUpQ}>{q.label}</Text>
+              {q.type === 'chips' && q.options && (
+                <View style={styles.followUpChipRow}>
+                  {q.options.map(opt => {
+                    const selected = followUpAnswers[q.id] === opt.id;
+                    return (
+                      <Pressable
+                        key={opt.id}
+                        style={[styles.followUpChip, selected && {
+                          backgroundColor: (typeConf?.color ?? T.brand) + '14',
+                          borderColor: (typeConf?.color ?? T.brand) + '40',
+                        }]}
+                        onPress={() => setFollowUpAnswers(prev => ({ ...prev, [q.id]: opt.id }))}
+                      >
+                        {opt.icon && <Feather name={opt.icon as any} size={11} color={selected ? (typeConf?.color ?? T.brand) : T.t3} />}
+                        <Text style={[styles.followUpChipLabel, selected && { color: typeConf?.color ?? T.brand, fontWeight: '700' as const }]}>
+                          {opt.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+              {q.type === 'text' && (
+                <TextInput
+                  style={styles.followUpInput}
+                  placeholder={q.placeholder}
+                  placeholderTextColor={T.t3}
+                  value={followUpAnswers[q.id] || ''}
+                  onChangeText={(v) => setFollowUpAnswers(prev => ({ ...prev, [q.id]: v }))}
+                  returnKeyType="done"
+                />
+              )}
+            </View>
+          ))}
+          {Object.keys(followUpAnswers).length > 0 && (
+            <Pressable style={styles.followUpGenBtn} onPress={handleFollowUpGenerate}>
+              <Feather name="zap" size={13} color="white" />
+              <Text style={styles.followUpGenText}>Generate plan</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      {creationMode === 'ai' && aiGenLoading && (
+        <View style={styles.followUpSection}>
+          <View style={styles.followUpHeader}>
+            <ActivityIndicator size="small" color={T.brand} />
+            <Text style={styles.followUpTitle}>M3NTOR is planning...</Text>
+          </View>
+        </View>
+      )}
+
+      {creationMode === 'ai' && aiGenResult?.habitPlan && (
+        <View style={[styles.aiResultCard, { backgroundColor: T.orange + '08', borderColor: T.orange + '18' }]}>
+          <View style={styles.aiResultHeader}>
+            <Feather name="zap" size={13} color={T.orange} />
+            <Text style={[styles.aiResultTitle, { color: T.orange }]}>M3NTOR's plan</Text>
+          </View>
+          {aiGenResult.habitPlan.schedule && (
+            <View style={styles.aiResultRow}>
+              <Feather name="calendar" size={11} color={T.t2} />
+              <Text style={styles.aiResultText}>{aiGenResult.habitPlan.schedule}</Text>
+            </View>
+          )}
+          {aiGenResult.habitPlan.tip && (
+            <View style={styles.aiResultRow}>
+              <Feather name="star" size={11} color={T.t2} />
+              <Text style={styles.aiResultText}>{aiGenResult.habitPlan.tip}</Text>
+            </View>
+          )}
+          {aiGenResult.habitPlan.why && (
+            <View style={styles.aiResultRow}>
+              <Feather name="heart" size={11} color={T.t2} />
+              <Text style={[styles.aiResultText, { fontStyle: 'italic' }]}>{aiGenResult.habitPlan.why}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {creationMode === 'ai' && aiGenResult?.actionPlan && (
+        <View style={[styles.aiResultCard, { backgroundColor: T.green + '08', borderColor: T.green + '18' }]}>
+          <View style={styles.aiResultHeader}>
+            <Feather name="zap" size={13} color={T.green} />
+            <Text style={[styles.aiResultTitle, { color: T.green }]}>M3NTOR's plan</Text>
+          </View>
+          {aiGenResult.actionPlan.tip && (
+            <View style={styles.aiResultRow}>
+              <Feather name="star" size={11} color={T.t2} />
+              <Text style={styles.aiResultText}>{aiGenResult.actionPlan.tip}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {creationMode === 'manual' && activeType === 'habit' && (
+        <View style={styles.manualSection}>
+          <Text style={styles.manualSectionTitle}>Habit settings</Text>
+          <Text style={styles.moreSectionLabel}>HOW OFTEN</Text>
+          <View style={styles.optionRow}>
+            {RECURRENCE_OPTIONS.map(r => {
+              const on = manualRecurrence === r.id;
+              return (
+                <Pressable key={r.id} style={[styles.optionChip, on && {
+                  backgroundColor: T.orange + '12', borderColor: T.orange + '40',
+                }]} onPress={() => setManualRecurrence(r.id)}>
+                  <Feather name={r.icon} size={11} color={on ? T.orange : T.t3} />
+                  <Text style={[styles.optionChipLabel, on && { color: T.orange, fontWeight: '700' as const }]}>{r.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>BEST TIME</Text>
+          <View style={styles.optionRow}>
+            {TOD_OPTIONS.map(o => {
+              const on = tod === o.id;
+              return (
+                <Pressable key={o.id} style={[styles.optionChip, on && {
+                  backgroundColor: T.orange + '12', borderColor: T.orange + '40',
+                }]} onPress={() => setTod(prev => prev === o.id ? null : o.id)}>
+                  <Feather name={o.icon} size={11} color={on ? T.orange : T.t3} />
+                  <Text style={[styles.optionChipLabel, on && { color: T.orange, fontWeight: '700' as const }]}>{o.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {creationMode === 'manual' && activeType === 'project' && (
+        <View style={styles.manualSection}>
+          <Text style={styles.manualSectionTitle}>Project steps</Text>
+          <Text style={styles.manualSectionSub}>Add your steps one by one</Text>
+          {breakdownSteps.map((step, stepIdx) => (
+            <View key={step.id} style={styles.breakdownRow}>
+              <View style={styles.breakdownDot} />
+              <View style={{ flex: 1 }}>
+                {editingStepId === step.id ? (
+                  <TextInput
+                    style={styles.breakdownStepInput}
+                    value={step.text}
+                    autoFocus
+                    onChangeText={(v) => setBreakdownSteps(prev =>
+                      prev.map(s => s.id === step.id ? { ...s, text: v } : s)
+                    )}
+                    onBlur={() => setEditingStepId(null)}
+                    onSubmitEditing={() => setEditingStepId(null)}
+                    returnKeyType="done"
+                  />
+                ) : (
+                  <Pressable onPress={() => setEditingStepId(step.id)}>
+                    <Text style={styles.breakdownStepText} numberOfLines={2}>
+                      {step.text || 'Tap to edit...'}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+              <View style={styles.breakdownActions}>
+                <Pressable hitSlop={4} disabled={stepIdx === 0}
+                  onPress={() => {
+                    setBreakdownSteps(prev => {
+                      const arr = [...prev];
+                      [arr[stepIdx - 1], arr[stepIdx]] = [arr[stepIdx], arr[stepIdx - 1]];
+                      return arr;
+                    });
+                  }}
+                  style={{ opacity: stepIdx === 0 ? 0.25 : 1 }}
+                >
+                  <Feather name="chevron-up" size={13} color={T.t3} />
+                </Pressable>
+                <Pressable hitSlop={4} disabled={stepIdx === breakdownSteps.length - 1}
+                  onPress={() => {
+                    setBreakdownSteps(prev => {
+                      const arr = [...prev];
+                      [arr[stepIdx], arr[stepIdx + 1]] = [arr[stepIdx + 1], arr[stepIdx]];
+                      return arr;
+                    });
+                  }}
+                  style={{ opacity: stepIdx === breakdownSteps.length - 1 ? 0.25 : 1 }}
+                >
+                  <Feather name="chevron-down" size={13} color={T.t3} />
+                </Pressable>
+              </View>
+              <Pressable hitSlop={8} onPress={() => setBreakdownSteps(prev => prev.filter(s => s.id !== step.id))}>
+                <Feather name="x" size={13} color={T.t3} />
+              </Pressable>
+            </View>
+          ))}
+          <Pressable
+            style={styles.addStepRow}
+            onPress={() => {
+              const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+              setBreakdownSteps(prev => [...prev, { id: newId, text: '' }]);
+              setEditingStepId(newId);
+            }}
+          >
+            <Feather name="plus" size={13} color={T.brand} />
+            <Text style={styles.addStepText}>Add step</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {creationMode === 'manual' && activeType === 'goal' && (
+        <View style={styles.manualSection}>
+          <Text style={styles.manualSectionTitle}>Goal details</Text>
+          <Text style={styles.moreSectionLabel}>TARGET DATE</Text>
+          <TextInput
+            value={deadline}
+            onChangeText={setDeadline}
+            placeholder="e.g. 2026-06-01"
+            placeholderTextColor={T.t3}
+            style={styles.deadlineInput}
+            returnKeyType="done"
+          />
+          <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>DESCRIPTION</Text>
+          <TextInput
+            value={manualDescription}
+            onChangeText={setManualDescription}
+            placeholder="What does achieving this goal look like?"
+            placeholderTextColor={T.t3}
+            style={[styles.deadlineInput, { minHeight: 60, textAlignVertical: 'top' }]}
+            multiline
+            returnKeyType="done"
+          />
+        </View>
+      )}
+
+      {creationMode === 'ai' && activeType === 'project' && showClarify && clarifyQuestions.length > 0 && (
         <View style={styles.clarifySection}>
           <View style={styles.clarifyHeader}>
             <Feather name="help-circle" size={13} color={T.brand} />
@@ -547,7 +933,7 @@ export default function CreateScreen() {
         </View>
       )}
 
-      {activeType === 'project' && clarifyLoading && !showClarify && breakdownSteps.length === 0 && !breakdownLoading && (
+      {creationMode === 'ai' && activeType === 'project' && clarifyLoading && !showClarify && breakdownSteps.length === 0 && !breakdownLoading && (
         <View style={styles.breakdownSection}>
           <View style={styles.breakdownHeader}>
             <ActivityIndicator size="small" color={T.brand} />
@@ -556,7 +942,7 @@ export default function CreateScreen() {
         </View>
       )}
 
-      {activeType === 'project' && (breakdownSteps.length > 0 || breakdownLoading) && (
+      {creationMode === 'ai' && activeType === 'project' && (breakdownSteps.length > 0 || breakdownLoading) && (
         <View style={styles.breakdownSection}>
           <View style={styles.breakdownHeader}>
             <Feather name="list" size={13} color={T.brand} />
@@ -646,111 +1032,71 @@ export default function CreateScreen() {
         </View>
       )}
 
-      {text.trim() && activeType !== 'project' && (
-        <>
-          <View style={styles.extrasRow}>
-            {areaConf ? (
-              <Pressable style={[styles.extraChip, { backgroundColor: areaConf.c + '10', borderColor: areaConf.c + '28' }]}
-                onPress={() => setShowAreaPicker(!showAreaPicker)}>
-                <Text>{areaConf.e}</Text>
-                <Text style={[styles.extraChipLabel, { color: areaConf.c }]}>{areaConf.n.split(' ')[0]}</Text>
-                <Feather name="chevron-down" size={10} color={areaConf.c} />
-              </Pressable>
-            ) : (
-              <Pressable style={styles.extraChipEmpty} onPress={() => setShowAreaPicker(true)}>
-                <Feather name="grid" size={11} color={T.t3} />
-                <Text style={styles.extraChipEmptyText}>Life area</Text>
-              </Pressable>
-            )}
-
-            <Pressable
-              style={[styles.extraChip, showExtras && {
-                backgroundColor: T.brand + '10',
-                borderColor: T.brand + '30',
-              }]}
-              onPress={() => setShowExtras(!showExtras)}>
-              <Feather name="sliders" size={12} color={showExtras ? T.brand : T.t3} />
-              <Text style={[styles.extraChipLabel, showExtras && { color: T.brand, fontWeight: '700' as const }]}>
-                Details
-              </Text>
-            </Pressable>
+      {creationMode === 'manual' && activeType === 'action' && text.trim() && (
+        <View style={styles.manualSection}>
+          <Text style={styles.manualSectionTitle}>Action details</Text>
+          <Text style={styles.moreSectionLabel}>BEST TIME</Text>
+          <View style={styles.optionRow}>
+            {TOD_OPTIONS.map(o => {
+              const on = tod === o.id;
+              return (
+                <Pressable key={o.id} style={[styles.optionChip, on && {
+                  backgroundColor: T.green + '12', borderColor: T.green + '40',
+                }]} onPress={() => setTod(prev => prev === o.id ? null : o.id)}>
+                  <Feather name={o.icon} size={11} color={on ? T.green : T.t3} />
+                  <Text style={[styles.optionChipLabel, on && { color: T.green, fontWeight: '700' as const }]}>{o.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
+          <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>EFFORT</Text>
+          <View style={styles.optionRow}>
+            {EFFORT_OPTIONS.map(e => {
+              const on = effort === e.id;
+              return (
+                <Pressable key={e.id} style={[styles.optionChip, on && {
+                  backgroundColor: e.color + '12', borderColor: e.color + '40',
+                }]} onPress={() => setEffort(e.id as Effort)}>
+                  <Feather name={e.icon} size={11} color={on ? e.color : T.t3} />
+                  <Text style={[styles.optionChipLabel, on && { color: e.color, fontWeight: '700' as const }]}>{e.label}</Text>
+                  <Text style={[styles.optionChipSub, on && { color: e.color + 'AA' }]}>{e.sub}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>PRIORITY</Text>
+          <View style={styles.optionRow}>
+            {PRIORITY_OPTIONS.map(p => {
+              const on = priority === p.id;
+              return (
+                <Pressable key={p.id} style={[styles.optionChip, on && {
+                  backgroundColor: p.color + '12', borderColor: p.color + '40',
+                }]} onPress={() => setPriority(p.id as Priority)}>
+                  <Feather name={p.icon} size={11} color={on ? p.color : T.t3} />
+                  <Text style={[styles.optionChipLabel, on && { color: p.color, fontWeight: '700' as const }]}>{p.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
-          {showExtras && (
-            <View style={styles.moreSection}>
-              {activeType !== 'goal' && (
-                <>
-                  <Text style={styles.moreSectionLabel}>BEST TIME</Text>
-                  <View style={styles.optionRow}>
-                    {TOD_OPTIONS.map(o => {
-                      const on = tod === o.id;
-                      return (
-                        <Pressable key={o.id} style={[styles.optionChip, on && {
-                          backgroundColor: (typeConf?.color ?? T.brand) + '12',
-                          borderColor: (typeConf?.color ?? T.brand) + '40',
-                        }]} onPress={() => setTod(prev => prev === o.id ? null : o.id)}>
-                          <Feather name={o.icon} size={11} color={on ? (typeConf?.color ?? T.brand) : T.t3} />
-                          <Text style={[styles.optionChipLabel, on && { color: typeConf?.color ?? T.brand, fontWeight: '700' as const }]}>
-                            {o.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>PRIORITY</Text>
-                </>
-              )}
-              {activeType === 'goal' && <Text style={styles.moreSectionLabel}>PRIORITY</Text>}
-              <View style={styles.optionRow}>
-                {PRIORITY_OPTIONS.map(p => {
-                  const on = priority === p.id;
-                  return (
-                    <Pressable key={p.id} style={[styles.optionChip, on && {
-                      backgroundColor: p.color + '12',
-                      borderColor: p.color + '40',
-                    }]} onPress={() => setPriority(p.id as Priority)}>
-                      <Feather name={p.icon} size={11} color={on ? p.color : T.t3} />
-                      <Text style={[styles.optionChipLabel, on && { color: p.color, fontWeight: '700' as const }]}>
-                        {p.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>EFFORT</Text>
-              <View style={styles.optionRow}>
-                {EFFORT_OPTIONS.map(e => {
-                  const on = effort === e.id;
-                  return (
-                    <Pressable key={e.id} style={[styles.optionChip, on && {
-                      backgroundColor: e.color + '12',
-                      borderColor: e.color + '40',
-                    }]} onPress={() => setEffort(e.id as Effort)}>
-                      <Feather name={e.icon} size={11} color={on ? e.color : T.t3} />
-                      <Text style={[styles.optionChipLabel, on && { color: e.color, fontWeight: '700' as const }]}>
-                        {e.label}
-                      </Text>
-                      <Text style={[styles.optionChipSub, on && { color: e.color + 'AA' }]}>
-                        {e.sub}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>DEADLINE</Text>
-              <TextInput
-                value={deadline}
-                onChangeText={setDeadline}
-                placeholder="e.g. 2026-03-15"
-                placeholderTextColor={T.t3}
-                style={styles.deadlineInput}
-                returnKeyType="done"
-              />
-            </View>
+      {creationMode && text.trim() && activeType !== 'goal' && (
+        <View style={styles.extrasRow}>
+          {areaConf ? (
+            <Pressable style={[styles.extraChip, { backgroundColor: areaConf.c + '10', borderColor: areaConf.c + '28' }]}
+              onPress={() => setShowAreaPicker(!showAreaPicker)}>
+              <Text>{areaConf.e}</Text>
+              <Text style={[styles.extraChipLabel, { color: areaConf.c }]}>{areaConf.n.split(' ')[0]}</Text>
+              <Feather name="chevron-down" size={10} color={areaConf.c} />
+            </Pressable>
+          ) : (
+            <Pressable style={styles.extraChipEmpty} onPress={() => setShowAreaPicker(true)}>
+              <Feather name="grid" size={11} color={T.t3} />
+              <Text style={styles.extraChipEmptyText}>Life area</Text>
+            </Pressable>
           )}
-        </>
+        </View>
       )}
 
       {showAreaPicker && (
@@ -760,7 +1106,7 @@ export default function CreateScreen() {
         />
       )}
 
-      {activeType === 'goal' && !area && text.trim() && (
+      {activeType === 'goal' && !area && text.trim() && creationMode && (
         <AreaPicker
           selected={area}
           onSelect={setArea}
@@ -769,14 +1115,14 @@ export default function CreateScreen() {
         />
       )}
 
-      <Pressable onPress={handleSave} disabled={!canSave} style={{ marginTop: S.md }}>
+      <Pressable onPress={handleSave} disabled={!canSaveFinal} style={{ marginTop: S.md }}>
         <LinearGradient
-          colors={canSave ? (typeConf ? [typeConf.color, typeConf.color + 'BB'] : T.gradColors) : [T.sep, T.sep]}
+          colors={canSaveFinal ? (typeConf ? [typeConf.color, typeConf.color + 'BB'] : T.gradColors) : [T.sep, T.sep]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={styles.saveBtn}>
           <View style={styles.saveBtnInner}>
-            {canSave && <Feather name="chevron-right" size={16} color="white" />}
-            <Text style={[styles.saveBtnText, !canSave && { color: T.t3 }]}>{saveBtnLabel}</Text>
+            {canSaveFinal && <Feather name="chevron-right" size={16} color="white" />}
+            <Text style={[styles.saveBtnText, !canSaveFinal && { color: T.t3 }]}>{saveBtnLabel}</Text>
           </View>
         </LinearGradient>
       </Pressable>
@@ -841,6 +1187,37 @@ const styles = StyleSheet.create({
   typeCardSub:    { fontSize: 10, color: T.t3 },
   typeDetailCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8, padding: 10, borderRadius: 10, borderWidth: 1 },
   typeDetailText: { fontSize: 12, lineHeight: 17, flex: 1 },
+
+  modeSection:      { marginBottom: 10 },
+  modeSectionLabel: { fontSize: 11, fontWeight: '600' as const, color: T.t3, marginBottom: 8, letterSpacing: 0.2 },
+  modeRow:          { flexDirection: 'row', gap: 8 },
+  modeCard:         { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.025)' },
+  modeIconWrap:     { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  modeCardLabel:    { fontSize: 13, fontWeight: '700' as const, color: T.t2 },
+  modeCardSub:      { fontSize: 10, color: T.t3, lineHeight: 14 },
+
+  followUpSection:  { backgroundColor: T.brand + '08', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: T.brand + '18' },
+  followUpHeader:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  followUpTitle:    { fontSize: 14, fontWeight: '700', color: T.brand },
+  followUpSubtext:  { fontSize: 12, color: T.t3, marginBottom: 10, lineHeight: 17 },
+  followUpQRow:     { marginBottom: 10 },
+  followUpQ:        { fontSize: 13, fontWeight: '600', color: T.text, marginBottom: 6 },
+  followUpChipRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  followUpChip:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.03)' },
+  followUpChipLabel:{ fontSize: 12, fontWeight: '500', color: T.t3 },
+  followUpInput:    { fontSize: 13, color: T.text, padding: 10, borderRadius: 10, backgroundColor: 'white', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
+  followUpGenBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start' as const, backgroundColor: T.brand, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, marginTop: 4 },
+  followUpGenText:  { fontSize: 13, fontWeight: '700', color: 'white' },
+
+  aiResultCard:     { borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1 },
+  aiResultHeader:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  aiResultTitle:    { fontSize: 13, fontWeight: '700' },
+  aiResultRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6 },
+  aiResultText:     { fontSize: 12, color: T.t2, lineHeight: 17, flex: 1 },
+
+  manualSection:    { backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
+  manualSectionTitle: { fontSize: 13, fontWeight: '700', color: T.text, marginBottom: 8 },
+  manualSectionSub: { fontSize: 12, color: T.t3, marginBottom: 10 },
 
   breakdownSection: { backgroundColor: T.brand + '06', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: T.brand + '14' },
   breakdownHeader:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
