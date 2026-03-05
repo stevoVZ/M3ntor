@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, Pressable, StyleSheet,
+  View, Text, TextInput, Pressable, StyleSheet, Image,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -67,7 +67,11 @@ export default function LoginScreen() {
         <LinearGradient
           colors={[T.dark, '#1E1E2A']}
           style={styles.hero}>
-          <Text style={styles.heroLogo}>M3NTOR</Text>
+          <Image
+            source={require('../assets/images/icon.png')}
+            style={styles.heroLogo}
+            resizeMode="contain"
+          />
           <Text style={styles.heroTagline}>Build the life you actually want</Text>
         </LinearGradient>
 
@@ -174,7 +178,7 @@ const styles = StyleSheet.create({
   kav:      { flex: 1 },
 
   hero:        { paddingTop: 56, paddingBottom: 40, paddingHorizontal: 32, alignItems: 'center' },
-  heroLogo:    { fontSize: 42, fontWeight: '900', color: 'white', letterSpacing: -2 },
+  heroLogo:    { width: 140, height: 140, borderRadius: 28 },
   heroTagline: { fontSize: 15, color: 'rgba(255,255,255,0.55)', marginTop: 8, textAlign: 'center' },
 
   form: {
