@@ -7,7 +7,6 @@ import { useStore } from '../../lib/store';
 import { ITEM_AREAS, PRG, DIFF, JOURNEY_ICONS, WA } from '../../constants/config';
 import type { Journey } from '../../types';
 import AICoach from '../../components/discover/AICoach';
-import ProgramBuilder from '../../components/discover/ProgramBuilder';
 
 function JourneyCard({ journey }: { journey: Journey }) {
   const area = ITEM_AREAS[journey.a] ?? ITEM_AREAS.learning;
@@ -79,8 +78,6 @@ export default function DiscoverScreen() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string | null>(null);
   const [showCoach, setShowCoach] = useState(false);
-  const [showBuilder, setShowBuilder] = useState(false);
-
   const areas = [...new Set(PRG.map(p => p.a))];
 
   const filtered = PRG.filter(j => {
@@ -91,14 +88,6 @@ export default function DiscoverScreen() {
 
   const featured = filtered.filter(j => j.f);
   const rest     = filtered.filter(j => !j.f);
-
-  if (showBuilder) {
-    return (
-      <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }]} edges={['top']}>
-        <ProgramBuilder onClose={() => setShowBuilder(false)} />
-      </SafeAreaView>
-    );
-  }
 
   if (showCoach) {
     return (
@@ -127,19 +116,6 @@ export default function DiscoverScreen() {
             <View style={styles.coachInfo}>
               <Text style={styles.coachTitle}>Find Your Journey</Text>
               <Text style={styles.coachSub}>Describe your goals and get AI-powered recommendations</Text>
-            </View>
-          </View>
-          <Feather name="chevron-right" size={18} color={T.t3} />
-        </Pressable>
-
-        <Pressable style={[styles.coachCard, shadow.sm, { borderColor: T.green + '20' }]} onPress={() => setShowBuilder(true)}>
-          <View style={styles.coachLeft}>
-            <View style={[styles.coachAvatar, { backgroundColor: T.green }]}>
-              <Feather name="edit-3" size={18} color="white" />
-            </View>
-            <View style={styles.coachInfo}>
-              <Text style={styles.coachTitle}>Build Custom Journey</Text>
-              <Text style={styles.coachSub}>Create a personalized program with AI assistance</Text>
             </View>
           </View>
           <Feather name="chevron-right" size={18} color={T.t3} />

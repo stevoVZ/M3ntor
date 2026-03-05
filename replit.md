@@ -39,7 +39,7 @@ components/
   add/              FabActionSheet, ProjectAddSheet, AreaPicker
   today/            SessionView (briefing→mood→cards→completion), CompletionScreen
   plan/             GoalDetailPage, ProjectEditPage, ItemEditSheet
-  discover/         AICoach (chat-style coach), ProgramBuilder (5-step wizard)
+  discover/         AICoach (chat-style coach)
   profile/          ProfileScreen
   WheelOfLife.tsx   SVG radar chart (self + app scores)
   WheelAreaDetail.tsx  Area detail with linked items, insights, journeys
@@ -60,7 +60,6 @@ components/
 - **Provider**: Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk`
 - **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`, `generateGoal()`, `generateProjectFromGoal()`, `generateJourneyPlan()` — all accept optional `country` param for region-aware responses
 - **AI Coach**: Chat-style interface for journey recommendations using server endpoint with fallback keyword matching; filters PRG catalog by user's country (global always shown, regional only when country matches)
-- **Program Builder**: AI-generated custom journey programs via `generateJourneyPlan()` — passes country context for region-appropriate content
 - **Smart Type Suggestion**: `getItemHint()` returns `suggestedType` and `typeReason`; FabActionSheet shows M3NTOR-recommended approach as a prominent card with reason text, pre-selected; "Other approaches" collapsible toggle shows remaining 3 types; user override adds "M3NTOR pick" badge to original recommendation; all user-facing AI labels use "M3NTOR" branding
 - **Auto-Breakdown**: When type is "project" (M3NTOR-suggested or user-selected), auto-calls `generateProjectTasks()` to show inline editable step breakdown in FAB sheet
 - **Country/Region**: `constants/countries.ts` has curated country list; PRG entries have `scope` (global/regional) and `regions`; ProfileScreen has searchable country picker
@@ -89,11 +88,11 @@ app/
   _layout.tsx          # Root layout with Zustand store, Supabase auth
   login.tsx            # Supabase auth screen
   (tabs)/
-    _layout.tsx        # Tab bar + FAB + ProgramBuilder modal
+    _layout.tsx        # Tab bar + FAB
     index.tsx          # Redirects to today
     today.tsx          # Today dashboard + session mode
     mylife.tsx         # My Life — wheel/list, app scores, insights, profile
-    discover.tsx       # Journey catalog + AI Coach + Program Builder
+    discover.tsx       # Journey catalog + AI Coach
     plan.tsx           # Hierarchy/list views, goal detail, project edit
   item/[id].tsx        # Item detail with full editing
 ```
@@ -102,7 +101,7 @@ app/
 
 - **Today**: Time-of-day grouped actions (morning/afternoon/evening/anytime), journey cards with session mode (briefing→mood→action deck→undo→completion→summary), quick-complete checkboxes, streak display
 - **Plan**: Dual view (hierarchy/list), goal cards with progress, linked/unlinked items, action menus (edit/pause/resume/delete), goal detail page, project edit page with step/subtask CRUD and AI generation
-- **Discover**: Journey catalog, AI Coach chat for recommendations, Program Builder wizard (goal→details→generating→review→saved), "Build Custom Journey" accessible from FAB
+- **Discover**: Journey catalog, AI Coach chat for recommendations
 - **My Life**: Wheel of Life with self + app scores, wheel/list view toggle, insights (strongest/focus area), time comparison (now/week/month/start), area detail with linked items/journeys, profile screen
 
 ### Platform Considerations
