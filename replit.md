@@ -43,6 +43,7 @@ components/
   profile/          ProfileScreen
   WheelOfLife.tsx   SVG radar chart (self + app scores)
   WheelAreaDetail.tsx  Area detail with linked items, insights, journeys
+  M3ntorIcon.tsx    Animated SVG logo mark (rainbow arc + leaves + dot) with Reanimated entrance animation
   ErrorBoundary.tsx
 ```
 

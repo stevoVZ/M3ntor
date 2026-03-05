@@ -10,6 +10,7 @@ import { itemKind, projectProgress, formatRecurrence, formatDuration } from '../
 import { greetingForTime, formatDeadline, isOverdue } from '../../utils/dates';
 import { getTodayActions, groupByTimeOfDay, sortedTimeSlots, timeSlotLabel, timeSlotIcon } from '../../utils/today';
 import SessionView from '../../components/today/SessionView';
+import M3ntorIcon from '../../components/M3ntorIcon';
 import type { Item, TodayAction, TimeOfDay, JourneyProgress, MoodValue } from '../../types';
 
 function TimeSlotIcon({ slot, size }: { slot: TimeOfDay; size: number }) {
@@ -396,6 +397,7 @@ export default function TodayScreen() {
         <View style={styles.hero}>
           <Text style={styles.heroDate}>{dateStr.toUpperCase()}</Text>
           <View style={styles.heroRow}>
+            <M3ntorIcon size={40} />
             <View style={{ flex: 1 }}>
               <Text style={styles.heroGreeting}>{greeting},</Text>
               <Text style={styles.heroName}>Ready to go.</Text>
@@ -496,7 +498,7 @@ const styles = StyleSheet.create({
 
   hero: { paddingHorizontal: 22, paddingTop: S.lg, paddingBottom: S.md },
   heroDate: { fontSize: 11, fontWeight: '600' as const, color: T.t3, letterSpacing: 1, marginBottom: 8 },
-  heroRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   heroGreeting: { fontSize: 28, fontWeight: '800' as const, letterSpacing: -1, lineHeight: 34, color: T.text },
   heroName: { fontSize: 28, fontWeight: '800' as const, letterSpacing: -1, lineHeight: 34, color: T.brand },
 
