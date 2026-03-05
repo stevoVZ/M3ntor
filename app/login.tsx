@@ -207,6 +207,13 @@ export default function LoginScreen() {
             <Text style={styles.socialBtnText}>Continue with Apple</Text>
           </Pressable>
 
+          <Pressable
+            style={styles.guestBtn}
+            onPress={() => router.replace('/(tabs)/today')}>
+            <Feather name="arrow-right" size={18} color={T.brand} />
+            <Text style={styles.guestBtnText}>Continue as Guest</Text>
+          </Pressable>
+
           <Text style={styles.legal}>
             By continuing you agree to our{'\n'}Terms of Service and Privacy Policy.
           </Text>
@@ -393,6 +400,25 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+
+  guestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(88,86,214,0.2)',
+    backgroundColor: 'rgba(88,86,214,0.04)',
+  },
+  guestBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: T.brand,
     letterSpacing: -0.2,
   },
 

@@ -8,20 +8,24 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useStore } from '../lib/store';
 import { T } from '../constants/theme';
 
-function useAuthRedirect(userId: string | null, loading: boolean) {
+function useAuthRedirect(userId: string | null, loading: boolean, guestMode: boolean) {
   const segments = useSegments();
   useEffect(() => {
     if (loading) return;
     if (!isSupabaseConfigured) return;
+    if (guestMode) return;
     const inLogin = segments[0] === 'login';
     if (!userId && !inLogin) router.replace('/login');
     else if (userId && inLogin) router.replace('/(tabs)/today');
-  }, [userId, loading, segments]);
+  }, [userId, loading, segments, guestMode]);
 }
 
 export default function RootLayout() {
   const { userId, setUserId, loadAll } = useStore();
   const [booting, setBooting] = useState(true);
+  const segments = useSegments();
+  const inTabs = segments[0] === '(tabs)';
+  const guestMode = !userId && inTabs;
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -46,7 +50,7 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
-  useAuthRedirect(userId, booting);
+  useAuthRedirect(userId, booting, guestMode);
 
   if (booting) {
     return (
