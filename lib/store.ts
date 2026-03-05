@@ -1,7 +1,112 @@
 import { create } from 'zustand';
 import type { Item, Step, Subtask, JourneyProgress, Profile, CompletionLog, MoodEntry, MoodValue } from '../types';
 import * as Crypto from 'expo-crypto';
-import { supabase, isSupabaseConfigured, fetchItems, fetchJourneyProgress, upsertItem, deleteItem, upsertStep } from './supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase, isSupabaseConfigured, fetchItems, fetchJourneyProgress, upsertItem, deleteItem, upsertStep, upsertCompletionLog, fetchCompletionLogs, upsertMoodEntry, fetchMoodEntries } from './supabase';
+import { SAMPLE_ITEMS, SAMPLE_COMMITTED } from '../constants/sample-data';
+import type { SampleItem, SampleStep, SampleSubtask, CommittedEntry } from '../constants/sample-data';
+
+function convertSubtask(st: SampleSubtask, stepId: string, idx: number): Subtask {
+  return {
+    id: st.id,
+    step_id: stepId,
+    title: st.title,
+    done: st.done,
+    assignees: st.assignees,
+    sort_order: idx,
+  };
+}
+
+function convertStep(s: SampleStep, itemId: string, idx: number): Step {
+  return {
+    id: s.id,
+    item_id: itemId,
+    title: s.title,
+    description: s.description,
+    done: s.done,
+    status: (s.status as Step['status']) ?? 'todo',
+    priority: (s.priority as Step['priority']) ?? 'normal',
+    effort: (s.effort as Step['effort']) ?? 'medium',
+    today: s.today ?? false,
+    blocked_by: s.blockedBy ?? [],
+    assignees: s.assignees,
+    sort_order: idx,
+    subtasks: s.subtasks?.map((st, si) => convertSubtask(st, s.id, si)),
+  };
+}
+
+function convertSampleItem(si: SampleItem): Item {
+  const now = new Date().toISOString();
+  return {
+    id: si.id,
+    user_id: 'guest',
+    title: si.title,
+    emoji: si.emoji,
+    description: si.description,
+    area: si.area,
+    secondary_areas: si.secondaryAreas,
+    status: si.status as Item['status'],
+    source: si.source as Item['source'],
+    priority: 'normal',
+    effort: 'medium',
+    deadline: si.deadline,
+    steps: si.steps?.map((s, idx) => convertStep(s, si.id, idx)),
+    linked_items: si.linkedItems,
+    linked_journeys: si.linkedJourneys,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function convertCommittedToJourney(c: CommittedEntry): JourneyProgress {
+  return {
+    id: Crypto.randomUUID(),
+    user_id: 'guest',
+    journey_id: c.id,
+    status: c.status === 'completed' ? 'done' : c.status === 'active' ? 'active' : 'paused',
+    current_week: c.week,
+    current_day: c.day,
+    streak: c.status === 'active' ? c.day : 0,
+    enrolled_at: new Date().toISOString(),
+  };
+}
+
+const COMPLETION_LOG_KEY = 'm3ntor_completion_log';
+const MOOD_LOG_KEY = 'm3ntor_mood_log';
+
+async function saveCompletionLogToStorage(log: CompletionLog) {
+  try {
+    await AsyncStorage.setItem(COMPLETION_LOG_KEY, JSON.stringify(log));
+  } catch (e) {
+    console.error('Failed to save completionLog:', e);
+  }
+}
+
+async function saveMoodLogToStorage(log: MoodEntry[]) {
+  try {
+    await AsyncStorage.setItem(MOOD_LOG_KEY, JSON.stringify(log));
+  } catch (e) {
+    console.error('Failed to save moodLog:', e);
+  }
+}
+
+async function loadCompletionLogFromStorage(): Promise<CompletionLog> {
+  try {
+    const raw = await AsyncStorage.getItem(COMPLETION_LOG_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function loadMoodLogFromStorage(): Promise<MoodEntry[]> {
+  try {
+    const raw = await AsyncStorage.getItem(MOOD_LOG_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
 
 interface AppState {
   items:         Item[];
@@ -75,18 +180,83 @@ export const useStore = create<AppState>((set, get) => ({
   loadAll: async (userId) => {
     set({ loading: true, error: null });
     try {
-      const [items, journeys] = await Promise.all([
-        fetchItems(userId),
-        fetchJourneyProgress(userId),
+      const effectiveUserId = userId ?? 'guest';
+      const isGuest = effectiveUserId === 'guest';
+
+      const [localCompletionLog, localMoodLog] = await Promise.all([
+        loadCompletionLogFromStorage(),
+        loadMoodLogFromStorage(),
       ]);
-      set({ items: (items ?? []) as Item[], journeys: journeys ?? [], loading: false });
+
+      if (isGuest) {
+        const sampleItems = SAMPLE_ITEMS.map(convertSampleItem);
+        const sampleJourneys = SAMPLE_COMMITTED
+          .filter(c => c.status !== 'queued')
+          .map(convertCommittedToJourney);
+        set({
+          items: sampleItems,
+          journeys: sampleJourneys,
+          completionLog: localCompletionLog,
+          moodLog: localMoodLog,
+          loading: false,
+        });
+        return;
+      }
+
+      const [items, journeys] = await Promise.all([
+        fetchItems(effectiveUserId),
+        fetchJourneyProgress(effectiveUserId),
+      ]);
+
+      let completionLog = localCompletionLog;
+      let moodLog = localMoodLog;
+
+      if (isSupabaseConfigured && supabase) {
+        const [remoteLogs, remoteMoods] = await Promise.all([
+          fetchCompletionLogs(effectiveUserId),
+          fetchMoodEntries(effectiveUserId),
+        ]);
+
+        if (remoteLogs && remoteLogs.length > 0) {
+          for (const row of remoteLogs) {
+            const key = (row as { date: string }).date;
+            const remote = row as { done: number; skipped: number; total: number };
+            const local = completionLog[key];
+            if (!local || remote.total > local.total) {
+              completionLog[key] = { done: remote.done, skipped: remote.skipped, total: remote.total };
+            }
+          }
+          saveCompletionLogToStorage(completionLog);
+        }
+
+        if (remoteMoods && remoteMoods.length > 0) {
+          const localDates = new Set(moodLog.map(m => m.date));
+          for (const row of remoteMoods) {
+            const entry = row as { timestamp: string; value: string | number };
+            if (!localDates.has(entry.timestamp)) {
+              const moodVal = (typeof entry.value === 'number' ? entry.value : parseInt(entry.value, 10) || 3) as MoodValue;
+              moodLog.push({ date: entry.timestamp, mood: moodVal });
+            }
+          }
+          moodLog.sort((a, b) => a.date.localeCompare(b.date));
+          saveMoodLogToStorage(moodLog);
+        }
+      }
+
+      set({
+        items: (items ?? []) as Item[],
+        journeys: journeys ?? [],
+        completionLog,
+        moodLog,
+        loading: false,
+      });
 
       if (isSupabaseConfigured && supabase) {
         supabase
           .channel('items_changes')
           .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'items', filter: `user_id=eq.${userId}` },
-            () => fetchItems(userId).then(fresh => set({ items: (fresh ?? []) as Item[] }))
+            { event: '*', schema: 'public', table: 'items', filter: `user_id=eq.${effectiveUserId}` },
+            () => fetchItems(effectiveUserId).then(fresh => set({ items: (fresh ?? []) as Item[] }))
           )
           .subscribe();
       }
@@ -348,23 +518,35 @@ export const useStore = create<AppState>((set, get) => ({
     const todayKey = new Date().toISOString().slice(0, 10);
     set(s => {
       const entry = s.completionLog[todayKey] || { done: 0, skipped: 0, total: 0 };
-      return {
-        completionLog: {
-          ...s.completionLog,
-          [todayKey]: {
-            done: entry.done + (status === 'done' ? 1 : 0),
-            skipped: entry.skipped + (status === 'skipped' ? 1 : 0),
-            total: entry.total + 1,
-          },
+      const newLog = {
+        ...s.completionLog,
+        [todayKey]: {
+          done: entry.done + (status === 'done' ? 1 : 0),
+          skipped: entry.skipped + (status === 'skipped' ? 1 : 0),
+          total: entry.total + 1,
         },
       };
+      saveCompletionLogToStorage(newLog);
+      const uid = s.userId ?? 'guest';
+      if (uid !== 'guest' && isSupabaseConfigured) {
+        upsertCompletionLog(uid, todayKey, newLog[todayKey]).catch(console.error);
+      }
+      return { completionLog: newLog };
     });
   },
 
   recordMood: (mood) => {
-    set(s => ({
-      moodLog: [...s.moodLog, { date: new Date().toISOString(), mood }],
-    }));
+    const now = new Date().toISOString();
+    set(s => {
+      const newEntry: MoodEntry = { date: now, mood };
+      const newLog = [...s.moodLog, newEntry];
+      saveMoodLogToStorage(newLog);
+      const uid = s.userId ?? 'guest';
+      if (uid !== 'guest' && isSupabaseConfigured) {
+        upsertMoodEntry(uid, mood, now).catch(console.error);
+      }
+      return { moodLog: newLog };
+    });
   },
 
   streak: () => {

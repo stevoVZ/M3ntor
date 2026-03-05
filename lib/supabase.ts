@@ -115,3 +115,64 @@ export async function fetchJourneyProgress(userId: string) {
   if (error) throw error;
   return data;
 }
+
+export async function upsertCompletionLog(
+  userId: string,
+  date: string,
+  entry: { done: number; skipped: number; total: number }
+) {
+  if (!_supabase) return null;
+  const { data, error } = await _supabase
+    .from('completion_logs')
+    .upsert({
+      user_id: userId,
+      date,
+      done: entry.done,
+      skipped: entry.skipped,
+      total: entry.total,
+    }, { onConflict: 'user_id,date' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchCompletionLogs(userId: string) {
+  if (!_supabase) return [];
+  const { data, error } = await _supabase
+    .from('completion_logs')
+    .select('*')
+    .eq('user_id', userId);
+  if (error) return [];
+  return data;
+}
+
+export async function upsertMoodEntry(
+  userId: string,
+  value: number,
+  timestamp: string
+) {
+  if (!_supabase) return null;
+  const { data, error } = await _supabase
+    .from('mood_entries')
+    .insert({
+      user_id: userId,
+      value,
+      timestamp,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchMoodEntries(userId: string) {
+  if (!_supabase) return [];
+  const { data, error } = await _supabase
+    .from('mood_entries')
+    .select('*')
+    .eq('user_id', userId)
+    .order('timestamp', { ascending: true });
+  if (error) return [];
+  return data;
+}

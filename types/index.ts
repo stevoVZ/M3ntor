@@ -4,7 +4,7 @@ export type StepStatus   = 'todo'    | 'doing'  | 'blocked'| 'done';
 export type Priority     = 'urgent'  | 'high'   | 'normal' | 'low';
 export type Effort       = 'quick'   | 'medium' | 'deep';
 export type TimeOfDay    = 'morning' | 'afternoon' | 'evening' | 'anytime';
-export type MoodValue    = 'great' | 'okay' | 'rough';
+export type MoodValue    = 1 | 2 | 3 | 4 | 5;
 
 export interface Subtask {
   id: string;

@@ -7,7 +7,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { T, S, F, R, shadow } from '../../constants/theme';
 import { AREAS } from '../../constants/config';
 import { useStore } from '../../lib/store';
-import { apiRequest } from '../../lib/query-client';
+import { generateJourneyPlan } from '../../lib/ai';
 import * as Crypto from 'expo-crypto';
 
 type WizardStep = 'goal' | 'details' | 'generating' | 'review' | 'saved';
@@ -67,37 +67,16 @@ export default function ProgramBuilder({ onClose, onSave }: ProgramBuilderProps)
   async function handleGenerate() {
     if (!goal.trim()) return;
     setStep('generating');
-    try {
-      const prompt = `You are an AI journey designer. Create a structured self-improvement journey based on the user's goal.\n\nAvailable life areas: ${areasCatalog}\n\nUser preferences: ${area ? `Area: ${area}` : 'Auto-detect best area'}, Duration: ${weeks} weeks, Time commitment: ${minsPerDay} min/day.\n\nRespond ONLY with valid JSON, no markdown backticks:\n{\n  "title": "Journey title (concise, action-oriented)",\n  "area": "area_id from list above",\n  "description": "1-2 sentence description",\n  "weeks": ${weeks},\n  "minutesPerDay": ${minsPerDay},\n  "weekPlan": [\n    {\n      "week": 1,\n      "focus": "Week theme (2-3 words)",\n      "actions": [\n        {"title": "Action name", "duration": "X minutes", "description": "Brief how-to"}\n      ]\n    }\n  ]\n}\n\nEach week should have 3-4 daily actions. Make actions specific, actionable, and progressive. Never use em dashes.\n\nMy goal: ${goal}`;
-
-      const res = await apiRequest('POST', '/api/ai/assist', { prompt });
-      const raw = await res.text();
-      const text = raw.replace(/^"|"$/g, '').replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/```json|```/g, '').trim();
-      const parsed: GeneratedProgram = JSON.parse(text);
-      setProgram(parsed);
-      setEditTitle(parsed.title);
-      setStep('review');
-    } catch {
-      const fallback: GeneratedProgram = {
-        title: `Custom: ${goal.slice(0, 30)}`,
-        area: area || 'personal',
-        description: `A personalized journey to help you ${goal.toLowerCase()}.`,
-        weeks,
-        minutesPerDay: minsPerDay,
-        weekPlan: Array.from({ length: weeks }, (_, i) => ({
-          week: i + 1,
-          focus: i === 0 ? 'Foundation' : i === weeks - 1 ? 'Integration' : `Week ${i + 1} Focus`,
-          actions: [
-            { title: 'Morning intention setting', duration: '5 minutes', description: 'Start each day by writing your specific intention for this week\'s focus.' },
-            { title: 'Core practice', duration: `${Math.max(5, minsPerDay - 10)} minutes`, description: 'Dedicated time for your main activity this week.' },
-            { title: 'Evening reflection', duration: '5 minutes', description: 'Review what worked, what did not, and what to adjust tomorrow.' },
-          ],
-        })),
-      };
-      setProgram(fallback);
-      setEditTitle(fallback.title);
-      setStep('review');
-    }
+    const result = await generateJourneyPlan(goal, {
+      area,
+      weeks,
+      minsPerDay,
+      areasCatalog,
+    });
+    const parsed: GeneratedProgram = result;
+    setProgram(parsed);
+    setEditTitle(parsed.title);
+    setStep('review');
   }
 
   function handleRemoveAction(weekIdx: number, actionIdx: number) {

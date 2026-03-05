@@ -24,7 +24,9 @@ Preferred communication style: Simple, everyday language.
 - **Score Utilities**: `utils/scores.ts` provides `computeAppScore()` (multi-area weighted scoring), `goalProgress()`, `areaWeight()`, `journeyAreaWeight()`, `appScoreInsight()`, `getUnlinkedItems()`
 - **Today Utilities**: `utils/today.ts` provides `getTodayActions()`, `groupByTimeOfDay()`, `pickSessionActions()`, `sortedTimeSlots` for action generation and grouping
 - **Design System**: `constants/theme.ts` exports `T` (colors/tokens — indigo `#5856D6` brand), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows)
-- **Config**: `constants/config.ts` exports `ITEM_AREAS`, `AREAS` (10 Wheel of Life areas), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog)
+- **Config**: `constants/config.ts` exports `ITEM_AREAS`, `AREAS` (10 Wheel of Life areas), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog), `MOODS` (5-point numeric scale), `DIFF` (difficulty labels/colors), `JOURNEY_ICONS`, `HISTORY` (historical scores), `PEOPLE`, `DEFAULT_USER`
+- **Weekly Actions**: `constants/weekly-actions.ts` exports `WA` — 54KB catalog of daily actions per journey per week (accessed as `WA[journeyId][weekIndex]`)
+- **Sample Data**: `constants/sample-data.ts` exports `SAMPLE_ITEMS` and `SAMPLE_COMMITTED` — seeded automatically for guest users
 - **Animations**: `react-native-reanimated` for transitions, `expo-haptics` for tactile feedback
 - **Fonts**: Inter font family loaded via `@expo-google-fonts/inter`
 
@@ -55,9 +57,9 @@ components/
 ### AI Integration
 
 - **Provider**: Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk`
-- **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`
+- **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`, `generateGoal()`, `generateProjectFromGoal()`, `generateJourneyPlan()`
 - **AI Coach**: Chat-style interface for journey recommendations using server endpoint with fallback keyword matching
-- **Program Builder**: AI-generated custom journey programs with week-by-week action plans
+- **Program Builder**: AI-generated custom journey programs via `generateJourneyPlan()` — all AI generation centralized in `lib/ai.ts`
 - **Env var**: Requires `EXPO_PUBLIC_ANTHROPIC_KEY` on the client
 - **Graceful degradation**: All AI functions catch errors and return safe defaults/fallback templates
 
@@ -72,7 +74,7 @@ components/
 - `JourneyProgress`: Tracks user progress through curated journey programs
 - `Journey`: Static catalog entry for expert-curated programs
 - `CompletionLog`: Daily completion tracking (date→{done,skipped,total})
-- `MoodEntry`: Mood recording with timestamp
+- `MoodEntry`: Mood recording with timestamp; `MoodValue` is numeric 1-5 scale
 - `TodayAction`: Unified action type for Today screen (journey|habit|project|action)
 - Item type is **derived** from properties at runtime via `itemKind()`
 
@@ -144,5 +146,13 @@ The Supabase schema is defined in `supabase-schema.sql`. It creates:
 - `steps` — project sub-tasks
 - `subtasks` — individual items within steps
 - `journey_progress` — tracks user journey enrollment
+- `completion_logs` — daily completion stats (done/skipped/total) with unique (user_id, date)
+- `mood_entries` — mood recordings with numeric 1-5 value and timestamp
 
 All tables have Row Level Security (RLS) policies ensuring users can only access their own data.
+
+### Data Persistence
+
+- **Guest mode**: Sample data auto-seeded on boot via `loadAll('guest')`; completion/mood logs persisted to AsyncStorage only
+- **Authenticated mode**: Items/journeys stored in Supabase with realtime sync; completion/mood logs persisted to both AsyncStorage (local cache) and Supabase (cloud sync)
+- **AsyncStorage keys**: `m3ntor_completion_log`, `m3ntor_mood_log`

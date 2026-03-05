@@ -4,8 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { T, S, F, R, shadow } from '../../constants/theme';
 import { useStore } from '../../lib/store';
-import { ITEM_AREAS } from '../../constants/config';
-import { PRG } from '../../constants/config';
+import { ITEM_AREAS, PRG, DIFF, JOURNEY_ICONS, WA } from '../../constants/config';
 import type { Journey } from '../../types';
 import AICoach from '../../components/discover/AICoach';
 import ProgramBuilder from '../../components/discover/ProgramBuilder';
@@ -22,13 +21,21 @@ function JourneyCard({ journey }: { journey: Journey }) {
       <View style={styles.cardBody}>
         <View style={styles.cardHeader}>
           <View style={[styles.cardArea, { backgroundColor: area.c + '14' }]}>
-            <Text style={{ fontSize: 16 }}>{area.e}</Text>
+            <Text style={{ fontSize: 16 }}>{JOURNEY_ICONS[journey.id] || area.e}</Text>
           </View>
-          {journey.f && (
-            <View style={styles.featuredBadge}>
-              <Text style={styles.featuredText}>⭐ Featured</Text>
-            </View>
-          )}
+          <View style={styles.cardBadges}>
+            {journey.d && DIFF[journey.d] && (
+              <View style={[styles.diffBadge, { backgroundColor: DIFF[journey.d].c + '14' }]}>
+                <Text style={[styles.diffBadgeText, { color: DIFF[journey.d].c }]}>{DIFF[journey.d].l}</Text>
+              </View>
+            )}
+            {journey.f && (
+              <View style={styles.featuredBadge}>
+                <Feather name="award" size={11} color="#B8860B" />
+                <Text style={styles.featuredText}>Featured</Text>
+              </View>
+            )}
+          </View>
         </View>
         <Text style={styles.cardTitle}>{journey.t}</Text>
         <Text style={styles.cardExpert}>by {journey.e}</Text>
@@ -42,6 +49,23 @@ function JourneyCard({ journey }: { journey: Journey }) {
           <Text style={styles.cardMetaDot}>·</Text>
           <Text style={styles.cardMetaText}>{(journey.u / 1000).toFixed(1)}k enrolled</Text>
         </View>
+        {WA[journey.id] && WA[journey.id][0] && (
+          <View style={styles.waPreview}>
+            <Text style={styles.waPreviewLabel}>Week 1 preview</Text>
+            {WA[journey.id][0].slice(0, 3).map((action, idx) => (
+              <View key={idx} style={styles.waPreviewRow}>
+                <Feather name="check-circle" size={10} color={area.c} style={{ marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.waPreviewTitle} numberOfLines={1}>{action.t}</Text>
+                  <Text style={styles.waPreviewDur}>{action.dur}</Text>
+                </View>
+              </View>
+            ))}
+            {WA[journey.id][0].length > 3 && (
+              <Text style={styles.waPreviewMore}>+{WA[journey.id][0].length - 3} more actions</Text>
+            )}
+          </View>
+        )}
         <Pressable style={[styles.enrollBtn, { backgroundColor: enrolled ? T.green : area.c }]}
           onPress={() => !enrolled && enrollJourney(journey.id)} disabled={enrolled}>
           <Text style={styles.enrollBtnText}>{enrolled ? "✓ Enrolled" : "Enrol in journey"}</Text>
@@ -157,7 +181,10 @@ export default function DiscoverScreen() {
 
         {featured.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>⭐  Featured</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name="award" size={14} color="#B8860B" />
+              <Text style={styles.sectionTitle}>Featured</Text>
+            </View>
             {featured.map(j => <JourneyCard key={j.id} journey={j} />)}
           </View>
         )}
@@ -171,7 +198,7 @@ export default function DiscoverScreen() {
 
         {filtered.length === 0 && (
           <View style={styles.empty}>
-            <Text style={styles.emptyEmoji}>🔍</Text>
+            <Feather name="search" size={40} color={T.t3} />
             <Text style={styles.emptyTitle}>No matches</Text>
             <Text style={styles.emptySub}>Try a different search or filter</Text>
           </View>
@@ -210,7 +237,10 @@ const styles = StyleSheet.create({
   cardBody:   { flex: 1, padding: S.md },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   cardArea:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  featuredBadge: { backgroundColor: '#FDCB6E20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  cardBadges: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  diffBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  diffBadgeText: { fontSize: 11, fontWeight: '700' },
+  featuredBadge: { backgroundColor: '#FDCB6E20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 },
   featuredText:  { fontSize: 11, fontWeight: '700', color: '#B8860B' },
   cardTitle:  { fontSize: F.md, fontWeight: '800', color: T.text, letterSpacing: -0.3 },
   cardExpert: { fontSize: F.xs, color: T.brand, fontWeight: '600', marginTop: 2, marginBottom: 6 },
@@ -231,6 +261,13 @@ const styles = StyleSheet.create({
   coachInfo: { flex: 1 },
   coachTitle: { fontSize: F.md, fontWeight: '700', color: T.text },
   coachSub: { fontSize: F.xs, color: T.t2, marginTop: 2 },
+
+  waPreview: { marginTop: 8, marginBottom: 10, backgroundColor: T.fill, borderRadius: 10, padding: 10, gap: 6 },
+  waPreviewLabel: { fontSize: 10, fontWeight: '700', color: T.t3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  waPreviewRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  waPreviewTitle: { fontSize: 12, fontWeight: '600', color: T.text, lineHeight: 16 },
+  waPreviewDur: { fontSize: 10, color: T.t3, marginTop: 1 },
+  waPreviewMore: { fontSize: 10, color: T.t3, fontWeight: '600', marginTop: 2 },
 
   empty:      { alignItems: 'center', paddingVertical: 48 },
   emptyEmoji: { fontSize: 40, marginBottom: S.md },

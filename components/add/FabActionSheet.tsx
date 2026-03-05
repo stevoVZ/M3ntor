@@ -14,7 +14,7 @@ import { T, S, F } from '../../constants/theme';
 import { ITEM_AREAS } from '../../constants/config';
 import type { Priority, Effort } from '../../types';
 import { suggestArea, inferType } from '../../utils/nlp';
-import { getItemHint } from '../../lib/ai';
+import { getItemHint, generateGoal } from '../../lib/ai';
 import { createItem } from '../../utils/items';
 import { useStore } from '../../lib/store';
 import { AreaPicker } from './AreaPicker';
@@ -85,6 +85,8 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const [aiLoading, setAiLoading]       = useState(false);
   const [saved, setSaved]               = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [goalSuggestion, setGoalSuggestion] = useState<{ why?: string; journeyHints?: string[]; firstSteps?: string[] } | null>(null);
+  const [goalEnrichLoading, setGoalEnrichLoading] = useState(false);
 
   const [kbHeight, setKbHeight] = useState(0);
 
@@ -140,22 +142,46 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
     setAiHint(null);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!canSave) return;
     const type = activeType ?? 'action';
     if (type === 'project') { onProject(text); return; }
     if (type === 'journey') { onJourney?.(); return; }
 
+    let enrichedEmoji = type === 'habit' ? '🔄' : type === 'goal' ? '🎯' : '✓';
+    let enrichedArea = area ?? suggestArea(text) ?? 'life';
+    let description: string | undefined;
+    let linkedJourneys: string[] | undefined;
+
+    if (type === 'goal') {
+      setGoalEnrichLoading(true);
+      try {
+        const suggestion = await generateGoal(text.trim());
+        if (suggestion.emoji) enrichedEmoji = suggestion.emoji;
+        if (suggestion.area) enrichedArea = suggestion.area;
+        if (suggestion.why) description = suggestion.why;
+        if (suggestion.journeyHints?.length) linkedJourneys = suggestion.journeyHints;
+        setGoalSuggestion({
+          why: suggestion.why,
+          journeyHints: suggestion.journeyHints,
+          firstSteps: suggestion.firstSteps,
+        });
+      } catch {}
+      setGoalEnrichLoading(false);
+    }
+
     const item = createItem(effectiveUserId, {
       title:             text.trim(),
-      area:              area ?? suggestArea(text) ?? 'life',
+      area:              enrichedArea,
       status:            type === 'goal' ? 'someday' : 'active',
-      emoji:             type === 'habit' ? '🔄' : type === 'goal' ? '🎯' : '✓',
+      emoji:             enrichedEmoji,
+      description,
       habit_time_of_day: (tod as 'morning' | 'afternoon' | 'evening') ?? undefined,
       recurrence:        type === 'habit' ? { type: 'daily' } : undefined,
       priority,
       effort,
       deadline:          deadline.trim() || undefined,
+      linked_journeys:   linkedJourneys,
     });
 
     addItem(item);

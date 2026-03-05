@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Crypto from 'expo-crypto';
 import { useStore } from '@/lib/store';
-import { projectProgress, itemKind } from '@/utils/items';
+import { projectProgress, itemKind, createStep } from '@/utils/items';
 import { ProgressBar } from '@/components/items/ProgressBar';
 import { ITEM_AREAS, STEP_STATUS, PRIORITY, EFFORT } from '@/constants/config';
 import { T, S, R, F, shadow } from '@/constants/theme';
@@ -95,19 +95,10 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
 
   const doAddTask = () => {
     if (!newTaskText.trim()) return;
-    const newStep: Step = {
-      id: Crypto.randomUUID(),
-      item_id: item.id,
+    const newStep = createStep(item.id, {
       title: newTaskText.trim(),
-      done: false,
-      status: 'todo',
-      priority: 'normal',
-      effort: 'medium',
-      today: false,
-      blocked_by: [],
-      assignees: [],
       sort_order: steps.length,
-    };
+    });
     addStep(item.id, newStep);
     setNewTaskText('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -139,19 +130,10 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
       const result = await generateProjectTasks(item.title, existing);
       if (result.tasks?.length) {
         result.tasks.forEach((t, i) => {
-          const newStep: Step = {
-            id: Crypto.randomUUID(),
-            item_id: item.id,
+          const newStep = createStep(item.id, {
             title: t,
-            done: false,
-            status: 'todo',
-            priority: 'normal',
-            effort: 'medium',
-            today: false,
-            blocked_by: [],
-            assignees: [],
             sort_order: steps.length + i,
-          };
+          });
           addStep(item.id, newStep);
         });
         setAiBanner('success');

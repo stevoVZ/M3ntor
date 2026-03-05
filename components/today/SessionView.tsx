@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet, Platform, ActivityIndicator } from '
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { T, S, R, shadow } from '../../constants/theme';
-import { ITEM_AREAS, PRG } from '../../constants/config';
+import { ITEM_AREAS, PRG, MOODS } from '../../constants/config';
 import { formatDuration } from '../../utils/items';
 import { pickSessionActions } from '../../utils/today';
 import type { TodayAction, MoodValue, JourneyProgress } from '../../types';
@@ -15,12 +15,6 @@ interface MoodOption {
   icon: string;
   color: string;
 }
-
-const MOODS: MoodOption[] = [
-  { value: 'rough', label: 'Rough', icon: 'frown', color: '#FF3B30' },
-  { value: 'okay', label: 'Okay', icon: 'meh', color: '#FFD60A' },
-  { value: 'great', label: 'Great', icon: 'smile', color: '#34C759' },
-];
 
 type SessionStep = 'briefing' | 'mood' | 'actions' | 'complete' | 'summary';
 
@@ -111,7 +105,7 @@ function MoodCheck({ onSelect }: { onSelect: (mood: MoodOption) => void }) {
           {MOODS.map(m => (
             <Pressable key={m.value} style={moodStyles.option} onPress={() => onSelect(m)}>
               <View style={[moodStyles.iconWrap, { backgroundColor: m.color + '14' }]}>
-                <Feather name={m.icon as any} size={32} color={m.color} />
+                <Feather name={m.icon as any} size={26} color={m.color} />
               </View>
               <Text style={moodStyles.optionLabel}>{m.label}</Text>
             </Pressable>
@@ -692,9 +686,9 @@ const moodStyles = StyleSheet.create({
   },
   label: { fontSize: 13, fontWeight: '600' as const, color: T.t3, letterSpacing: 0.5, marginBottom: 8 },
   title: { fontSize: 22, fontWeight: '700' as const, color: T.text, marginBottom: 24 },
-  row: { flexDirection: 'row', justifyContent: 'center', gap: 24 },
-  option: { alignItems: 'center', gap: 8 },
-  iconWrap: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  option: { alignItems: 'center', gap: 6 },
+  iconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   optionLabel: { fontSize: 13, fontWeight: '500' as const, color: T.t3 },
 });
 

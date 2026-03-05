@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { T, S, F } from '@/constants/theme';
 import { scoreLabel, scoreTier } from './WheelOfLife';
 import type { LifeArea } from '@/constants/config';
-import { PRG } from '@/constants/config';
+import { PRG, WA } from '@/constants/config';
 import { useStore } from '@/lib/store';
 import { appScoreInsight, journeyProgress as calcJourneyProgress, areaWeight, journeyAreaWeight, goalProgress } from '@/utils/scores';
 import { formatRecurrence, formatDuration } from '@/utils/items';
@@ -172,6 +172,28 @@ export default function WheelAreaDetail({ area, appScore }: Props) {
                     </View>
                   </View>
                 )}
+                {j.status === 'active' && WA[j.journey_id] && (() => {
+                  const weekIdx = Math.min(j.current_week - 1, (WA[j.journey_id]?.length ?? 1) - 1);
+                  const weekActions = WA[j.journey_id]?.[weekIdx];
+                  if (!weekActions || weekActions.length === 0) return null;
+                  return (
+                    <View style={styles.waActionsWrap}>
+                      <Text style={styles.waActionsLabel}>This week's actions</Text>
+                      {weekActions.slice(0, 3).map((wa, idx) => (
+                        <View key={idx} style={styles.waActionRow}>
+                          <Feather name="arrow-right" size={9} color={area.c} style={{ marginTop: 3 }} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.waActionTitle} numberOfLines={1}>{wa.t}</Text>
+                            <Text style={styles.waActionDur}>{wa.dur}</Text>
+                          </View>
+                        </View>
+                      ))}
+                      {weekActions.length > 3 && (
+                        <Text style={styles.waActionMore}>+{weekActions.length - 3} more</Text>
+                      )}
+                    </View>
+                  );
+                })()}
                 {j.status === 'done' && (
                   <View style={styles.completedRow}>
                     <Feather name="check" size={12} color={T.green} />
@@ -966,5 +988,41 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 10,
     fontWeight: '650',
+  },
+  waActionsWrap: {
+    marginTop: 8,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    borderRadius: 10,
+    padding: 8,
+    gap: 4,
+  },
+  waActionsLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: T.t3,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  waActionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 5,
+  },
+  waActionTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: T.text,
+    lineHeight: 15,
+  },
+  waActionDur: {
+    fontSize: 9,
+    color: T.t3,
+  },
+  waActionMore: {
+    fontSize: 9,
+    color: T.t3,
+    fontWeight: '600',
+    marginTop: 2,
   },
 });

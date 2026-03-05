@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../lib/store';
 import { T, S, F, R, shadow } from '../../constants/theme';
-import { ITEM_AREAS, KIND_CONFIG, PRG } from '../../constants/config';
+import { ITEM_AREAS, KIND_CONFIG, PRG, JOURNEY_ICONS } from '../../constants/config';
 import { itemKind, projectProgress, formatRecurrence, formatDuration } from '../../utils/items';
 import { greetingForTime, formatDeadline, isOverdue } from '../../utils/dates';
 import { getTodayActions, groupByTimeOfDay, sortedTimeSlots, timeSlotLabel, timeSlotIcon } from '../../utils/today';
@@ -86,7 +86,11 @@ function JourneyCard({
     <View style={[styles.journeyCard, { borderLeftColor: ac }]}>
       <View style={styles.journeyHeader}>
         <View style={[styles.journeyIcon, { backgroundColor: ac + '14' }]}>
-          <Feather name="compass" size={22} color={ac} />
+          {JOURNEY_ICONS[jp.journey_id] ? (
+            <Text style={{ fontSize: 22 }}>{JOURNEY_ICONS[jp.journey_id]}</Text>
+          ) : (
+            <Feather name="compass" size={22} color={ac} />
+          )}
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.journeyTitle} numberOfLines={1}>{prog.t}</Text>

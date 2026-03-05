@@ -11,13 +11,13 @@ import Animated, {
   FadeIn, FadeOut,
 } from 'react-native-reanimated';
 import { T, S, F, R, shadow } from '../../constants/theme';
-import { ITEM_AREAS, KIND_CONFIG, PRIORITY, EFFORT, STEP_STATUS, PRG } from '../../constants/config';
+import { ITEM_AREAS, KIND_CONFIG, PRIORITY, EFFORT, STEP_STATUS, PRG, WA } from '../../constants/config';
 import { itemKind, projectProgress, createStep, formatRecurrence, formatDuration } from '../../utils/items';
 import { formatDeadline, isOverdue } from '../../utils/dates';
 import { generateProjectTasks, generateSubtasks } from '../../lib/ai';
 import { useStore } from '../../lib/store';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import type { Step, Subtask } from '../../types';
+import type { Step, Subtask, JourneyProgress, Journey } from '../../types';
 import * as Crypto from 'expo-crypto';
 
 const STATUS_ORDER: Step['status'][] = ['todo', 'doing', 'blocked', 'done'];
@@ -220,6 +220,63 @@ function StepRow({
           </View>
         </Animated.View>
       )}
+    </View>
+  );
+}
+
+function WeeklyPlanSection({ journeyInfo }: { journeyInfo: { jp: JourneyProgress; prog: Journey } }) {
+  const [expandedWeek, setExpandedWeek] = useState<number | null>(journeyInfo.jp.current_week);
+  const weeklyActions = WA[journeyInfo.jp.journey_id];
+
+  return (
+    <View style={{ marginTop: S.sm }}>
+      <Text style={{ fontSize: 11, color: T.t3, fontWeight: '600' as const, marginBottom: 4 }}>Weekly Plan</Text>
+      {journeyInfo.prog.wp.map((week, i) => {
+        const weekNum = i + 1;
+        const isCurrent = weekNum === journeyInfo.jp.current_week;
+        const isPast = weekNum < journeyInfo.jp.current_week;
+        const isExpanded = expandedWeek === weekNum;
+        const actions = weeklyActions?.[i];
+
+        return (
+          <View key={i}>
+            <Pressable
+              style={[styles.weekRow, isPast && !isExpanded ? { opacity: 0.5 } : {}]}
+              onPress={() => setExpandedWeek(isExpanded ? null : weekNum)}
+            >
+              <View style={[styles.weekDot, {
+                backgroundColor: isCurrent ? T.brand : isPast ? T.green : T.sep,
+              }]} />
+              <Text style={{ fontSize: 12, color: isCurrent ? T.brand : T.text, fontWeight: isCurrent ? '700' as const : '400' as const, flex: 1 }}>
+                Week {weekNum}: {week}
+              </Text>
+              {isPast && <Feather name="check" size={12} color={T.green} />}
+              {isCurrent && (
+                <View style={{ backgroundColor: T.brand + '12', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 9, fontWeight: '700' as const, color: T.brand }}>CURRENT</Text>
+                </View>
+              )}
+              {actions && actions.length > 0 && (
+                <Feather name={isExpanded ? 'chevron-down' : 'chevron-right'} size={12} color={T.t3} />
+              )}
+            </Pressable>
+            {isExpanded && actions && actions.length > 0 && (
+              <View style={styles.waWeekActions}>
+                {actions.map((wa, idx) => (
+                  <View key={idx} style={styles.waWeekActionRow}>
+                    <View style={[styles.waWeekDot, { backgroundColor: isCurrent ? T.brand + '30' : T.sep }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.waWeekActionTitle}>{wa.t}</Text>
+                      <Text style={styles.waWeekActionDesc} numberOfLines={2}>{wa.desc}</Text>
+                      <Text style={styles.waWeekActionDur}>{wa.dur}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -932,25 +989,7 @@ export default function ItemDetailPage() {
                   <Text style={styles.detailLabel}>Streak</Text>
                   <Text style={styles.detailValue}>{journeyInfo.jp.streak} days</Text>
                 </View>
-                <View style={{ marginTop: S.sm }}>
-                  <Text style={{ fontSize: 11, color: T.t3, fontWeight: '600' as const, marginBottom: 4 }}>Weekly Plan</Text>
-                  {journeyInfo.prog.wp.map((week, i) => (
-                    <View key={i} style={[styles.weekRow, i < journeyInfo!.jp.current_week ? { opacity: 0.5 } : {}]}>
-                      <View style={[styles.weekDot, {
-                        backgroundColor: i + 1 === journeyInfo!.jp.current_week ? T.brand : i + 1 < journeyInfo!.jp.current_week ? T.green : T.sep,
-                      }]} />
-                      <Text style={{ fontSize: 12, color: i + 1 === journeyInfo!.jp.current_week ? T.brand : T.text, fontWeight: i + 1 === journeyInfo!.jp.current_week ? '700' as const : '400' as const }}>
-                        Week {i + 1}: {week}
-                      </Text>
-                      {i + 1 < journeyInfo!.jp.current_week && <Feather name="check" size={12} color={T.green} />}
-                      {i + 1 === journeyInfo!.jp.current_week && (
-                        <View style={{ backgroundColor: T.brand + '12', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                          <Text style={{ fontSize: 9, fontWeight: '700' as const, color: T.brand }}>CURRENT</Text>
-                        </View>
-                      )}
-                    </View>
-                  ))}
-                </View>
+                <WeeklyPlanSection journeyInfo={journeyInfo} />
               </View>
             </View>
           )}
@@ -1087,4 +1126,10 @@ const styles = StyleSheet.create({
 
   weekRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   weekDot: { width: 8, height: 8, borderRadius: 4 },
+  waWeekActions: { marginLeft: 16, marginBottom: 8, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: T.brand + '15', gap: 8 },
+  waWeekActionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  waWeekDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
+  waWeekActionTitle: { fontSize: 13, fontWeight: '600' as const, color: T.text, lineHeight: 18 },
+  waWeekActionDesc: { fontSize: 11, color: T.t2, lineHeight: 16, marginTop: 1 },
+  waWeekActionDur: { fontSize: 10, color: T.t3, fontWeight: '500' as const, marginTop: 2 },
 });

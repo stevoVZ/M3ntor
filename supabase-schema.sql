@@ -122,12 +122,35 @@ CREATE TABLE IF NOT EXISTS journey_progress (
   UNIQUE (user_id, journey_id)
 );
 
+-- ── COMPLETION LOGS ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS completion_logs (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id    UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  date       DATE NOT NULL,
+  done       INT NOT NULL DEFAULT 0,
+  skipped    INT NOT NULL DEFAULT 0,
+  total      INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, date)
+);
+
+-- ── MOOD ENTRIES ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS mood_entries (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id    UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  value      INT NOT NULL CHECK (value BETWEEN 1 AND 5),
+  timestamp  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ── ROW LEVEL SECURITY ───────────────────────────────────────
 ALTER TABLE profiles        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE items           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE steps           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subtasks        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE journey_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE completion_logs  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mood_entries     ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: users can read/write their own
 CREATE POLICY "profiles_self" ON profiles
@@ -156,6 +179,16 @@ CREATE POLICY "journey_progress_self" ON journey_progress
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
+-- Completion logs: users see their own
+CREATE POLICY "completion_logs_self" ON completion_logs
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- Mood entries: users see their own
+CREATE POLICY "mood_entries_self" ON mood_entries
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
 -- ── REALTIME ─────────────────────────────────────────────────
 ALTER PUBLICATION supabase_realtime ADD TABLE items;
 ALTER PUBLICATION supabase_realtime ADD TABLE steps;
@@ -167,6 +200,10 @@ CREATE INDEX IF NOT EXISTS items_status     ON items(status);
 CREATE INDEX IF NOT EXISTS steps_item_id    ON steps(item_id);
 CREATE INDEX IF NOT EXISTS subtasks_step_id ON subtasks(step_id);
 CREATE INDEX IF NOT EXISTS jp_user_id       ON journey_progress(user_id);
+CREATE INDEX IF NOT EXISTS cl_user_id      ON completion_logs(user_id);
+CREATE INDEX IF NOT EXISTS cl_date         ON completion_logs(date);
+CREATE INDEX IF NOT EXISTS me_user_id      ON mood_entries(user_id);
+CREATE INDEX IF NOT EXISTS me_timestamp    ON mood_entries(timestamp);
 
 -- ── DONE ─────────────────────────────────────────────────────
 -- Run SELECT * FROM items; to confirm the table exists.

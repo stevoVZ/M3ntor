@@ -33,7 +33,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setBooting(false);
+      loadAll('guest').finally(() => setBooting(false));
       return;
     }
 
@@ -41,7 +41,7 @@ export default function RootLayout() {
       const uid = session?.user?.id ?? null;
       setUserId(uid);
       if (uid) loadAll(uid).finally(() => setBooting(false));
-      else setBooting(false);
+      else loadAll('guest').finally(() => setBooting(false));
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
