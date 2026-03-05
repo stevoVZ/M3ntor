@@ -64,16 +64,14 @@ export default function LoginScreen() {
         style={styles.kav}>
 
         {/* Brand hero */}
-        <LinearGradient
-          colors={[T.dark, '#1E1E2A']}
-          style={styles.hero}>
+        <View style={styles.hero}>
           <Image
             source={require('../assets/images/m3ntor-logo.png')}
             style={styles.heroLogo}
             resizeMode="contain"
           />
           <Text style={styles.heroTagline}>Build the life you actually want</Text>
-        </LinearGradient>
+        </View>
 
         {/* Form */}
         <View style={styles.form}>
@@ -174,17 +172,16 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: T.dark },
+  safe:     { flex: 1, backgroundColor: '#FFFFFF' },
   kav:      { flex: 1 },
 
-  hero:        { paddingTop: 56, paddingBottom: 40, paddingHorizontal: 32, alignItems: 'center' },
-  heroLogo:    { width: 200, height: 120 },
-  heroTagline: { fontSize: 15, color: 'rgba(255,255,255,0.55)', marginTop: 8, textAlign: 'center' },
+  hero:        { paddingTop: 56, paddingBottom: 32, paddingHorizontal: 32, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  heroLogo:    { width: 240, height: 150 },
+  heroTagline: { fontSize: 15, color: T.t3, marginTop: 10, textAlign: 'center' },
 
   form: {
-    flex: 1, backgroundColor: T.bg,
-    borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: S.lg, paddingTop: 28,
+    flex: 1, backgroundColor: '#FFFFFF',
+    padding: S.lg, paddingTop: 20,
   },
 
   modeToggle: {
