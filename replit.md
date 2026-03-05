@@ -105,3 +105,14 @@ app/
 - `EXPO_PUBLIC_SUPABASE_URL` — Supabase project URL (client-side, optional)
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon/public key (client-side, optional)
 - `EXPO_PUBLIC_DOMAIN` — Public domain for API URL resolution (set automatically in Replit)
+
+### Database Setup
+
+The Supabase schema is defined in `supabase-schema.sql`. It creates:
+- `profiles` — auto-created via trigger on signup (uses `SET search_path = public` for proper permissions)
+- `items` — core entity with steps/subtasks nested queries
+- `steps` — project sub-tasks
+- `subtasks` — individual items within steps
+- `journey_progress` — tracks user journey enrollment
+
+All tables have Row Level Security (RLS) policies ensuring users can only access their own data. Realtime subscriptions are enabled for items, steps, and subtasks.
