@@ -291,8 +291,9 @@ export function FabActionSheet({ onClose }: Props) {
           style={[styles.sheet, {
             paddingHorizontal: horizontalPad,
             paddingBottom: kbHeight > 0 ? 12 : (Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 16)),
-            marginBottom: kbHeight,
-            maxHeight: screenHeight - kbHeight - (insets.top || 44) - 10,
+            ...(kbHeight > 0
+              ? { height: screenHeight - kbHeight - (insets.top || 44), marginBottom: kbHeight }
+              : { maxHeight: screenHeight * 0.92 }),
           }]}>
 
           <View style={styles.handleRow}>
