@@ -30,13 +30,15 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email:    email.trim(),
           password: password.trim(),
           options:  { data: { name: name.trim() || undefined } },
         });
         if (error) throw error;
-        Alert.alert('Check your email', 'We sent you a confirmation link.');
+        if (!data.session) {
+          Alert.alert('Check your email', 'We sent you a confirmation link.');
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email:    email.trim(),

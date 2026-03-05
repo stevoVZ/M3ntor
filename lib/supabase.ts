@@ -16,6 +16,8 @@ function isValidUrl(url: string): boolean {
 
 export const isSupabaseConfigured = isValidUrl(SUPABASE_URL) && SUPABASE_KEY.length > 10;
 
+console.log('[supabase] URL set:', !!SUPABASE_URL, 'KEY set:', !!SUPABASE_KEY, 'configured:', isSupabaseConfigured);
+
 let _supabase: SupabaseClient | null = null;
 
 if (isSupabaseConfigured) {
