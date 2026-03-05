@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  Platform, ActivityIndicator, KeyboardAvoidingView,
+  Platform, ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import Animated, {
@@ -276,6 +276,7 @@ export default function CreateScreen() {
       style={{ flex: 1 }}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets={true}
       contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: horizontalPad }}>
       <View style={styles.headerRow}>
         <Text style={[styles.title, isCompact && { fontSize: 17 }]}>What's next?</Text>
@@ -577,15 +578,10 @@ export default function CreateScreen() {
   return (
     <View style={[styles.container, {
       backgroundColor: 'rgba(253,252,255,0.98)',
-      paddingTop: webTopInset,
+      paddingTop: webTopInset || insets.top,
       paddingBottom: webBottomInset || Math.max(insets.bottom, 16),
     }]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}>
-        {content}
-      </KeyboardAvoidingView>
+      {content}
     </View>
   );
 }

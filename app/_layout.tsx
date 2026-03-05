@@ -75,12 +75,9 @@ export default function RootLayout() {
           <Stack.Screen
             name="create"
             options={{
-              presentation: 'formSheet',
-              sheetAllowedDetents: [0.75, 1],
-              sheetGrabberVisible: true,
-              sheetExpandsWhenScrolledToEdge: true,
+              presentation: 'modal',
               headerShown: false,
-              contentStyle: { backgroundColor: 'transparent' },
+              animation: 'slide_from_bottom',
             }}
           />
         </Stack>
