@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Pressable, Text, StyleSheet, Platform, Keyboard, Modal } from 'react-native';
+import { View, Pressable, Text, StyleSheet, Platform, Keyboard, Modal, Image } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,7 +8,6 @@ import { T, shadow, R } from '../../constants/theme';
 import { FabActionSheet } from '../../components/add/FabActionSheet';
 import { ProjectAddSheet } from '../../components/add/ProjectAddSheet';
 import ProgramBuilder from '../../components/discover/ProgramBuilder';
-import { M3ntorIconStatic } from '../../components/M3ntorIcon';
 
 // ── Tab icon SVG paths ────────────────────────────────────
 function TabIcon({ name, active }: { name: string; active: boolean }) {
@@ -101,7 +100,11 @@ function CustomTabBar({ state, navigation, onFabPress }: { state: any; navigatio
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={styles.fab}>
               <View style={styles.fabIcon}>
-                <M3ntorIconStatic size={26} fill="white" />
+                <Image
+                  source={require('../../assets/images/m3ntor-icon-mark.png')}
+                  style={{ width: 34, height: 22, tintColor: 'white' }}
+                  resizeMode="contain"
+                />
               </View>
             </LinearGradient>
           </Pressable>
