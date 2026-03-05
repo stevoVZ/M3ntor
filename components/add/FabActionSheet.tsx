@@ -286,14 +286,16 @@ export function FabActionSheet({ onClose }: Props) {
         <Animated.View
           entering={SlideInDown.springify().damping(32).stiffness(360)}
           exiting={SlideOutDown.springify().damping(28)}
-          style={[styles.sheet, {
-            paddingHorizontal: horizontalPad,
-            paddingBottom: kbHeight > 0 ? 12 : (Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 16)),
-            marginBottom: kbHeight,
-            ...(kbHeight > 0
-              ? { height: screenHeight - kbHeight - (insets.top || 44) }
-              : { maxHeight: screenHeight * 0.92 }),
-          }]}>
+          style={[
+            kbHeight > 0 ? styles.sheetKb : styles.sheet,
+            {
+              paddingHorizontal: horizontalPad,
+              paddingBottom: kbHeight > 0 ? 12 : (Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 16)),
+              ...(kbHeight > 0
+                ? { bottom: kbHeight, top: insets.top || 44 }
+                : { maxHeight: screenHeight * 0.92 }),
+            },
+          ]}>
 
           <View style={styles.handleRow}>
             <View style={styles.handle} />
@@ -620,6 +622,7 @@ const styles = StyleSheet.create({
   overlay:        { flex: 1, justifyContent: 'flex-end', overflow: 'hidden' },
   backdrop:       { flex: 1, backgroundColor: 'rgba(10,8,22,0.52)' },
   sheet:          { backgroundColor: 'rgba(253,252,255,0.98)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 0 },
+  sheetKb:        { position: 'absolute', left: 0, right: 0, backgroundColor: 'rgba(253,252,255,0.98)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 0 },
   handleRow:      { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
   handle:         { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.08)' },
 
