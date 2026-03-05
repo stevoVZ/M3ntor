@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -23,9 +23,13 @@ function useAuthRedirect(userId: string | null, loading: boolean, guestMode: boo
 export default function RootLayout() {
   const { userId, setUserId, loadAll } = useStore();
   const [booting, setBooting] = useState(true);
+  const guestRef = useRef(false);
   const segments = useSegments();
-  const inTabs = segments[0] === '(tabs)';
-  const guestMode = !userId && inTabs;
+  const inApp = segments[0] === '(tabs)' || segments[0] === 'item';
+
+  if (!guestRef.current && !userId && inApp) guestRef.current = true;
+  if (userId) guestRef.current = false;
+  const guestMode = guestRef.current;
 
   useEffect(() => {
     if (!isSupabaseConfigured) {

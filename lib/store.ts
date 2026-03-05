@@ -68,16 +68,18 @@ export const useStore = create<AppState>((set, get) => ({
 
   addItem: (item) => {
     set(s => ({ items: [item, ...s.items] }));
-    upsertItem(item as unknown as Record<string, unknown>)
-      .then(() => {
-        if (item.steps?.length) {
-          const stepsWithItemId = item.steps.map(s => ({ ...s, item_id: item.id }));
-          return Promise.all(
-            stepsWithItemId.map(s => upsertStep(s as unknown as Record<string, unknown>))
-          );
-        }
-      })
-      .catch(console.error);
+    if (item.user_id && item.user_id !== 'guest') {
+      upsertItem(item as unknown as Record<string, unknown>)
+        .then(() => {
+          if (item.steps?.length) {
+            const stepsWithItemId = item.steps.map(s => ({ ...s, item_id: item.id }));
+            return Promise.all(
+              stepsWithItemId.map(s => upsertStep(s as unknown as Record<string, unknown>))
+            );
+          }
+        })
+        .catch(console.error);
+    }
   },
 
   updateItem: (id, patch) => {
@@ -87,12 +89,17 @@ export const useStore = create<AppState>((set, get) => ({
       ),
     }));
     const updated = get().items.find(i => i.id === id);
-    if (updated) upsertItem(updated as unknown as Record<string, unknown>).catch(console.error);
+    if (updated && updated.user_id !== 'guest') {
+      upsertItem(updated as unknown as Record<string, unknown>).catch(console.error);
+    }
   },
 
   removeItem: (id) => {
+    const item = get().items.find(i => i.id === id);
     set(s => ({ items: s.items.filter(i => i.id !== id) }));
-    deleteItem(id).catch(console.error);
+    if (item?.user_id !== 'guest') {
+      deleteItem(id).catch(console.error);
+    }
   },
 
   toggleStep: (itemId, stepId, done) => {
