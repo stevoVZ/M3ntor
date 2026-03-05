@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  Modal, KeyboardAvoidingView, Platform, ActivityIndicator,
-  useWindowDimensions, Keyboard,
+  Modal, Platform, ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -59,21 +60,11 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
   const [saved, setSaved]           = useState(false);
   const [showAttributes, setShowAttributes] = useState(false);
 
-  const [kbHeight, setKbHeight] = useState(0);
-
   const inputRef = useRef<TextInput>(null);
   const stepRef  = useRef<TextInput>(null);
 
   const isCompact = screenWidth < 380;
   const horizontalPad = isCompact ? 14 : 20;
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (e) => setKbHeight(e.endCoordinates.height));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKbHeight(0));
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
 
   useEffect(() => {
     if (title.length >= 3 && !areaConfirmed) {
@@ -155,7 +146,8 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
   return (
     <Modal transparent animationType="none" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
+        keyboardVerticalOffset={0}
         style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
           <View style={styles.backdrop} />
@@ -185,7 +177,7 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 40 : kbHeight > 0 ? kbHeight * 0.3 : 0 }}>
+              contentContainerStyle={{ paddingBottom: 20 }}>
               <View style={styles.headerRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.sheetTitle, isCompact && { fontSize: 18 }]}>New Project</Text>

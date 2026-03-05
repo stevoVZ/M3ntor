@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Pressable, TextInput,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  Platform, ActivityIndicator,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { T, S, F, R, shadow } from '../../constants/theme';
 import { ITEM_AREAS, PRG, AREAS } from '../../constants/config';
@@ -156,8 +157,8 @@ export default function AICoach({ onClose }: AICoachProps) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior="padding"
+      keyboardVerticalOffset={0}
     >
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={onClose}>

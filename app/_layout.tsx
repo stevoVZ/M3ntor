@@ -4,6 +4,7 @@ import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useStore } from '../lib/store';
 import { T } from '../constants/theme';
@@ -66,14 +67,16 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)"    options={{ headerShown: false }} />
-          <Stack.Screen name="login"     options={{ headerShown: false }} />
-          <Stack.Screen name="item/[id]" options={{ presentation: 'modal', headerShown: false }} />
-        </Stack>
-      </SafeAreaProvider>
+      <KeyboardProvider>
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)"    options={{ headerShown: false }} />
+            <Stack.Screen name="login"     options={{ headerShown: false }} />
+            <Stack.Screen name="item/[id]" options={{ presentation: 'modal', headerShown: false }} />
+          </Stack>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

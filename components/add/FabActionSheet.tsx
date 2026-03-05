@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  Modal, KeyboardAvoidingView, Platform, ActivityIndicator,
-  useWindowDimensions, Keyboard,
+  Modal, Platform, ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, {
   SlideInDown, SlideOutDown,
 } from 'react-native-reanimated';
@@ -88,21 +89,11 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const [goalSuggestion, setGoalSuggestion] = useState<{ why?: string; journeyHints?: string[]; firstSteps?: string[] } | null>(null);
   const [goalEnrichLoading, setGoalEnrichLoading] = useState(false);
 
-  const [kbHeight, setKbHeight] = useState(0);
-
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isCompact = screenWidth < 380;
   const horizontalPad = isCompact ? 14 : 18;
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (e) => setKbHeight(e.endCoordinates.height));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKbHeight(0));
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 200);
@@ -199,7 +190,8 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   return (
     <Modal transparent animationType="none" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
+        keyboardVerticalOffset={0}
         style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
           <View style={styles.backdrop} />
@@ -210,7 +202,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
           exiting={SlideOutDown.springify().damping(28)}
           style={[styles.sheet, {
             paddingHorizontal: horizontalPad,
-            paddingBottom: Math.max(insets.bottom + 16, Platform.OS === 'web' ? 34 : 28),
+            paddingBottom: Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 16),
           }]}>
 
           <View style={styles.handleRow}>
@@ -229,7 +221,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 40 : kbHeight > 0 ? kbHeight * 0.3 : 0 }}>
+              contentContainerStyle={{ paddingBottom: 20 }}>
               <View style={styles.headerRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.title, isCompact && { fontSize: 18 }]}>What's next?</Text>
