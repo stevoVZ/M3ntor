@@ -30,18 +30,12 @@ export interface AiHint {
   typeReason?:    string;
 }
 
-export async function getItemHint(text: string, type: string, country?: string): Promise<AiHint> {
+export async function getItemHint(text: string, _type?: string, country?: string): Promise<AiHint> {
   const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples.` : '';
   const noApps = `\nNever recommend apps, websites, software, or third-party services. Only suggest actions the user can do themselves.`;
-  const typeInfer = `\nAlso suggest the best item type for this. Reply with "suggestedType":"action|habit|goal|project" and "typeReason":"one short sentence explaining why this type fits".`;
-  const prompts: Record<string, string> = {
-    action:  `Task: "${text}"${countryCtx}${noApps}${typeInfer}\nReply JSON only: {"why":"one short sentence why this matters","effort":"quick|medium|deep","suggestedType":"...","typeReason":"..."}`,
-    habit:   `Habit: "${text}"${countryCtx}${noApps}${typeInfer}\nReply JSON only: {"why":"one short sentence life impact","tip":"one practical tip to make it stick","suggestedType":"...","typeReason":"..."}`,
-    goal:    `Goal: "${text}"${countryCtx}${noApps}${typeInfer}\nReply JSON only: {"why":"one emotional sentence why this goal matters","firstStep":"single best first action","suggestedType":"...","typeReason":"..."}`,
-    project: `Project: "${text}"${countryCtx}${noApps}${typeInfer}\nReply JSON only: {"why":"one sentence why this matters","firstStep":"the very first task to start","suggestedType":"...","typeReason":"..."}`,
-  };
+  const prompt = `The user wants to do: "${text}"${countryCtx}${noApps}\nAnalyze this and reply JSON only: {"why":"one short motivational sentence why this matters","tip":"one practical tip to get started or stay consistent","firstStep":"the single best first action to take","effort":"quick|medium|deep","suggestedType":"action|habit|goal|project","typeReason":"one short sentence explaining why this type fits best"}`;
   try {
-    const raw   = await aiAssist(prompts[type] ?? prompts.action);
+    const raw   = await aiAssist(prompt);
     const clean = raw.replace(/```json|```/g, '').trim();
     return JSON.parse(clean) as AiHint;
   } catch {

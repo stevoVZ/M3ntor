@@ -53,9 +53,9 @@ const PROMOS = [
 ];
 
 const TOD_OPTIONS = [
-  { id: 'morning',   label: 'AM',  icon: 'sun'   as const },
-  { id: 'afternoon', label: 'PM',  icon: 'cloud' as const },
-  { id: 'evening',   label: 'Eve', icon: 'moon'  as const },
+  { id: 'morning',   label: 'Morning',   icon: 'sun'     as const },
+  { id: 'afternoon', label: 'Afternoon', icon: 'sunrise' as const },
+  { id: 'evening',   label: 'Evening',   icon: 'moon'    as const },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -142,7 +142,7 @@ export function FabActionSheet({ onClose }: Props) {
 
     debounceRef.current = setTimeout(async () => {
       setAiLoading(true);
-      const hint = await getItemHint(text, activeType ?? 'action', countryName);
+      const hint = await getItemHint(text, undefined, countryName);
       if (!hint.suggestedType) {
         hint.suggestedType = inferType(text);
         if (!hint.typeReason) hint.typeReason = 'Based on what you typed';
@@ -166,7 +166,7 @@ export function FabActionSheet({ onClose }: Props) {
     }, 900);
 
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [text, selectedType]);
+  }, [text]);
 
   const areaConf = area ? ITEM_AREAS[area] : null;
   const canSave  = text.trim().length > 0 && (activeType !== 'goal' || !!area);
@@ -462,23 +462,10 @@ export function FabActionSheet({ onClose }: Props) {
                       </Pressable>
                     ) : (
                       <Pressable style={styles.extraChipEmpty} onPress={() => setShowAreaPicker(true)}>
-                        <Text style={styles.extraChipEmptyText}>＋ area</Text>
+                        <Feather name="grid" size={11} color={T.t3} />
+                        <Text style={styles.extraChipEmptyText}>Life area</Text>
                       </Pressable>
                     )}
-                    {activeType !== 'goal' && TOD_OPTIONS.map(o => {
-                      const on = tod === o.id;
-                      return (
-                        <Pressable key={o.id} style={[styles.extraChip, on && {
-                          backgroundColor: (typeConf?.color ?? T.brand) + '10',
-                          borderColor:     (typeConf?.color ?? T.brand) + '30',
-                        }]} onPress={() => setTod(prev => prev === o.id ? null : o.id)}>
-                          <Feather name={o.icon} size={12} color={on ? (typeConf?.color ?? T.brand) : T.t3} />
-                          <Text style={[styles.extraChipLabel, on && { color: typeConf?.color ?? T.brand, fontWeight: '700' as const }]}>
-                            {o.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
 
                     <Pressable
                       style={[styles.extraChip, showExtras && {
@@ -488,14 +475,36 @@ export function FabActionSheet({ onClose }: Props) {
                       onPress={() => setShowExtras(!showExtras)}>
                       <Feather name="sliders" size={12} color={showExtras ? T.brand : T.t3} />
                       <Text style={[styles.extraChipLabel, showExtras && { color: T.brand, fontWeight: '700' as const }]}>
-                        More
+                        Details
                       </Text>
                     </Pressable>
                   </View>
 
                   {showExtras && (
                     <View style={styles.moreSection}>
-                      <Text style={styles.moreSectionLabel}>PRIORITY</Text>
+                      {activeType !== 'goal' && (
+                        <>
+                          <Text style={styles.moreSectionLabel}>BEST TIME</Text>
+                          <View style={styles.optionRow}>
+                            {TOD_OPTIONS.map(o => {
+                              const on = tod === o.id;
+                              return (
+                                <Pressable key={o.id} style={[styles.optionChip, on && {
+                                  backgroundColor: (typeConf?.color ?? T.brand) + '12',
+                                  borderColor: (typeConf?.color ?? T.brand) + '40',
+                                }]} onPress={() => setTod(prev => prev === o.id ? null : o.id)}>
+                                  <Feather name={o.icon} size={11} color={on ? (typeConf?.color ?? T.brand) : T.t3} />
+                                  <Text style={[styles.optionChipLabel, on && { color: typeConf?.color ?? T.brand, fontWeight: '700' as const }]}>
+                                    {o.label}
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                          <Text style={[styles.moreSectionLabel, { marginTop: 10 }]}>PRIORITY</Text>
+                        </>
+                      )}
+                      {activeType === 'goal' && <Text style={styles.moreSectionLabel}>PRIORITY</Text>}
                       <View style={styles.optionRow}>
                         {PRIORITY_OPTIONS.map(p => {
                           const on = priority === p.id;
@@ -636,7 +645,7 @@ const styles = StyleSheet.create({
   extrasRow:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14, flexWrap: 'wrap' },
   extraChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(0,0,0,0.09)' },
   extraChipLabel: { fontSize: 12, color: T.t3 },
-  extraChipEmpty: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
+  extraChipEmpty: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
   extraChipEmptyText: { fontSize: 12, color: T.t3 },
 
   moreSection:    { backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
