@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import Animated, {
   SlideInDown, SlideOutDown,
+  useSharedValue, useAnimatedStyle, withRepeat, withTiming, cancelAnimation,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -94,6 +95,7 @@ export function FabActionSheet({ onClose }: Props) {
   const [showExtras, setShowExtras]     = useState(false);
   const [aiHint, setAiHint]             = useState<{ why?: string; firstStep?: string; tip?: string; effort?: string; suggestedType?: string; typeReason?: string } | null>(null);
   const [aiLoading, setAiLoading]       = useState(false);
+  const [aiPending, setAiPending]       = useState(false);
   const [saved, setSaved]               = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [goalSuggestion, setGoalSuggestion] = useState<{ why?: string; journeyHints?: string[]; firstSteps?: string[] } | null>(null);
@@ -107,6 +109,22 @@ export function FabActionSheet({ onClose }: Props) {
 
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pulseOpacity = useSharedValue(1);
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
+
+  useEffect(() => {
+    if (aiPending && !aiHint) {
+      pulseOpacity.value = withRepeat(
+        withTiming(0.45, { duration: 800 }),
+        -1,
+        true
+      );
+    } else {
+      cancelAnimation(pulseOpacity);
+      pulseOpacity.value = withTiming(1, { duration: 200 });
+    }
+  }, [aiPending, aiHint]);
 
   const isCompact = screenWidth < 380;
   const horizontalPad = isCompact ? 14 : 18;
@@ -138,7 +156,14 @@ export function FabActionSheet({ onClose }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!text.trim() || text.trim().length < 5) { setAiHint(null); return; }
+    if (!text.trim() || text.trim().length < 5) {
+      setAiHint(null);
+      setAiPending(false);
+      setAiLoading(false);
+      return;
+    }
+
+    setAiPending(true);
 
     debounceRef.current = setTimeout(async () => {
       setAiLoading(true);
@@ -163,6 +188,7 @@ export function FabActionSheet({ onClose }: Props) {
         }
       }
       setAiLoading(false);
+      setAiPending(false);
     }, 900);
 
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
@@ -316,18 +342,17 @@ export function FabActionSheet({ onClose }: Props) {
               </View>
 
               <View style={styles.hintArea}>
-                {aiLoading && (
+                {(aiPending || aiLoading) && !aiHint && (
                   <View style={styles.thinkingRow}>
                     <View style={styles.thinkingIconBox}>
                       <ActivityIndicator size="small" color={T.brand} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.thinkingLine1}>M3NTOR is thinking…</Text>
-                      <Text style={styles.thinkingLine2}>Getting a personalised insight</Text>
+                      <Text style={styles.thinkingLine1}>M3NTOR is analyzing…</Text>
                     </View>
                   </View>
                 )}
-                {!aiLoading && aiHint && (aiHint.why || aiHint.firstStep || aiHint.tip || aiHint.effort) && (
+                {aiHint && (aiHint.why || aiHint.firstStep || aiHint.tip || aiHint.effort) && (
                   <View style={[styles.hintCard, {
                     backgroundColor: (typeConf?.color ?? T.brand) + '09',
                     borderColor:     (typeConf?.color ?? T.brand) + '1A',
@@ -364,7 +389,7 @@ export function FabActionSheet({ onClose }: Props) {
                     </View>
                   </View>
                 )}
-                {!aiLoading && !aiHint && !text.trim() && (
+                {!aiPending && !aiLoading && !aiHint && !text.trim() && (
                   <View style={styles.promoRow}>
                     {PROMOS.map(p => (
                       <Pressable key={p.text} style={styles.promoChip}
@@ -377,7 +402,7 @@ export function FabActionSheet({ onClose }: Props) {
               </View>
 
               <View style={styles.approachSection}>
-                <View style={styles.typeGrid}>
+                <Animated.View style={[styles.typeGrid, aiPending && !aiHint ? pulseStyle : undefined]}>
                   {ALL_TYPES.map(t => {
                     const on = activeType === t.id && !!text.trim();
                     return (
@@ -398,7 +423,7 @@ export function FabActionSheet({ onClose }: Props) {
                       </Pressable>
                     );
                   })}
-                </View>
+                </Animated.View>
               </View>
 
               {activeType === 'project' && (breakdownSteps.length > 0 || breakdownLoading) && (
@@ -615,7 +640,6 @@ const styles = StyleSheet.create({
   thinkingRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, paddingHorizontal: 12, borderRadius: 12, backgroundColor: T.brand + '0A', borderWidth: 1, borderColor: T.brand + '18' },
   thinkingIconBox:{ width: 26, height: 26, borderRadius: 8, backgroundColor: T.brand + '12', alignItems: 'center', justifyContent: 'center' },
   thinkingLine1:  { fontSize: 12, fontWeight: '600', color: T.brand },
-  thinkingLine2:  { fontSize: 10, color: T.t3, marginTop: 1 },
   hintCard:       { flexDirection: 'row', gap: 7, padding: 10, borderRadius: 12, borderWidth: 1 },
   hintIconBox:    { width: 24, height: 24, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   hintWhy:        { fontSize: 12, color: T.t2, lineHeight: 17, fontStyle: 'italic', marginBottom: 4 },
