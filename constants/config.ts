@@ -1,6 +1,11 @@
 import { T } from './theme';
 import type { Journey } from '../types';
 
+export { WA } from './weekly-actions';
+export type { WeeklyAction } from './weekly-actions';
+
+export { SAMPLE_ITEMS, SAMPLE_COMMITTED, PEOPLE } from './sample-data';
+
 // ─────────────────────────────────────────────────────────
 // ITEM_AREAS — life areas with display config
 // ─────────────────────────────────────────────────────────
@@ -129,6 +134,7 @@ export const PRG: Journey[] = [
   { id: 'deepwork',    a: 'career',                                     t: 'Deep Work Protocol',       e: 'Cal Newport',      w: 4, d: 'moderate', m: 20,  u: 4200, rt: 4.8, f: true,  ds: 'Eliminate distraction. Build focus blocks.',                   wp: ['Distraction audit','First block','Daily practice','Long-term ritual'] },
   { id: 'leadership',  a: 'career',                                     t: 'Leadership Essentials',    e: 'Research-based',   w: 6, d: 'moderate', m: 15,  u: 1800, rt: 4.5,           ds: 'Develop communication and delegation skills.',                 wp: ['Style assessment','Listening','Delegation','Hard conversations','Culture','Vision'] },
   { id: 'negotiate',   a: 'career',                                     t: 'Negotiation Mastery',      e: 'Chris Voss',       w: 4, d: 'advanced', m: 15,  u: 2100, rt: 4.7,           ds: 'Tactical empathy from a former FBI negotiator.',               wp: ['Empathy','Mirroring','Questions','Closing'] },
+  { id: 'career-pivot',a: 'career',                                     t: 'Career Pivot Blueprint',   e: 'Research-based',   w: 6, d: 'moderate', m: 20,  u: 980,  rt: 4.4,           ds: 'Systematic career change planning.',                           wp: ['Values','Exploration','Interviews','Skill gaps','Transition','First steps'] },
   { id: 'financial',   a: 'finance',       sa: ['learning','career'],  t: 'Financial Foundations',    e: 'Ramit Sethi',      w: 4, d: 'beginner', m: 15,  u: 3600, rt: 4.8,           ds: 'Automate finances on autopilot.',                              wp: ['Automation','Spending plan','Debt strategy','Investing'] },
   { id: 'investing',   a: 'finance',                                    t: 'Investing Fundamentals',   e: 'Morgan Housel',    w: 4, d: 'beginner', m: 15,  u: 2400, rt: 4.7,           ds: 'Behaviour over stock picks.',                                  wp: ['Psychology','Allocation','Accounts','Strategy'] },
   { id: 'side-income', a: 'finance',                                    t: 'Side Income Builder',      e: 'Research-based',   w: 6, d: 'moderate', m: 20,  u: 1340, rt: 4.3,           ds: 'Validate ideas without quitting.',                             wp: ['Skills','Validation','MVP','Customers','Time','Scaling'] },
@@ -138,4 +144,25 @@ export const PRG: Journey[] = [
   { id: 'mindfulness', a: 'spirituality',  sa: ['health','learning'],  t: 'Mindfulness & Meditation', e: 'Jon Kabat-Zinn',   w: 4, d: 'beginner', m: 10,  u: 3400, rt: 4.8,           ds: 'Build a sustainable meditation habit.',                        wp: ['Breath','Body scan','Walking','Anchoring'] },
   { id: 'gratitude',   a: 'spirituality',                              t: 'Gratitude Practice',       e: 'Research-based',   w: 3, d: 'beginner', m: 5,   u: 2100, rt: 4.6,           ds: 'Structured gratitude beyond simple lists.',                    wp: ['Journaling','Expressing','Adversity'] },
   { id: 'creativity',  a: 'fun',                                        t: 'Creative Spark',           e: 'Research-based',   w: 4, d: 'beginner', m: 15,  u: 720,  rt: 4.4,           ds: 'Unlock creativity regardless of your job.',                    wp: ['Identity','Micro-creation','Frameworks','Launch'] },
+  { id: 'space',       a: 'environment',                                t: 'Space Design',             e: 'Research-based',   w: 3, d: 'beginner', m: 15,  u: 680,  rt: 4.3,           ds: 'Redesign your environment for goals.',                         wp: ['Friction mapping','Workspace','Home'] },
 ];
+
+export const DIFF = { beginner: { l: 'Beginner', c: '#34C759', n: 1 }, moderate: { l: 'Moderate', c: '#FF9500', n: 2 }, advanced: { l: 'Advanced', c: '#FF3B30', n: 3 } } as const;
+
+export const JOURNEY_ICONS: Record<string, string> = { sleep: '🌙', strength: '💪', nutrition: '🥗', running: '🏃', deepwork: '🎯', leadership: '⭐', negotiate: '🤝', 'career-pivot': '🔄', financial: '💳', investing: '📈', 'side-income': '💡', communication: '💬', boundaries: '🛡️', habits: '⛓️', mindfulness: '🧘', gratitude: '🙏', creativity: '🎨', space: '🏠' };
+
+export const MOODS = [
+  { value: 1, label: 'Rough', icon: 'frown', color: '#FF3B30' },
+  { value: 2, label: 'Low', icon: 'frown', color: '#FF9500' },
+  { value: 3, label: 'Okay', icon: 'meh', color: '#FFD60A' },
+  { value: 4, label: 'Good', icon: 'smile', color: '#34C759' },
+  { value: 5, label: 'Great', icon: 'smile', color: '#30D158' },
+] as const;
+
+export const HISTORY = {
+  week: { label: '1 week ago', scores: { health: 3, career: 4, finances: 5, relationships: 6, personal: 5, social: 5, love: 8, fun: 3, environment: 6, spirituality: 5 } },
+  month: { label: '1 month ago', scores: { health: 2, career: 3, finances: 4, relationships: 6, personal: 4, social: 4, love: 7, fun: 3, environment: 5, spirituality: 4 } },
+  year: { label: 'Start', scores: { health: 5, career: 3, finances: 4, relationships: 6, personal: 5, social: 5, love: 8, fun: 3, environment: 5, spirituality: 4 } },
+} as const;
+
+export const DEFAULT_USER = { name: 'Stevo', streak: 4, weekDay: 5, programWeek: 1 };
