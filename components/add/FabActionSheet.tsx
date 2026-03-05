@@ -26,12 +26,24 @@ interface Props {
   onClose:    () => void;
 }
 
-const TYPE_OPTIONS = [
-  { id: 'action',  label: 'Action',  sub: 'One-off task',       icon: 'check'  as const, color: T.green   },
-  { id: 'habit',   label: 'Habit',   sub: 'Daily or recurring', icon: 'repeat' as const, color: T.orange  },
-  { id: 'goal',    label: 'Goal',    sub: 'Big aspiration',     icon: 'target' as const, color: '#9B59B6' },
-  { id: 'project', label: 'Project', sub: 'Multi-step plan',   icon: 'layers' as const, color: T.brand   },
+const TYPE_GROUPS = [
+  {
+    label: 'Quick',
+    items: [
+      { id: 'action',  label: 'Action',  sub: 'Just do it',        icon: 'check'  as const, color: T.green  },
+      { id: 'habit',   label: 'Habit',   sub: 'Build a routine',   icon: 'repeat' as const, color: T.orange },
+    ],
+  },
+  {
+    label: 'Planned',
+    items: [
+      { id: 'goal',    label: 'Goal',    sub: 'Set a target',      icon: 'target' as const, color: '#9B59B6' },
+      { id: 'project', label: 'Project', sub: 'Break it down',     icon: 'layers' as const, color: T.brand  },
+    ],
+  },
 ] as const;
+
+const ALL_TYPES = TYPE_GROUPS.flatMap(g => g.items);
 
 const PROMOS = [
   { text: 'Meditate every morning',  type: 'habit'   },
@@ -91,6 +103,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const [breakdownSteps, setBreakdownSteps] = useState<{ id: string; text: string }[]>([]);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [pinnedAiType, setPinnedAiType] = useState<string | null>(null);
 
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -103,11 +116,10 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   }, []);
 
   const inferredType = useMemo(() => inferType(text), [text]);
-  const [pinnedAiType, setPinnedAiType] = useState<string | null>(null);
   const validTypes = new Set(['action', 'habit', 'goal', 'project']);
   const safePinnedType = pinnedAiType && validTypes.has(pinnedAiType) ? pinnedAiType : null;
   const activeType   = selectedType ?? (safePinnedType && text.trim() ? safePinnedType : (text.trim() ? inferredType : null));
-  const typeConf     = activeType ? TYPE_OPTIONS.find(t => t.id === activeType) : null;
+  const typeConf     = activeType ? ALL_TYPES.find(t => t.id === activeType) : null;
 
   useEffect(() => {
     if (activeType === 'goal') return;
@@ -149,8 +161,6 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   function handleTypeSelect(id: string) {
     const newVal = selectedType === id ? null : id;
     setSelectedType(newVal);
-    setPinnedAiType(null);
-    setAiHint(null);
     if (newVal === 'project' && text.trim() && breakdownSteps.length === 0) {
       setBreakdownLoading(true);
       generateProjectTasks(text, [], countryName).then(result => {
@@ -162,9 +172,6 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
         }
         setBreakdownLoading(false);
       });
-    }
-    if (newVal !== 'project') {
-      setBreakdownSteps([]);
     }
   }
 
@@ -356,24 +363,34 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                 )}
               </View>
 
-              <View style={styles.typeGrid}>
-                {TYPE_OPTIONS.map(t => {
-                  const on = activeType === t.id && !!text.trim();
-                  return (
-                    <Pressable key={t.id} style={[styles.typeCard, on && {
-                      backgroundColor: t.color + '10',
-                      borderColor:     t.color + '40',
-                    }]} onPress={() => handleTypeSelect(t.id)}>
-                      <Feather name={t.icon} size={16} color={on ? t.color : T.t3} />
-                      <Text style={[styles.typeCardLabel, on && { color: t.color }]}>
-                        {t.label}
-                      </Text>
-                      <Text style={[styles.typeCardSub, on && { color: t.color + 'AA' }]}>
-                        {t.sub}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+              <View style={styles.approachSection}>
+                <Text style={styles.approachLabel}>Pick your approach</Text>
+                {TYPE_GROUPS.map(group => (
+                  <View key={group.label} style={styles.typeGroupRow}>
+                    <Text style={styles.typeGroupLabel}>{group.label}</Text>
+                    <View style={styles.typeGroupCards}>
+                      {group.items.map(t => {
+                        const on = activeType === t.id && !!text.trim();
+                        return (
+                          <Pressable key={t.id} style={[styles.typeCard, on && {
+                            backgroundColor: t.color + '10',
+                            borderColor:     t.color + '40',
+                          }]} onPress={() => handleTypeSelect(t.id)}>
+                            <Feather name={t.icon} size={16} color={on ? t.color : T.t3} />
+                            <View>
+                              <Text style={[styles.typeCardLabel, on && { color: t.color }]}>
+                                {t.label}
+                              </Text>
+                              <Text style={[styles.typeCardSub, on && { color: t.color + 'AA' }]}>
+                                {t.sub}
+                              </Text>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
               </View>
 
               {aiHint?.typeReason && pinnedAiType && !selectedType && (
@@ -617,10 +634,14 @@ const styles = StyleSheet.create({
   promoChip:      { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(108,92,231,0.06)', borderWidth: 1, borderColor: 'rgba(108,92,231,0.13)' },
   promoChipText:  { fontSize: 12, color: T.t2 },
 
-  typeGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
-  typeCard:       { width: '47%' as unknown as number, alignItems: 'center', gap: 2, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.025)' },
-  typeCardLabel:  { fontSize: 13, fontWeight: '700' as const, color: T.t2, marginTop: 2 },
-  typeCardSub:    { fontSize: 10, color: T.t3, textAlign: 'center' as const },
+  approachSection:{ marginBottom: 8 },
+  approachLabel:  { fontSize: 11, fontWeight: '700' as const, color: T.t3, letterSpacing: 0.4, marginBottom: 8, textTransform: 'uppercase' as const },
+  typeGroupRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  typeGroupLabel: { fontSize: 10, fontWeight: '600' as const, color: T.t3, width: 48, textAlign: 'right' as const },
+  typeGroupCards: { flexDirection: 'row', flex: 1, gap: 8 },
+  typeCard:       { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.025)' },
+  typeCardLabel:  { fontSize: 13, fontWeight: '700' as const, color: T.t2 },
+  typeCardSub:    { fontSize: 10, color: T.t3 },
 
   typeReasonRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, marginBottom: 10 },
   typeReasonText: { fontSize: 11, color: T.brand, fontStyle: 'italic', flex: 1 },
