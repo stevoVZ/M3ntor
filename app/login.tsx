@@ -2,9 +2,10 @@ import { useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Image,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { T, S, F, R, shadow } from '../constants/theme';
@@ -12,6 +13,7 @@ import { T, S, F, R, shadow } from '../constants/theme';
 type Mode = 'signin' | 'signup';
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const [mode, setMode]       = useState<Mode>('signin');
   const [email, setEmail]     = useState('');
   const [password, setPass]   = useState('');
@@ -45,7 +47,6 @@ export default function LoginScreen() {
           password: password.trim(),
         });
         if (error) throw error;
-        // Auth state change in _layout.tsx will handle navigation
       }
     } catch (e: any) {
       Alert.alert('Error', e.message ?? 'Something went wrong.');
@@ -54,166 +55,249 @@ export default function LoginScreen() {
     }
   }
 
-  // Apple Sign In — install expo-apple-authentication and enable in app.json
-  // async function handleAppleSignIn() { ... }
+  const canSubmit = email.trim().length > 0 && password.trim().length > 0;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.safe}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.kav}>
+        <ScrollView
+          contentContainerStyle={[styles.scroll, {
+            paddingTop: Math.max(insets.top, Platform.OS === 'web' ? 67 : 0) + 20,
+            paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 0) + 20,
+          }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
 
-        {/* Brand hero */}
-        <View style={styles.hero}>
-          <Image
-            source={require('../assets/images/m3ntor-logo.png')}
-            style={styles.heroLogo}
-            resizeMode="contain"
-          />
-          <Text style={styles.heroTagline}>Build the life you actually want</Text>
-        </View>
+          <View style={styles.hero}>
+            <Image
+              source={require('../assets/images/m3ntor-logo.png')}
+              style={styles.heroLogo}
+              resizeMode="contain"
+            />
+          </View>
 
-        {/* Form */}
-        <View style={styles.form}>
-          {/* Mode toggle */}
           <View style={styles.modeToggle}>
             {(['signin', 'signup'] as Mode[]).map(m => (
               <Pressable key={m} style={[styles.modeBtn, mode === m && styles.modeBtnActive]}
                 onPress={() => setMode(m)}>
                 <Text style={[styles.modeBtnText, mode === m && styles.modeBtnTextActive]}>
-                  {m === 'signin' ? 'Sign in' : 'Create account'}
+                  {m === 'signin' ? 'Sign In' : 'Create Account'}
                 </Text>
               </Pressable>
             ))}
           </View>
 
-          {/* Name (sign-up only) */}
-          {mode === 'signup' && (
+          <View style={styles.formCard}>
+            {mode === 'signup' && (
+              <View style={styles.inputGroup}>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Full Name"
+                  placeholderTextColor="#C7C7CC"
+                  style={styles.input}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              </View>
+            )}
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Name</Text>
               <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="Your name"
-                placeholderTextColor={T.t3}
-                style={styles.input}
-                autoCapitalize="words"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor="#C7C7CC"
+                style={[styles.input, mode === 'signup' && styles.inputBorderTop]}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
                 returnKeyType="next"
               />
             </View>
+
+            <View style={styles.inputGroup}>
+              <TextInput
+                value={password}
+                onChangeText={setPass}
+                placeholder="Password"
+                placeholderTextColor="#C7C7CC"
+                style={[styles.input, styles.inputBorderTop]}
+                secureTextEntry
+                returnKeyType="done"
+                onSubmitEditing={handleEmailAuth}
+              />
+            </View>
+          </View>
+
+          {mode === 'signin' && (
+            <Pressable style={styles.forgotBtn}>
+              <Text style={styles.forgotText}>Forgot Password?</Text>
+            </Pressable>
           )}
 
-          {/* Email */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              placeholderTextColor={T.t3}
-              style={styles.input}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="next"
-            />
-          </View>
-
-          {/* Password */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPass}
-              placeholder={mode === 'signup' ? 'Min. 8 characters' : '••••••••'}
-              placeholderTextColor={T.t3}
-              style={styles.input}
-              secureTextEntry
-              returnKeyType="done"
-              onSubmitEditing={handleEmailAuth}
-            />
-          </View>
-
-          {/* Primary CTA */}
-          <Pressable onPress={handleEmailAuth} disabled={loading} style={{ marginTop: S.sm }}>
-            <LinearGradient
-              colors={T.gradColors}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.primaryBtn}>
-              {loading
-                ? <ActivityIndicator color="white" />
-                : <Text style={styles.primaryBtnText}>
-                    {mode === 'signin' ? 'Sign in' : 'Create account'}
-                  </Text>
-              }
-            </LinearGradient>
+          <Pressable
+            onPress={handleEmailAuth}
+            disabled={loading || !canSubmit}
+            style={[styles.primaryBtn, (!canSubmit && !loading) && styles.primaryBtnDisabled]}>
+            {loading
+              ? <ActivityIndicator color="white" />
+              : <Text style={styles.primaryBtnText}>
+                  {mode === 'signin' ? 'Sign In' : 'Create Account'}
+                </Text>
+            }
           </Pressable>
 
-          {/* Divider */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>or</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Apple Sign In placeholder — wire up expo-apple-authentication */}
-          <Pressable style={styles.appleBtn}>
-            <Text style={styles.appleBtnText}>🍎  Continue with Apple</Text>
+          <Pressable style={styles.socialBtn}>
+            <View style={styles.socialIcon}>
+              <Feather name="smartphone" size={18} color="white" />
+            </View>
+            <Text style={styles.socialBtnText}>Continue with Apple</Text>
           </Pressable>
 
-          {/* Legal */}
           <Text style={styles.legal}>
-            By continuing you agree to our Terms of Service and Privacy Policy.
+            By continuing you agree to our{'\n'}Terms of Service and Privacy Policy.
           </Text>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe:     { flex: 1, backgroundColor: '#FFFFFF' },
-  kav:      { flex: 1 },
+  safe: { flex: 1, backgroundColor: '#F2F2F7' },
+  kav:  { flex: 1 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24 },
 
-  hero:        { paddingTop: 56, paddingBottom: 32, paddingHorizontal: 32, alignItems: 'center', backgroundColor: '#FFFFFF' },
-  heroLogo:    { width: 240, height: 150 },
-  heroTagline: { fontSize: 15, color: T.t3, marginTop: 10, textAlign: 'center' },
-
-  form: {
-    flex: 1, backgroundColor: '#FFFFFF',
-    padding: S.lg, paddingTop: 20,
-  },
+  hero: { alignItems: 'center', paddingTop: 24, paddingBottom: 32 },
+  heroLogo: { width: 280, height: 180 },
 
   modeToggle: {
-    flexDirection: 'row', backgroundColor: T.sep,
-    borderRadius: R.lg, padding: 3, marginBottom: S.lg,
+    flexDirection: 'row',
+    backgroundColor: '#E5E5EA',
+    borderRadius: 10,
+    padding: 2,
+    marginBottom: 24,
   },
   modeBtn: {
-    flex: 1, paddingVertical: 10, borderRadius: R.md - 2,
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  modeBtnActive: { backgroundColor: 'white', ...shadow.sm },
-  modeBtnText:   { fontSize: F.sm, fontWeight: '600', color: T.t3 },
-  modeBtnTextActive: { color: T.brand, fontWeight: '800' },
-
-  inputGroup: { marginBottom: S.md },
-  inputLabel: { fontSize: F.xs, fontWeight: '700', color: T.t2, marginBottom: 6, letterSpacing: 0.2 },
-  input: {
-    backgroundColor: 'white', borderRadius: R.md,
-    borderWidth: 1, borderColor: T.sep,
-    paddingHorizontal: S.md, paddingVertical: 13,
-    fontSize: F.md, color: T.text,
+  modeBtnActive: {
+    backgroundColor: '#FFFFFF',
+    ...shadow.sm,
+  },
+  modeBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: T.t3,
+  },
+  modeBtnTextActive: {
+    color: T.text,
+    fontWeight: '600',
   },
 
-  primaryBtn:     { borderRadius: R.xl, paddingVertical: 16, alignItems: 'center' },
-  primaryBtnText: { fontSize: F.lg, fontWeight: '800', color: 'white', letterSpacing: -0.3 },
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  inputGroup: {},
+  input: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: T.text,
+    backgroundColor: '#FFFFFF',
+  },
+  inputBorderTop: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5EA',
+  },
 
-  divider:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: S.md },
-  dividerLine: { flex: 1, height: 0.5, backgroundColor: T.sep },
-  dividerText: { fontSize: F.xs, color: T.t3 },
+  forgotBtn: {
+    alignSelf: 'flex-end',
+    marginBottom: 20,
+    paddingVertical: 4,
+  },
+  forgotText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: T.brand,
+  },
 
-  appleBtn:     { backgroundColor: '#1C1C1E', borderRadius: R.xl, paddingVertical: 15, alignItems: 'center' },
-  appleBtnText: { fontSize: F.md, fontWeight: '700', color: 'white' },
+  primaryBtn: {
+    backgroundColor: T.brand,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  primaryBtnDisabled: {
+    opacity: 0.45,
+  },
+  primaryBtnText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
 
-  legal: { fontSize: 10, color: T.t3, textAlign: 'center', lineHeight: 14, marginTop: S.md },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#D1D1D6',
+  },
+  dividerText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#AEAEB2',
+  },
+
+  socialBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    paddingVertical: 15,
+    marginBottom: 24,
+  },
+  socialIcon: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialBtnText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+
+  legal: {
+    fontSize: 12,
+    color: '#AEAEB2',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
 });
