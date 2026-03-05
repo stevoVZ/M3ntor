@@ -130,8 +130,6 @@ interface AppState {
   pauseItem:       (id: string) => void;
   resumeItem:      (id: string) => void;
   completeItem:    (id: string) => void;
-  activateDream:   (id: string, asType?: 'habit' | 'project' | 'action') => void;
-
   toggleStep:      (itemId: string, stepId: string, done: boolean) => void;
   markStepToday:   (itemId: string, stepId: string, today: boolean) => void;
   addStep:         (itemId: string, step: Step) => void;
@@ -149,14 +147,7 @@ interface AppState {
 
   streak:          () => number;
   weeklyData:      () => { label: string; date: string; done: number; total: number; isToday: boolean }[];
-  activeItems:     () => Item[];
   pausedItems:     () => Item[];
-  somedayItems:    () => Item[];
-  doneItems:       () => Item[];
-  projectItems:    () => Item[];
-  habitItems:      () => Item[];
-  actionItems:     () => Item[];
-  itemsByArea:     (area: string) => Item[];
   getItem:         (id: string) => Item | undefined;
 }
 
@@ -337,32 +328,6 @@ export const useStore = create<AppState>((set, get) => ({
       items: s.items.map(i =>
         i.id === id ? { ...i, status: 'done' as const, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() } : i
       ),
-    }));
-    syncItem(get().items.find(i => i.id === id));
-  },
-
-  activateDream: (id, asType) => {
-    set(s => ({
-      items: s.items.map(i => {
-        if (i.id !== id) return i;
-        const now = new Date().toISOString();
-        if (asType === 'habit') {
-          return { ...i, status: 'active' as const, recurrence: { type: 'daily' as const }, habit_duration: 15, habit_time_of_day: 'morning' as const, updated_at: now };
-        }
-        if (asType === 'project') {
-          return {
-            ...i,
-            status: 'active' as const,
-            steps: [
-              { id: Crypto.randomUUID(), item_id: i.id, title: 'Plan first step', done: false, status: 'todo' as const, priority: 'normal' as const, effort: 'quick' as const, today: false, blocked_by: [], assignees: [], sort_order: 0 },
-              { id: Crypto.randomUUID(), item_id: i.id, title: 'Get started', done: false, status: 'todo' as const, priority: 'normal' as const, effort: 'medium' as const, today: false, blocked_by: [], assignees: [], sort_order: 1 },
-              { id: Crypto.randomUUID(), item_id: i.id, title: 'Complete', done: false, status: 'todo' as const, priority: 'normal' as const, effort: 'medium' as const, today: false, blocked_by: [], assignees: [], sort_order: 2 },
-            ],
-            updated_at: now,
-          };
-        }
-        return { ...i, status: 'active' as const, updated_at: now };
-      }),
     }));
     syncItem(get().items.find(i => i.id === id));
   },
@@ -600,16 +565,6 @@ export const useStore = create<AppState>((set, get) => ({
     return days;
   },
 
-  activeItems:  () => get().items.filter(i => i.status === 'active'),
   pausedItems:  () => get().items.filter(i => i.status === 'paused'),
-  somedayItems: () => get().items.filter(i => i.status === 'someday'),
-  doneItems:    () => get().items.filter(i => i.status === 'done'),
-  projectItems: () => get().items.filter(i => i.status === 'active' && (i.steps?.length ?? 0) > 0),
-  habitItems:   () => get().items.filter(i => i.status === 'active' && !!i.recurrence),
-  actionItems:  () => get().items.filter(i => i.status === 'active' && !i.steps?.length && !i.recurrence),
-  itemsByArea:  (area) => get().items.filter(i =>
-    (i.status === 'active' || i.status === 'paused') &&
-    (i.area === area || (i.secondary_areas ?? []).includes(area))
-  ),
   getItem: (id) => get().items.find(i => i.id === id),
 }));

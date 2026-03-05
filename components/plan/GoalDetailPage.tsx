@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Platform, Ale
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useStore } from '@/lib/store';
-import { T, S, F, R } from '@/constants/theme';
+import { T, S, F, R, shadow } from '@/constants/theme';
 import { ITEM_AREAS, KIND_CONFIG, PRG } from '@/constants/config';
 import { itemKind, projectProgress } from '@/utils/items';
 import { goalProgress, getUnlinkedItems, journeyProgress } from '@/utils/scores';

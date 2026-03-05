@@ -98,6 +98,7 @@ function CustomTabBar({ state, navigation, onFabPress }: { state: any; navigatio
               source={require('../../assets/images/m3ntor-icon-mark.png')}
               style={styles.fabImg}
               resizeMode="contain"
+              tintColor={T.brand}
             />
             <Text style={styles.fabLabel}>Create</Text>
           </Pressable>

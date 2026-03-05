@@ -58,7 +58,7 @@ components/
 ### AI Integration
 
 - **Provider**: Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk`
-- **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`, `generateGoal()`, `generateProjectFromGoal()`, `generateJourneyPlan()` — all accept optional `country` param for region-aware responses
+- **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`, `generateGoal()` — all accept optional `country` param for region-aware responses
 - **AI Coach**: Chat-style interface for journey recommendations using server endpoint with fallback keyword matching; filters PRG catalog by user's country (global always shown, regional only when country matches)
 - **Smart Type Suggestion**: `getItemHint()` returns `suggestedType` and `typeReason`; FabActionSheet shows M3NTOR-recommended approach as a prominent card with reason text, pre-selected; "Other approaches" collapsible toggle shows remaining 3 types; user override adds "M3NTOR pick" badge to original recommendation; all user-facing AI labels use "M3NTOR" branding
 - **Auto-Breakdown**: When type is "project" (M3NTOR-suggested or user-selected), auto-calls `generateProjectTasks()` to show inline editable step breakdown in FAB sheet
