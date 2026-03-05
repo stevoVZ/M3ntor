@@ -97,7 +97,7 @@ export default function AddScreen() {
     setSaving(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    const item = createItem(userId ?? 'local', {
+    const baseItem = createItem(userId ?? 'local', {
       title: title.trim(),
       description: description.trim() || undefined,
       area,
@@ -106,13 +106,17 @@ export default function AddScreen() {
         recurrence: { type: 'daily' as const },
         habit_time_of_day: timeOfDay,
       } : {}),
-      ...(kind === 'project' && steps.length > 0 ? {
-        steps: steps.map((s, i) => createStep(`temp-${Date.now()}`, {
-          title: s,
-          sort_order: i,
-        })),
-      } : {}),
     });
+
+    const item = kind === 'project' && steps.length > 0
+      ? {
+          ...baseItem,
+          steps: steps.map((s, i) => createStep(baseItem.id, {
+            title: s,
+            sort_order: i,
+          })),
+        }
+      : baseItem;
 
     addItem(item);
     setSaving(false);

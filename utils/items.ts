@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import type { Item, Step, ItemKind } from '../types';
 
 // ─────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ export function createItem(
   fields: Partial<Item> & { title: string; area: string }
 ): Item {
   return {
-    id:          `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id:          Crypto.randomUUID(),
     user_id:     userId,
     emoji:       '✓',
     description: '',
@@ -112,7 +113,7 @@ export function createStep(
   fields: Partial<Step> & { title: string }
 ): Step {
   return {
-    id:         `step-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id:         Crypto.randomUUID(),
     item_id:    itemId,
     done:       false,
     status:     'todo',

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Item, JourneyProgress, Profile } from '../types';
-import { supabase, isSupabaseConfigured, fetchItems, fetchJourneyProgress, upsertItem, deleteItem } from './supabase';
+import * as Crypto from 'expo-crypto';
+import { supabase, isSupabaseConfigured, fetchItems, fetchJourneyProgress, upsertItem, deleteItem, upsertStep } from './supabase';
 
 interface AppState {
   items:     Item[];
@@ -67,7 +68,16 @@ export const useStore = create<AppState>((set, get) => ({
 
   addItem: (item) => {
     set(s => ({ items: [item, ...s.items] }));
-    upsertItem(item as unknown as Record<string, unknown>).catch(console.error);
+    upsertItem(item as unknown as Record<string, unknown>)
+      .then(() => {
+        if (item.steps?.length) {
+          const stepsWithItemId = item.steps.map(s => ({ ...s, item_id: item.id }));
+          return Promise.all(
+            stepsWithItemId.map(s => upsertStep(s as unknown as Record<string, unknown>))
+          );
+        }
+      })
+      .catch(console.error);
   },
 
   updateItem: (id, patch) => {
@@ -123,7 +133,7 @@ export const useStore = create<AppState>((set, get) => ({
     const uid = get().userId;
     if (!uid) return;
     const entry: JourneyProgress = {
-      id: `jp-${Date.now()}`, user_id: uid, journey_id: journeyId,
+      id: Crypto.randomUUID(), user_id: uid, journey_id: journeyId,
       status: 'active', current_week: 1, streak: 0,
       enrolled_at: new Date().toISOString(),
     };

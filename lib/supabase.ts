@@ -42,11 +42,24 @@ export async function fetchItems(userId: string) {
   return data;
 }
 
+const ITEM_COLUMNS = [
+  'id', 'user_id', 'title', 'emoji', 'description', 'area', 'secondary_areas',
+  'status', 'source', 'recurrence', 'habit_time_of_day', 'habit_duration',
+  'deadline', 'priority', 'effort', 'paused_at', 'completed_at',
+  'created_at', 'updated_at',
+];
+
 export async function upsertItem(item: Record<string, unknown>) {
   if (!_supabase) return null;
+  const row: Record<string, unknown> = {};
+  for (const key of ITEM_COLUMNS) {
+    if (key in item && item[key] !== undefined) {
+      row[key] = item[key];
+    }
+  }
   const { data, error } = await _supabase
     .from('items')
-    .upsert(item)
+    .upsert(row)
     .select()
     .single();
   if (error) throw error;
@@ -59,11 +72,23 @@ export async function deleteItem(id: string) {
   if (error) throw error;
 }
 
+const STEP_COLUMNS = [
+  'id', 'item_id', 'title', 'description', 'done', 'status',
+  'priority', 'effort', 'today', 'blocked_by', 'assignees',
+  'sort_order', 'created_at',
+];
+
 export async function upsertStep(step: Record<string, unknown>) {
   if (!_supabase) return null;
+  const row: Record<string, unknown> = {};
+  for (const key of STEP_COLUMNS) {
+    if (key in step && step[key] !== undefined) {
+      row[key] = step[key];
+    }
+  }
   const { data, error } = await _supabase
     .from('steps')
-    .upsert(step)
+    .upsert(row)
     .select()
     .single();
   if (error) throw error;
