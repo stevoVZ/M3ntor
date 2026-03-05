@@ -104,6 +104,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [pinnedAiType, setPinnedAiType] = useState<string | null>(null);
+  const [showOtherApproaches, setShowOtherApproaches] = useState(false);
 
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -129,7 +130,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!text.trim() || text.trim().length < 5) { setAiHint(null); return; }
+    if (!text.trim() || text.trim().length < 5) { setAiHint(null); setShowOtherApproaches(false); return; }
 
     debounceRef.current = setTimeout(async () => {
       setAiLoading(true);
@@ -137,6 +138,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
       setAiHint(hint);
       if (hint.suggestedType && !selectedType) {
         setPinnedAiType(hint.suggestedType);
+        setShowOtherApproaches(false);
         if (hint.suggestedType === 'project' && breakdownSteps.length === 0) {
           setBreakdownLoading(true);
           const result = await generateProjectTasks(text, [], countryName);
@@ -275,7 +277,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
               <View style={styles.headerRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.title, isCompact && { fontSize: 18 }]}>What's next?</Text>
-                  <Text style={styles.subtitle}>Type your idea — AI shapes it as you write</Text>
+                  <Text style={styles.subtitle}>Type your idea — M3NTOR shapes it as you write</Text>
                 </View>
                 <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={8}>
                   <Feather name="x" size={14} color={T.t3} />
@@ -311,7 +313,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                       <ActivityIndicator size="small" color={T.brand} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.thinkingLine1}>AI is thinking…</Text>
+                      <Text style={styles.thinkingLine1}>M3NTOR is thinking…</Text>
                       <Text style={styles.thinkingLine2}>Getting a personalised insight</Text>
                     </View>
                   </View>
@@ -365,40 +367,119 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
 
               <View style={styles.approachSection}>
                 <Text style={styles.approachLabel}>Pick your approach</Text>
-                {TYPE_GROUPS.map(group => (
-                  <View key={group.label} style={styles.typeGroupRow}>
-                    <Text style={styles.typeGroupLabel}>{group.label}</Text>
-                    <View style={styles.typeGroupCards}>
-                      {group.items.map(t => {
-                        const on = activeType === t.id && !!text.trim();
-                        return (
-                          <Pressable key={t.id} style={[styles.typeCard, on && {
-                            backgroundColor: t.color + '10',
-                            borderColor:     t.color + '40',
-                          }]} onPress={() => handleTypeSelect(t.id)}>
-                            <Feather name={t.icon} size={16} color={on ? t.color : T.t3} />
-                            <View>
-                              <Text style={[styles.typeCardLabel, on && { color: t.color }]}>
-                                {t.label}
-                              </Text>
-                              <Text style={[styles.typeCardSub, on && { color: t.color + 'AA' }]}>
-                                {t.sub}
+
+                {aiLoading && text.trim().length >= 5 ? (
+                  <View style={styles.analyzingRow}>
+                    <ActivityIndicator size="small" color={T.brand} />
+                    <Text style={styles.analyzingText}>M3NTOR is analyzing…</Text>
+                  </View>
+                ) : safePinnedType && aiHint?.typeReason ? (
+                  <View>
+                    {(() => {
+                      const rec = ALL_TYPES.find(t => t.id === safePinnedType)!;
+                      const isRecActive = activeType === rec.id;
+                      const userOverrode = !!selectedType && selectedType !== safePinnedType;
+                      return (
+                        <>
+                          <Pressable
+                            style={[styles.recCard, {
+                              backgroundColor: isRecActive ? rec.color + '10' : 'rgba(0,0,0,0.025)',
+                              borderColor: isRecActive ? rec.color + '40' : 'rgba(0,0,0,0.07)',
+                            }]}
+                            onPress={() => handleTypeSelect(rec.id)}
+                          >
+                            <View style={[styles.recIconBox, { backgroundColor: rec.color + '14' }]}>
+                              <Feather name={rec.icon} size={18} color={rec.color} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={styles.recTitleRow}>
+                                <Text style={[styles.recLabel, isRecActive && { color: rec.color }]}>
+                                  {rec.label}
+                                </Text>
+                                {userOverrode && (
+                                  <View style={styles.m3ntorBadge}>
+                                    <Feather name="cpu" size={9} color={T.brand} />
+                                    <Text style={styles.m3ntorBadgeText}>M3NTOR pick</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={[styles.recReason, isRecActive && { color: rec.color + 'CC' }]}>
+                                {aiHint.typeReason}
                               </Text>
                             </View>
+                            {isRecActive && <Feather name="check-circle" size={16} color={rec.color} />}
                           </Pressable>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))}
-              </View>
 
-              {aiHint?.typeReason && pinnedAiType && !selectedType && (
-                <View style={styles.typeReasonRow}>
-                  <Feather name="cpu" size={11} color={T.brand} />
-                  <Text style={styles.typeReasonText}>{aiHint.typeReason}</Text>
-                </View>
-              )}
+                          <Pressable
+                            style={styles.otherToggle}
+                            onPress={() => setShowOtherApproaches(p => !p)}
+                          >
+                            <Text style={styles.otherToggleText}>Other approaches</Text>
+                            <Feather
+                              name={showOtherApproaches ? 'chevron-up' : 'chevron-down'}
+                              size={14}
+                              color={T.t3}
+                            />
+                          </Pressable>
+
+                          {showOtherApproaches && (
+                            <View style={styles.otherCards}>
+                              {ALL_TYPES.filter(t => t.id !== safePinnedType).map(t => {
+                                const on = activeType === t.id;
+                                return (
+                                  <Pressable key={t.id} style={[styles.typeCard, on && {
+                                    backgroundColor: t.color + '10',
+                                    borderColor: t.color + '40',
+                                  }]} onPress={() => handleTypeSelect(t.id)}>
+                                    <Feather name={t.icon} size={16} color={on ? t.color : T.t3} />
+                                    <View>
+                                      <Text style={[styles.typeCardLabel, on && { color: t.color }]}>
+                                        {t.label}
+                                      </Text>
+                                      <Text style={[styles.typeCardSub, on && { color: t.color + 'AA' }]}>
+                                        {t.sub}
+                                      </Text>
+                                    </View>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </View>
+                ) : (
+                  <>
+                    {TYPE_GROUPS.map(group => (
+                      <View key={group.label} style={styles.typeGroupRow}>
+                        <Text style={styles.typeGroupLabel}>{group.label}</Text>
+                        <View style={styles.typeGroupCards}>
+                          {group.items.map(t => {
+                            const on = activeType === t.id && !!text.trim();
+                            return (
+                              <Pressable key={t.id} style={[styles.typeCard, on && {
+                                backgroundColor: t.color + '10',
+                                borderColor:     t.color + '40',
+                              }]} onPress={() => handleTypeSelect(t.id)}>
+                                <Feather name={t.icon} size={16} color={on ? t.color : T.t3} />
+                                <View>
+                                  <Text style={[styles.typeCardLabel, on && { color: t.color }]}>
+                                    {t.label}
+                                  </Text>
+                                  <Text style={[styles.typeCardSub, on && { color: t.color + 'AA' }]}>
+                                    {t.sub}
+                                  </Text>
+                                </View>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                )}
+              </View>
 
               {activeType === 'project' && (breakdownSteps.length > 0 || breakdownLoading) && (
                 <View style={styles.breakdownSection}>
@@ -580,7 +661,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.journeyCardTitle}>Build Custom Journey</Text>
-                  <Text style={styles.journeyCardSub}>AI designs a multi-week program for your goal</Text>
+                  <Text style={styles.journeyCardSub}>M3NTOR designs a multi-week program for your goal</Text>
                 </View>
                 <Feather name="chevron-right" size={16} color={T.t3} />
               </Pressable>
@@ -643,8 +724,20 @@ const styles = StyleSheet.create({
   typeCardLabel:  { fontSize: 13, fontWeight: '700' as const, color: T.t2 },
   typeCardSub:    { fontSize: 10, color: T.t3 },
 
-  typeReasonRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, marginBottom: 10 },
-  typeReasonText: { fontSize: 11, color: T.brand, fontStyle: 'italic', flex: 1 },
+  analyzingRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 4 },
+  analyzingText:  { fontSize: 13, fontWeight: '600' as const, color: T.brand },
+
+  recCard:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1.5, marginBottom: 6 },
+  recIconBox:     { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  recTitleRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recLabel:       { fontSize: 15, fontWeight: '700' as const, color: T.t2 },
+  recReason:      { fontSize: 12, color: T.t3, marginTop: 2, lineHeight: 16 },
+  m3ntorBadge:    { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: T.brand + '0C', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  m3ntorBadgeText:{ fontSize: 9, fontWeight: '700' as const, color: T.brand, letterSpacing: 0.3 },
+
+  otherToggle:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, marginBottom: 4 },
+  otherToggleText:{ fontSize: 12, fontWeight: '600' as const, color: T.t3 },
+  otherCards:     { gap: 8, marginBottom: 4 },
 
   breakdownSection: { backgroundColor: T.brand + '06', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: T.brand + '14' },
   breakdownHeader:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },

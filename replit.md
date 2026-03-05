@@ -60,8 +60,8 @@ components/
 - **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`, `generateGoal()`, `generateProjectFromGoal()`, `generateJourneyPlan()` — all accept optional `country` param for region-aware responses
 - **AI Coach**: Chat-style interface for journey recommendations using server endpoint with fallback keyword matching; filters PRG catalog by user's country (global always shown, regional only when country matches)
 - **Program Builder**: AI-generated custom journey programs via `generateJourneyPlan()` — passes country context for region-appropriate content
-- **Smart Type Suggestion**: `getItemHint()` returns `suggestedType` and `typeReason`; FabActionSheet auto-selects the AI-suggested type chip (pinned until user overrides)
-- **Auto-Breakdown**: When type is "project" (AI-suggested or user-selected), auto-calls `generateProjectTasks()` to show inline editable step breakdown in FAB sheet
+- **Smart Type Suggestion**: `getItemHint()` returns `suggestedType` and `typeReason`; FabActionSheet shows M3NTOR-recommended approach as a prominent card with reason text, pre-selected; "Other approaches" collapsible toggle shows remaining 3 types; user override adds "M3NTOR pick" badge to original recommendation; all user-facing AI labels use "M3NTOR" branding
+- **Auto-Breakdown**: When type is "project" (M3NTOR-suggested or user-selected), auto-calls `generateProjectTasks()` to show inline editable step breakdown in FAB sheet
 - **Country/Region**: `constants/countries.ts` has curated country list; PRG entries have `scope` (global/regional) and `regions`; ProfileScreen has searchable country picker
 - **Env var**: Requires `EXPO_PUBLIC_ANTHROPIC_KEY` on the client
 - **Graceful degradation**: All AI functions catch errors and return safe defaults/fallback templates
