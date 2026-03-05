@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
-  Platform, ActivityIndicator, KeyboardAvoidingView,
+  Platform, ActivityIndicator, Keyboard,
   useWindowDimensions,
 } from 'react-native';
 import Animated, {
@@ -80,7 +80,7 @@ const EFFORT_CONFIG: Record<string, { icon: 'zap' | 'clock'; label: string; colo
 
 export function FabActionSheet({ onProject, onClose }: Props) {
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { userId, addItem, profile } = useStore();
   const effectiveUserId = userId ?? 'guest';
   const countryName = profile?.country ? getCountryByCode(profile.country)?.name : undefined;
@@ -105,6 +105,8 @@ export function FabActionSheet({ onProject, onClose }: Props) {
   const [pinnedAiType, setPinnedAiType] = useState<string | null>(null);
   const [showOtherApproaches, setShowOtherApproaches] = useState(false);
 
+  const [kbHeight, setKbHeight] = useState(0);
+
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -113,6 +115,15 @@ export function FabActionSheet({ onProject, onClose }: Props) {
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 200);
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
   const inferredType = useMemo(() => inferType(text), [text]);
@@ -240,11 +251,8 @@ export function FabActionSheet({ onProject, onClose }: Props) {
 
   return (
     <View style={styles.fullOverlay}>
-      <KeyboardAvoidingView
-        behavior="padding"
-        keyboardVerticalOffset={0}
-        style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
+      <View style={styles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => { Keyboard.dismiss(); onClose(); }}>
           <View style={styles.backdrop} />
         </Pressable>
 
@@ -253,7 +261,11 @@ export function FabActionSheet({ onProject, onClose }: Props) {
           exiting={SlideOutDown.springify().damping(28)}
           style={[styles.sheet, {
             paddingHorizontal: horizontalPad,
-            paddingBottom: Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 16),
+            paddingBottom: kbHeight > 0 ? 12 : (Platform.OS === 'web' ? 34 : Math.max(insets.bottom, 16)),
+            marginBottom: kbHeight,
+            maxHeight: kbHeight > 0
+              ? screenHeight - kbHeight - (insets.top || 44)
+              : screenHeight * 0.92,
           }]}>
 
           <View style={styles.handleRow}>
@@ -658,16 +670,16 @@ export function FabActionSheet({ onProject, onClose }: Props) {
             </ScrollView>
           )}
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   fullOverlay:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 },
-  overlay:        { flex: 1, justifyContent: 'flex-end' },
+  overlay:        { flex: 1, justifyContent: 'flex-end', overflow: 'hidden' },
   backdrop:       { flex: 1, backgroundColor: 'rgba(10,8,22,0.52)' },
-  sheet:          { backgroundColor: 'rgba(253,252,255,0.98)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 0, maxHeight: '92%' },
+  sheet:          { backgroundColor: 'rgba(253,252,255,0.98)', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 0 },
   handleRow:      { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
   handle:         { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.08)' },
 
