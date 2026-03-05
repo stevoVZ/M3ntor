@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Modal, KeyboardAvoidingView, Platform, ActivityIndicator,
-  useWindowDimensions,
+  useWindowDimensions, Keyboard,
 } from 'react-native';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,11 +58,21 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
   const [saved, setSaved]           = useState(false);
   const [showAttributes, setShowAttributes] = useState(false);
 
+  const [kbHeight, setKbHeight] = useState(0);
+
   const inputRef = useRef<TextInput>(null);
   const stepRef  = useRef<TextInput>(null);
 
   const isCompact = screenWidth < 380;
   const horizontalPad = isCompact ? 14 : 20;
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   useEffect(() => {
     if (title.length >= 3 && !areaConfirmed) {
@@ -171,7 +181,10 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
               <Text style={styles.savedSub}>{title}</Text>
             </View>
           ) : (
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 40 : kbHeight > 0 ? kbHeight * 0.3 : 0 }}>
               <View style={styles.headerRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.sheetTitle, isCompact && { fontSize: 18 }]}>New Project</Text>

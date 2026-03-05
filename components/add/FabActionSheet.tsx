@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView,
   Modal, KeyboardAvoidingView, Platform, ActivityIndicator,
-  useWindowDimensions,
+  useWindowDimensions, Keyboard,
 } from 'react-native';
 import Animated, {
   SlideInDown, SlideOutDown,
@@ -85,11 +85,21 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const [saved, setSaved]               = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
 
+  const [kbHeight, setKbHeight] = useState(0);
+
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isCompact = screenWidth < 380;
   const horizontalPad = isCompact ? 14 : 18;
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 200);
@@ -189,7 +199,10 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
               <Text style={styles.savedSub}>"{text}"</Text>
             </View>
           ) : (
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 40 : kbHeight > 0 ? kbHeight * 0.3 : 0 }}>
               <View style={styles.headerRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.title, isCompact && { fontSize: 18 }]}>What's next?</Text>

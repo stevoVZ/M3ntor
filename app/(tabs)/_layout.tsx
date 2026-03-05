@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Pressable, Text, StyleSheet, Platform } from 'react-native';
+import { View, Pressable, Text, StyleSheet, Platform, Keyboard } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -67,6 +67,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   const TAB_ROUTES = ['today', 'mylife', 'discover', 'plan'];
 
   function handleFabPress() {
+    Keyboard.dismiss();
     fabScale.value = withSpring(0.88, {}, () => {
       fabScale.value = withSpring(1);
     });
