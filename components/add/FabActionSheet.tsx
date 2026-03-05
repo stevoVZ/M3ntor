@@ -71,6 +71,7 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const { userId, addItem } = useStore();
+  const effectiveUserId = userId ?? 'guest';
 
   const [text, setText]                 = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -140,12 +141,12 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
   }
 
   function handleSave() {
-    if (!canSave || !userId) return;
+    if (!canSave) return;
     const type = activeType ?? 'action';
     if (type === 'project') { onProject(text); return; }
     if (type === 'journey') { onJourney?.(); return; }
 
-    const item = createItem(userId, {
+    const item = createItem(effectiveUserId, {
       title:             text.trim(),
       area:              area ?? suggestArea(text) ?? 'life',
       status:            type === 'goal' ? 'someday' : 'active',

@@ -41,6 +41,7 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const { userId, addItem } = useStore();
+  const effectiveUserId = userId ?? 'guest';
 
   const [title, setTitle]           = useState(prefillText);
   const [description, setDescription] = useState('');
@@ -119,9 +120,9 @@ export function ProjectAddSheet({ prefillText = '', onClose }: Props) {
   }
 
   function handleSave() {
-    if (!canSave || !userId) return;
+    if (!canSave) return;
 
-    const item = createItem(userId, {
+    const item = createItem(effectiveUserId, {
       title: title.trim(),
       description: description.trim() || undefined,
       area:  area!,
