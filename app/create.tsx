@@ -25,15 +25,15 @@ const TYPE_GROUPS = [
   {
     label: 'Quick',
     items: [
-      { id: 'action',  label: 'Action',  sub: 'Just do it',        icon: 'check'  as const, color: T.green  },
-      { id: 'habit',   label: 'Habit',   sub: 'Build a routine',   icon: 'repeat' as const, color: T.orange },
+      { id: 'action',  label: 'Action',  sub: 'A one-off task',            detail: 'Do it once and tick it off. Great for errands, calls, or quick wins.',  icon: 'check'  as const, color: T.green  },
+      { id: 'habit',   label: 'Habit',   sub: 'A recurring routine',       detail: 'Something you want to do regularly — daily, weekly, or on specific days.', icon: 'repeat' as const, color: T.orange },
     ],
   },
   {
     label: 'Planned',
     items: [
-      { id: 'goal',    label: 'Goal',    sub: 'Set a target',      icon: 'target' as const, color: '#9B59B6' },
-      { id: 'project', label: 'Project', sub: 'Break it down',     icon: 'layers' as const, color: T.brand  },
+      { id: 'goal',    label: 'Goal',    sub: 'A bigger ambition',         detail: 'A target you\'re working toward. Link projects and habits to track progress.', icon: 'target' as const, color: '#9B59B6' },
+      { id: 'project', label: 'Project', sub: 'Multiple steps',            detail: 'Something with several tasks. M3NTOR breaks it down into a step-by-step plan.', icon: 'layers' as const, color: T.brand  },
     ],
   },
 ] as const;
@@ -41,12 +41,12 @@ const TYPE_GROUPS = [
 const ALL_TYPES = TYPE_GROUPS.flatMap(g => g.items);
 
 const PROMOS = [
-  { text: 'Meditate every morning',  type: 'habit'   },
-  { text: 'Run a 5K by June',        type: 'goal'    },
-  { text: 'Redesign the website',    type: 'project' },
-  { text: 'Call Mum this week',      type: 'action'  },
-  { text: 'Read 12 books this year', type: 'goal'    },
-  { text: 'Build a sleep routine',   type: 'habit'   },
+  { text: 'Call Mum this week',      type: 'action',  hint: 'Action' },
+  { text: 'Meditate every morning',  type: 'habit',   hint: 'Habit'  },
+  { text: 'Run a 5K by June',        type: 'goal',    hint: 'Goal'   },
+  { text: 'Redesign the website',    type: 'project', hint: 'Project'},
+  { text: 'Read 12 books this year', type: 'goal',    hint: 'Goal'   },
+  { text: 'Build a sleep routine',   type: 'habit',   hint: 'Habit'  },
 ];
 
 const TOD_OPTIONS = [
@@ -441,18 +441,33 @@ export default function CreateScreen() {
           </View>
         )}
         {!aiPending && !aiLoading && !aiHint && !text.trim() && (
-          <View style={styles.promoRow}>
-            {PROMOS.map(p => (
-              <Pressable key={p.text} style={styles.promoChip}
-                onPress={() => { setText(p.text); setSelectedType(p.type); }}>
-                <Text style={styles.promoChipText}>{p.text}</Text>
-              </Pressable>
-            ))}
+          <View style={styles.promoSection}>
+            <Text style={styles.promoLabel}>Try one of these to get started</Text>
+            <View style={styles.promoRow}>
+              {PROMOS.map(p => {
+                const tc = ALL_TYPES.find(t => t.id === p.type);
+                return (
+                  <Pressable key={p.text} style={styles.promoChip}
+                    onPress={() => { setText(p.text); setSelectedType(p.type); }}>
+                    <Text style={styles.promoChipText}>{p.text}</Text>
+                    {tc && (
+                      <View style={[styles.promoChipBadge, { backgroundColor: tc.color + '14' }]}>
+                        <Feather name={tc.icon} size={9} color={tc.color} />
+                        <Text style={[styles.promoChipBadgeText, { color: tc.color }]}>{p.hint}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         )}
       </View>
 
       <View style={styles.approachSection}>
+        {!text.trim() && (
+          <Text style={styles.approachLabel}>How would you like to approach this?</Text>
+        )}
         <Animated.View style={[styles.typeGrid, aiPending && !aiHint ? pulseStyle : undefined]}>
           {ALL_TYPES.map(t => {
             const on = activeType === t.id && !!text.trim();
@@ -461,7 +476,9 @@ export default function CreateScreen() {
                 backgroundColor: t.color + '10',
                 borderColor: t.color + '40',
               }]} onPress={() => handleTypeSelect(t.id)}>
-                <Feather name={t.icon} size={16} color={on ? t.color : T.t3} />
+                <View style={[styles.typeIconWrap, { backgroundColor: (on ? t.color : T.t3) + '12' }]}>
+                  <Feather name={t.icon} size={14} color={on ? t.color : T.t3} />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.typeCardLabel, on && { color: t.color }]}>
                     {t.label}
@@ -475,6 +492,14 @@ export default function CreateScreen() {
             );
           })}
         </Animated.View>
+        {activeType && text.trim() && (
+          <View style={[styles.typeDetailCard, { backgroundColor: (typeConf?.color ?? T.brand) + '08', borderColor: (typeConf?.color ?? T.brand) + '18' }]}>
+            <Feather name="info" size={12} color={(typeConf?.color ?? T.brand) + 'AA'} />
+            <Text style={[styles.typeDetailText, { color: (typeConf?.color ?? T.brand) + 'CC' }]}>
+              {ALL_TYPES.find(t => t.id === activeType)?.detail}
+            </Text>
+          </View>
+        )}
       </View>
 
       {activeType === 'project' && showClarify && clarifyQuestions.length > 0 && (
@@ -799,15 +824,23 @@ const styles = StyleSheet.create({
   hintDetail:     { flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.72)', padding: 5, borderRadius: 8 },
   hintDetailLabel:{ fontSize: 10, fontWeight: '700' },
   hintDetailText: { fontSize: 11, color: T.text, flex: 1, lineHeight: 15 },
+  promoSection:   { marginBottom: 4 },
+  promoLabel:     { fontSize: 11, fontWeight: '600' as const, color: T.t3, marginBottom: 8, letterSpacing: 0.2 },
   promoRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  promoChip:      { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(108,92,231,0.06)', borderWidth: 1, borderColor: 'rgba(108,92,231,0.13)' },
+  promoChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 13, paddingRight: 5, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(108,92,231,0.06)', borderWidth: 1, borderColor: 'rgba(108,92,231,0.13)' },
   promoChipText:  { fontSize: 12, color: T.t2 },
+  promoChipBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  promoChipBadgeText: { fontSize: 9, fontWeight: '700' as const },
 
   approachSection:{ marginBottom: 8 },
+  approachLabel:  { fontSize: 11, fontWeight: '600' as const, color: T.t3, marginBottom: 8, letterSpacing: 0.2 },
   typeGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typeCard:       { flexBasis: '47%' as any, flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.025)' },
+  typeIconWrap:   { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   typeCardLabel:  { fontSize: 13, fontWeight: '700' as const, color: T.t2 },
   typeCardSub:    { fontSize: 10, color: T.t3 },
+  typeDetailCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8, padding: 10, borderRadius: 10, borderWidth: 1 },
+  typeDetailText: { fontSize: 12, lineHeight: 17, flex: 1 },
 
   breakdownSection: { backgroundColor: T.brand + '06', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: T.brand + '14' },
   breakdownHeader:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
