@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { T, S, F, R, shadow } from '../../constants/theme';
 import { useStore } from '../../lib/store';
 import { ITEM_AREAS } from '../../constants/config';
 import { PRG } from '../../constants/config';
 import type { Journey } from '../../types';
+import AICoach from '../../components/discover/AICoach';
+import ProgramBuilder from '../../components/discover/ProgramBuilder';
 
 function JourneyCard({ journey }: { journey: Journey }) {
   const area = ITEM_AREAS[journey.a] ?? ITEM_AREAS.learning;
@@ -51,6 +54,8 @@ function JourneyCard({ journey }: { journey: Journey }) {
 export default function DiscoverScreen() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string | null>(null);
+  const [showCoach, setShowCoach] = useState(false);
+  const [showBuilder, setShowBuilder] = useState(false);
 
   const areas = [...new Set(PRG.map(p => p.a))];
 
@@ -63,6 +68,22 @@ export default function DiscoverScreen() {
   const featured = filtered.filter(j => j.f);
   const rest     = filtered.filter(j => !j.f);
 
+  if (showBuilder) {
+    return (
+      <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }]} edges={['top']}>
+        <ProgramBuilder onClose={() => setShowBuilder(false)} />
+      </SafeAreaView>
+    );
+  }
+
+  if (showCoach) {
+    return (
+      <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }]} edges={['top']}>
+        <AICoach onClose={() => setShowCoach(false)} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }]} edges={['top']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}
@@ -73,6 +94,32 @@ export default function DiscoverScreen() {
           <Text style={styles.heroTitle}>Discover</Text>
           <Text style={styles.heroSub}>Science-backed journeys curated for real results</Text>
         </View>
+
+        <Pressable style={[styles.coachCard, shadow.sm]} onPress={() => setShowCoach(true)}>
+          <View style={styles.coachLeft}>
+            <View style={styles.coachAvatar}>
+              <Feather name="compass" size={18} color="white" />
+            </View>
+            <View style={styles.coachInfo}>
+              <Text style={styles.coachTitle}>Find Your Journey</Text>
+              <Text style={styles.coachSub}>Describe your goals and get AI-powered recommendations</Text>
+            </View>
+          </View>
+          <Feather name="chevron-right" size={18} color={T.t3} />
+        </Pressable>
+
+        <Pressable style={[styles.coachCard, shadow.sm, { borderColor: T.green + '20' }]} onPress={() => setShowBuilder(true)}>
+          <View style={styles.coachLeft}>
+            <View style={[styles.coachAvatar, { backgroundColor: T.green }]}>
+              <Feather name="edit-3" size={18} color="white" />
+            </View>
+            <View style={styles.coachInfo}>
+              <Text style={styles.coachTitle}>Build Custom Journey</Text>
+              <Text style={styles.coachSub}>Create a personalized program with AI assistance</Text>
+            </View>
+          </View>
+          <Feather name="chevron-right" size={18} color={T.t3} />
+        </Pressable>
 
         {/* Search */}
         <View style={styles.searchWrap}>
@@ -173,6 +220,17 @@ const styles = StyleSheet.create({
   cardMetaDot:  { fontSize: 11, color: T.t3 },
   enrollBtn:    { borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   enrollBtnText:{ fontSize: 13, fontWeight: '700', color: 'white' },
+
+  coachCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: 'white', borderRadius: R.lg, padding: S.md, marginBottom: S.md,
+    borderWidth: 0.5, borderColor: T.brand + '20',
+  },
+  coachLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  coachAvatar: { width: 40, height: 40, borderRadius: 12, backgroundColor: T.brand, alignItems: 'center', justifyContent: 'center' },
+  coachInfo: { flex: 1 },
+  coachTitle: { fontSize: F.md, fontWeight: '700', color: T.text },
+  coachSub: { fontSize: F.xs, color: T.t2, marginTop: 2 },
 
   empty:      { alignItems: 'center', paddingVertical: 48 },
   emptyEmoji: { fontSize: 40, marginBottom: S.md },

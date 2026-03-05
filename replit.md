@@ -2,7 +2,7 @@
 
 ## Overview
 
-M3NTOR is a mobile-first productivity and life coaching application built with Expo (React Native). It helps users organize their lives into actionable items across different life areas (Health, Career, Finance, Relationships, Learning, Fun, Home, Spirituality, Life Tasks). Items can be categorized as actions (one-off tasks), habits (recurring), goals (aspirations), or projects (multi-step). The app includes an AI assistant powered by Claude (Anthropic) for contextual hints, project task generation, and subtask breakdown.
+M3NTOR is a mobile-first productivity and life coaching application built with Expo (React Native). It helps users organize their lives into actionable items across different life areas (Health, Career, Finance, Relationships, Learning, Fun, Home, Spirituality, Life Tasks). Items can be categorized as actions (one-off tasks), habits (recurring), goals (aspirations), or projects (multi-step). The app includes an AI assistant powered by Claude (Anthropic) for contextual hints, project task generation, subtask breakdown, journey recommendations, and custom program building.
 
 The app runs as an Expo React Native app for mobile devices and web, with a companion Express.js backend server. AI calls go directly from the client to Anthropic (no server proxy). Data persistence uses Zustand for local state with optional Supabase cloud sync when authenticated.
 
@@ -16,42 +16,64 @@ Preferred communication style: Simple, everyday language.
 
 - **Framework**: Expo (React Native) with expo-router for file-based navigation
 - **Navigation**: Tab-based layout with 4 main tabs: Today, My Life, Discover, and Plan. Modal sheets for adding items and viewing item details. Login screen for Supabase auth (optional)
-- **State Management**: Zustand store (`lib/store.ts`) provides item CRUD operations, auth state (userId, profile), Supabase sync, and derived selectors (activeItems, pausedItems, somedayItems, projectItems, habitItems, actionItems, itemsByArea, getItem)
-- **Supabase Integration**: `lib/supabase.ts` provides client initialization with graceful fallback if not configured (exports `isSupabaseConfigured` flag), typed query helpers (`fetchItems`, `upsertItem`, `deleteItem`, `upsertStep`, `upsertSubtask`, `fetchJourneyProgress`), and auth via `@supabase/supabase-js`
+- **State Management**: Zustand store (`lib/store.ts`) provides item CRUD, auth state, journey progress, completion/mood logging, streak tracking, pause/resume/complete/activate actions, step/subtask management, and derived selectors
+- **Supabase Integration**: `lib/supabase.ts` provides client initialization with graceful fallback if not configured
 - **NLP Utilities**: `utils/nlp.ts` provides instant local area suggestion and type inference from text
 - **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers
-- **Item Utilities**: `utils/items.ts` provides `itemKind()` (derive type from properties), `createItem()` and `createStep()` factories, progress calculations, recurrence helpers
-- **Design System**: `constants/theme.ts` exports `T` (colors/tokens using M3NTOR brand palette — indigo `#5856D6` brand, iOS system accent colors, white `#FFFFFF` background, dark `#141419` for login/splash), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows)
-- **Config**: `constants/config.ts` exports `ITEM_AREAS` (Record<string, {n,c,e}>), `AREAS` (10 Wheel of Life areas with id, name, color, score, icon, description), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog). Also exports `normalizeAreaId()`, `resolveArea()`, `scoreLabel()`, `scoreTier()` for bridging between ITEM_AREAS and AREAS systems
-- **Animations**: `react-native-reanimated` for smooth transitions and spring animations. `expo-haptics` for tactile feedback
+- **Item Utilities**: `utils/items.ts` provides `itemKind()`, `createItem()`, `createStep()` factories, progress calculations, recurrence helpers
+- **Score Utilities**: `utils/scores.ts` provides `computeAppScore()` (multi-area weighted scoring), `goalProgress()`, `areaWeight()`, `journeyAreaWeight()`, `appScoreInsight()`, `getUnlinkedItems()`
+- **Today Utilities**: `utils/today.ts` provides `getTodayActions()`, `groupByTimeOfDay()`, `pickSessionActions()`, `sortedTimeSlots` for action generation and grouping
+- **Design System**: `constants/theme.ts` exports `T` (colors/tokens — indigo `#5856D6` brand), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows)
+- **Config**: `constants/config.ts` exports `ITEM_AREAS`, `AREAS` (10 Wheel of Life areas), `KIND_CONFIG`, `PRIORITY`, `EFFORT`, `STEP_STATUS`, `PRG` (journey catalog)
+- **Animations**: `react-native-reanimated` for transitions, `expo-haptics` for tactile feedback
 - **Fonts**: Inter font family loaded via `@expo-google-fonts/inter`
-- **UI Components**: Custom reusable components in `components/ui/` (Badge), `components/items/` (ItemCard, TaskRow, ProgressBar), `components/add/` (FabActionSheet, ProjectAddSheet, AreaPicker — shared responsive 4-column area grid), `components/WheelOfLife.tsx` (SVG Wheel of Life visualization using react-native-svg), `components/WheelAreaDetail.tsx` (tappable area detail panel). All UI icons use Feather from `@expo/vector-icons`
-- **Responsive Add Sheets**: FabActionSheet and ProjectAddSheet use `useWindowDimensions` to adapt layout for compact screens (<380px). Both sheets support setting priority (urgent/high/normal/low), effort (quick/medium/deep), and deadline via expandable "More" / "Priority, effort & deadline" toggles. ProjectAddSheet also supports a description field. Attribute chips use Feather icons for visual indicators.
+
+### Component Architecture
+
+```
+components/
+  ui/               Badge
+  items/            ItemCard, TaskRow, ProgressBar
+  add/              FabActionSheet, ProjectAddSheet, AreaPicker
+  today/            SessionView (briefing→mood→cards→completion), CompletionScreen
+  plan/             GoalDetailPage, ProjectEditPage, ItemEditSheet
+  discover/         AICoach (chat-style coach), ProgramBuilder (5-step wizard)
+  profile/          ProfileScreen
+  WheelOfLife.tsx   SVG radar chart (self + app scores)
+  WheelAreaDetail.tsx  Area detail with linked items, insights, journeys
+  ErrorBoundary.tsx
+```
 
 ### Backend Architecture
 
-- **Server**: Express.js (`server/index.ts`) running as a separate Node.js process on port 5000
+- **Server**: Express.js (`server/index.ts`) running on port 5000
 - **CORS**: Configured dynamically for Replit dev/prod domains and localhost
 - **Storage Layer**: `server/storage.ts` has an in-memory `MemStorage` class
+- **AI Endpoint**: `/api/ai/assist` proxies AI requests server-side
 - **Build**: Server built with esbuild for production deployment
 
 ### AI Integration
 
-- **Provider**: Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk` — called directly from the client
+- **Provider**: Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk`
 - **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`
-- **Env var**: Requires `EXPO_PUBLIC_ANTHROPIC_KEY` on the client (not server-side)
-- **Graceful degradation**: All AI functions catch errors and return safe defaults
+- **AI Coach**: Chat-style interface for journey recommendations using server endpoint with fallback keyword matching
+- **Program Builder**: AI-generated custom journey programs with week-by-week action plans
+- **Env var**: Requires `EXPO_PUBLIC_ANTHROPIC_KEY` on the client
+- **Graceful degradation**: All AI functions catch errors and return safe defaults/fallback templates
 
 ### Data Models
 
 **Client-side types** (`types/index.ts`):
-- `Item`: Core entity with title, description, area, status, recurrence, habit_time_of_day, deadline, priority, effort, emoji, user_id, steps array
+- `Item`: Core entity with title, description, area, status, recurrence, habit_time_of_day, deadline, priority, effort, emoji, user_id, steps array, linked_items, linked_journeys
 - `Step`: Sub-tasks within a project item, with blocked_by, assignees, subtasks
 - `Subtask`: Individual sub-items within a step
 - `Recurrence`: Supports daily, weekdays, specific_days, interval, monthly
 - `Profile`: User profile with name, avatar_url
 - `JourneyProgress`: Tracks user progress through curated journey programs
 - `Journey`: Static catalog entry for expert-curated programs
+- `CompletionLog`: Daily completion tracking (date→{done,skipped,total})
+- `MoodEntry`: Mood recording with timestamp
+- `TodayAction`: Unified action type for Today screen (journey|habit|project|action)
 - Item type is **derived** from properties at runtime via `itemKind()`
 
 ### Routing Structure
@@ -61,19 +83,27 @@ app/
   _layout.tsx          # Root layout with Zustand store, Supabase auth
   login.tsx            # Supabase auth screen
   (tabs)/
-    _layout.tsx        # Tab bar configuration
+    _layout.tsx        # Tab bar + FAB + ProgramBuilder modal
     index.tsx          # Redirects to today
-    today.tsx          # Today's active items
-    mylife.tsx         # My Life — Wheel of Life SVG visualization, area scoring, glass-card design, insight cards
-    discover.tsx       # Journey/program discovery
-    plan.tsx           # Full item list with filters
-  item/[id].tsx        # Item detail modal sheet
+    today.tsx          # Today dashboard + session mode
+    mylife.tsx         # My Life — wheel/list, app scores, insights, profile
+    discover.tsx       # Journey catalog + AI Coach + Program Builder
+    plan.tsx           # Hierarchy/list views, goal detail, project edit
+  item/[id].tsx        # Item detail with full editing
 ```
+
+### Key Screens & Features
+
+- **Today**: Time-of-day grouped actions (morning/afternoon/evening/anytime), journey cards with session mode (briefing→mood→action deck→undo→completion→summary), quick-complete checkboxes, streak display
+- **Plan**: Dual view (hierarchy/list), goal cards with progress, linked/unlinked items, action menus (edit/pause/resume/delete), goal detail page, project edit page with step/subtask CRUD and AI generation
+- **Discover**: Journey catalog, AI Coach chat for recommendations, Program Builder wizard (goal→details→generating→review→saved), "Build Custom Journey" accessible from FAB
+- **My Life**: Wheel of Life with self + app scores, wheel/list view toggle, insights (strongest/focus area), time comparison (now/week/month/start), area detail with linked items/journeys, profile screen
 
 ### Platform Considerations
 
 - The app targets iOS, Android, and Web
 - Tab bar uses native iOS tab implementation when Liquid Glass is available, falls back to classic Expo Tabs
+- Web-specific insets (67px top, 34px bottom) applied via Platform.OS checks
 
 ## External Dependencies
 
@@ -109,10 +139,10 @@ app/
 ### Database Setup
 
 The Supabase schema is defined in `supabase-schema.sql`. It creates:
-- `profiles` — auto-created via trigger on signup (uses `SET search_path = public` for proper permissions)
+- `profiles` — auto-created via trigger on signup
 - `items` — core entity with steps/subtasks nested queries
 - `steps` — project sub-tasks
 - `subtasks` — individual items within steps
 - `journey_progress` — tracks user journey enrollment
 
-All tables have Row Level Security (RLS) policies ensuring users can only access their own data. Realtime subscriptions are enabled for items, steps, and subtasks.
+All tables have Row Level Security (RLS) policies ensuring users can only access their own data.

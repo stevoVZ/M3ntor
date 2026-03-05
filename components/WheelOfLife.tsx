@@ -58,9 +58,10 @@ interface WheelOfLifeProps {
   size?: number;
   onTapArea?: (index: number) => void;
   tappedIdx: number | null;
+  appScores?: Record<string, number>;
 }
 
-export default function WheelOfLife({ areas, size = 300, onTapArea, tappedIdx }: WheelOfLifeProps) {
+export default function WheelOfLife({ areas, size = 300, onTapArea, tappedIdx, appScores }: WheelOfLifeProps) {
   const cx = size / 2;
   const cy = size / 2;
   const outerR = size / 2 - 40;
@@ -129,6 +130,28 @@ export default function WheelOfLife({ areas, size = 300, onTapArea, tappedIdx }:
               fill={`url(#wfg-${i})`}
               opacity={tappedIdx !== null && !isTapped ? 0.35 : 1}
               onPress={() => onTapArea?.(i)}
+            />
+          );
+        })}
+
+        {appScores && areas.map((a, i) => {
+          const appS = appScores[a.id] || 1;
+          const sa = i * wedgeAngle + gapDeg / 2;
+          const ea = (i + 1) * wedgeAngle - gapDeg / 2;
+          const r = (appS / 10) * outerR;
+          if (r < 3) return null;
+          const midAngle = (sa + ea) / 2;
+          const arcStart = polarToCart(cx, cy, r, sa);
+          const arcEnd = polarToCart(cx, cy, r, ea);
+          return (
+            <Path
+              key={`app-${i}`}
+              d={`M${cx},${cy} L${arcStart.x},${arcStart.y} A${r},${r} 0 0 1 ${arcEnd.x},${arcEnd.y} Z`}
+              fill="none"
+              stroke={a.c}
+              strokeWidth={1.5}
+              strokeDasharray="4,3"
+              opacity={tappedIdx !== null && tappedIdx !== i ? 0.2 : 0.5}
             />
           );
         })}

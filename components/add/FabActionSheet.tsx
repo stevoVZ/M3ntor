@@ -435,6 +435,19 @@ export function FabActionSheet({ onProject, onJourney, onClose }: Props) {
                 </LinearGradient>
               </Pressable>
 
+              <Pressable
+                style={styles.journeyCard}
+                onPress={() => onJourney?.()}>
+                <View style={styles.journeyCardIcon}>
+                  <Feather name="compass" size={18} color="#007AFF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.journeyCardTitle}>Build Custom Journey</Text>
+                  <Text style={styles.journeyCardSub}>AI designs a multi-week program for your goal</Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={T.t3} />
+              </Pressable>
+
               <Pressable onPress={onClose} style={styles.cancelBtn}>
                 <Text style={styles.cancelText}>Cancel</Text>
               </Pressable>
@@ -505,6 +518,11 @@ const styles = StyleSheet.create({
   saveBtn:        { borderRadius: 20, padding: 17, alignItems: 'center', justifyContent: 'center' },
   saveBtnInner:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
   saveBtnText:    { fontSize: 16, fontWeight: '700', color: 'white', letterSpacing: -0.3 },
+  journeyCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, backgroundColor: 'rgba(0,122,255,0.05)', borderWidth: 1, borderColor: 'rgba(0,122,255,0.15)', marginTop: 8, marginBottom: 4 },
+  journeyCardIcon:{ width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(0,122,255,0.10)', alignItems: 'center', justifyContent: 'center' },
+  journeyCardTitle:{ fontSize: 14, fontWeight: '700', color: '#007AFF' },
+  journeyCardSub: { fontSize: 11, color: T.t3, marginTop: 1 },
+
   cancelBtn:      { padding: 12, alignItems: 'center', marginTop: 6 },
   cancelText:     { fontSize: 14, fontWeight: '600', color: T.t3 },
 });

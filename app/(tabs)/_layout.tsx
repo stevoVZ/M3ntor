@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Pressable, Text, StyleSheet, Platform, Keyboard } from 'react-native';
+import { View, Pressable, Text, StyleSheet, Platform, Keyboard, Modal } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,6 +7,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-na
 import { T, shadow, R } from '../../constants/theme';
 import { FabActionSheet } from '../../components/add/FabActionSheet';
 import { ProjectAddSheet } from '../../components/add/ProjectAddSheet';
+import ProgramBuilder from '../../components/discover/ProgramBuilder';
 
 // ── Tab icon SVG paths ────────────────────────────────────
 function TabIcon({ name, active }: { name: string; active: boolean }) {
@@ -56,7 +57,7 @@ function TabIcon({ name, active }: { name: string; active: boolean }) {
 function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   const insets = useSafeAreaInsets();
   const [showAdd, setShowAdd]         = useState(false);
-  const [addMode, setAddMode]         = useState<'sheet' | 'project'>('sheet');
+  const [addMode, setAddMode]         = useState<'sheet' | 'project' | 'journey'>('sheet');
   const [prefill, setPrefill]         = useState('');
   const fabScale = useSharedValue(1);
 
@@ -133,7 +134,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       {showAdd && addMode === 'sheet' && (
         <FabActionSheet
           onProject={(text) => { setPrefill(text); setAddMode('project'); }}
-          onJourney={() => { setShowAdd(false); navigation.navigate('discover'); }}
+          onJourney={() => { setAddMode('journey'); }}
           onClose={() => setShowAdd(false)}
         />
       )}
@@ -142,6 +143,13 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
           prefillText={prefill}
           onClose={() => { setShowAdd(false); setAddMode('sheet'); }}
         />
+      )}
+      {showAdd && addMode === 'journey' && (
+        <Modal transparent={false} animationType="slide" visible>
+          <ProgramBuilder
+            onClose={() => { setShowAdd(false); setAddMode('sheet'); }}
+          />
+        </Modal>
       )}
     </>
   );
