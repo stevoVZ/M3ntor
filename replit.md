@@ -16,7 +16,7 @@ Preferred communication style: Simple, everyday language.
 
 - **Framework**: Expo (React Native) with expo-router for file-based navigation
 - **Navigation**: Tab-based layout with 4 main tabs: Today, My Life, Discover, and Plan. Modal sheets for adding items and viewing item details. Login screen for Supabase auth (optional)
-- **State Management**: Zustand store (`lib/store.ts`) provides item CRUD, auth state, journey progress, completion/mood logging, streak tracking, pause/resume/complete/activate actions, step/subtask management, and derived selectors
+- **State Management**: Zustand store (`lib/store.ts`) provides item CRUD, auth state, journey progress, completion/mood logging, streak tracking, pause/resume/complete/activate actions, step/subtask management (including `reorderStep` for up/down reordering), and derived selectors
 - **Supabase Integration**: `lib/supabase.ts` provides client initialization with graceful fallback if not configured
 - **NLP Utilities**: `utils/nlp.ts` provides instant local area suggestion and type inference from text
 - **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers
@@ -61,6 +61,8 @@ components/
 - **Client-side AI module**: `lib/ai.ts` exports `aiAssist()`, `getItemHint()`, `generateProjectTasks()`, `generateSubtasks()`, `generateGoal()` — all accept optional `country` param for region-aware responses
 - **AI Coach**: Chat-style interface for journey recommendations using server endpoint with fallback keyword matching; filters PRG catalog by user's country (global always shown, regional only when country matches)
 - **Smart Type Suggestion**: `getItemHint()` uses a single unified prompt (type-agnostic) and returns `suggestedType`, `typeReason`, `why`, `tip`, `firstStep`, and `effort` in one call; AI fires only on text change (not type switch) so switching approach types is instant; FabActionSheet shows all 4 types in a 2x2 grid with the AI-recommended type pre-highlighted; falls back to local `inferType()` NLP when API fails; all user-facing AI labels use "M3NTOR" branding
+- **Complexity Detection**: `assessProjectComplexity()` evaluates whether a project is complex (multi-phase, domain-specific); if complex, shows 2-3 clarifying questions before generating tasks; answers feed into `generateProjectTasks()` context for smarter breakdown
+- **Effort Estimation**: AI-generated project tasks include per-task effort levels (quick/medium/deep) with duration labels (< 15 min, ~1-2 hrs, Half day+); effort badges show duration throughout the UI
 - **AI Constraints**: All AI prompts include "Never recommend apps, websites, software, or third-party services" to keep recommendations actionable and self-contained
 - **Auto-Breakdown**: When type is "project" (M3NTOR-suggested or user-selected), auto-calls `generateProjectTasks()` to show inline editable step breakdown in FAB sheet
 - **Country/Region**: `constants/countries.ts` has curated country list; PRG entries have `scope` (global/regional) and `regions`; ProfileScreen has searchable country picker

@@ -43,22 +43,52 @@ export async function getItemHint(text: string, _type?: string, country?: string
   }
 }
 
+export interface AiComplexity {
+  complex: boolean;
+  questions: string[];
+}
+
+export async function assessProjectComplexity(title: string, country?: string): Promise<AiComplexity> {
+  const countryCtx = country ? `\nThe user is based in ${country}.` : '';
+  const prompt = `Assess this project: "${title}"${countryCtx}\nIs this a complex project (multi-phase, multi-month, requires domain knowledge, many dependencies, or involves significant planning)? If yes, generate 2-3 short clarifying questions that would help create a better task breakdown. If it's simple (can be done in a day or two, straightforward steps), mark as not complex.\nReply JSON only: {"complex":true/false,"questions":["question 1","question 2"]}`;
+  try {
+    const raw = await aiAssist(prompt);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean) as AiComplexity;
+  } catch {
+    return { complex: false, questions: [] };
+  }
+}
+
+export interface AiTaskItem {
+  title: string;
+  effort?: 'quick' | 'medium' | 'deep';
+}
+
 export interface AiTasks {
-  tasks: string[];
+  tasks: AiTaskItem[];
   emoji?: string;
   why?:   string;
 }
 
-export async function generateProjectTasks(title: string, existing: string[] = [], country?: string): Promise<AiTasks> {
+export async function generateProjectTasks(title: string, existing: string[] = [], country?: string, context?: string): Promise<AiTasks> {
   const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples.` : '';
   const noApps = `\nNever recommend apps, websites, software, or third-party services. Only suggest actions the user can do themselves.`;
+  const contextCtx = context ? `\nAdditional context from the user:\n${context}` : '';
+  const effortNote = `\nFor each task, estimate effort: "quick" (< 15 min), "medium" (~1-2 hrs), or "deep" (half day+).`;
   const prompt = existing.length
-    ? `Project: "${title}"${countryCtx}${noApps}\nExisting tasks: ${existing.join(', ')}\nGenerate 3-5 MORE missing tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji"}`
-    : `Project: "${title}"${countryCtx}${noApps}\nGenerate 5-7 concrete actionable tasks. Reply JSON only: {"tasks":["task 1"],"emoji":"emoji","why":"one sentence"}`;
+    ? `Project: "${title}"${countryCtx}${noApps}${contextCtx}${effortNote}\nExisting tasks: ${existing.join(', ')}\nGenerate 3-5 MORE missing tasks. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium"}],"emoji":"emoji"}`
+    : `Project: "${title}"${countryCtx}${noApps}${contextCtx}${effortNote}\nGenerate 5-7 concrete actionable tasks in logical order. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium"}],"emoji":"emoji","why":"one sentence"}`;
   try {
     const raw    = await aiAssist(prompt);
     const clean  = raw.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean) as AiTasks;
+    const parsed = JSON.parse(clean);
+    if (Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
+      if (typeof parsed.tasks[0] === 'string') {
+        parsed.tasks = parsed.tasks.map((t: string) => ({ title: t, effort: 'medium' }));
+      }
+    }
+    return parsed as AiTasks;
   } catch {
     return { tasks: [] };
   }

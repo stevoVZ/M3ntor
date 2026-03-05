@@ -12,7 +12,7 @@ import { projectProgress, itemKind, createStep } from '@/utils/items';
 import { ProgressBar } from '@/components/items/ProgressBar';
 import { ITEM_AREAS, STEP_STATUS, PRIORITY, EFFORT } from '@/constants/config';
 import { T, S, R, F, shadow } from '@/constants/theme';
-import { generateProjectTasks, generateSubtasks } from '@/lib/ai';
+import { generateProjectTasks, generateSubtasks, assessProjectComplexity } from '@/lib/ai';
 import type { Step, Subtask } from '@/types';
 
 interface ProjectEditPageProps {
@@ -34,6 +34,7 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
   const removeStep = useStore(s => s.removeStep);
   const updateStep = useStore(s => s.updateStep);
   const updateStepStatus = useStore(s => s.updateStepStatus);
+  const reorderStep = useStore(s => s.reorderStep);
   const toggleSubtask = useStore(s => s.toggleSubtask);
   const addSubtask = useStore(s => s.addSubtask);
   const removeSubtask = useStore(s => s.removeSubtask);
@@ -52,6 +53,9 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
   const [aiTasksLoading, setAiTasksLoading] = useState(false);
   const [aiSubLoading, setAiSubLoading] = useState<string | null>(null);
   const [aiBanner, setAiBanner] = useState<'success' | 'error' | null>(null);
+  const [clarifyQuestions, setClarifyQuestions] = useState<string[]>([]);
+  const [clarifyAnswers, setClarifyAnswers] = useState<Record<number, string>>({});
+  const [showClarify, setShowClarify] = useState(false);
 
   const taskInputRef = useRef<TextInput>(null);
   const subInputRef = useRef<TextInput>(null);
@@ -68,6 +72,7 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
   const ai = ITEM_AREAS[item.area];
   const ac = ai?.c || T.brand;
   const steps = item.steps || [];
+  const sortedSteps = [...steps].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   const pct = Math.round(projectProgress(item) * 100);
   const kind = itemKind(item);
   const doneCount = steps.filter(s => s.done).length;
@@ -121,18 +126,29 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
     setTimeout(() => subInputRef.current?.focus(), 50);
   };
 
-  const handleAiTasks = async () => {
+  const handleAiTasks = async (context?: string, skipComplexityCheck?: boolean) => {
     if (aiTasksLoading) return;
     setAiTasksLoading(true);
     setAiBanner(null);
     try {
+      if (steps.length === 0 && !context && !skipComplexityCheck) {
+        const complexity = await assessProjectComplexity(item.title);
+        if (complexity.complex && complexity.questions.length > 0) {
+          setClarifyQuestions(complexity.questions);
+          setClarifyAnswers({});
+          setShowClarify(true);
+          setAiTasksLoading(false);
+          return;
+        }
+      }
       const existing = steps.map(s => s.title);
-      const result = await generateProjectTasks(item.title, existing);
+      const result = await generateProjectTasks(item.title, existing, undefined, context);
       if (result.tasks?.length) {
         result.tasks.forEach((t, i) => {
           const newStep = createStep(item.id, {
-            title: t,
+            title: t.title,
             sort_order: steps.length + i,
+            effort: t.effort || undefined,
           });
           addStep(item.id, newStep);
         });
@@ -144,6 +160,14 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
     }
     setAiTasksLoading(false);
     setTimeout(() => setAiBanner(null), 3000);
+  };
+
+  const handleClarifyGenerate = () => {
+    const contextParts = clarifyQuestions.map((q, i) =>
+      `Q: ${q}\nA: ${clarifyAnswers[i] || '(not answered)'}`
+    ).join('\n');
+    setShowClarify(false);
+    handleAiTasks(contextParts);
   };
 
   const handleAiSubtasks = async (stepId: string) => {
@@ -330,14 +354,46 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
           </View>
         </View>
 
-        {steps.map((step, idx) => (
+        {showClarify && clarifyQuestions.length > 0 && (
+          <View style={styles.clarifySection}>
+            <View style={styles.clarifyHeader}>
+              <Feather name="help-circle" size={13} color={T.brand} />
+              <Text style={styles.clarifyTitle}>A few questions first</Text>
+            </View>
+            <Text style={styles.clarifySubtext}>This looks like a complex project. Answering these helps M3NTOR create a better breakdown.</Text>
+            {clarifyQuestions.map((q, idx) => (
+              <View key={idx} style={styles.clarifyQRow}>
+                <Text style={styles.clarifyQ}>{q}</Text>
+                <TextInput
+                  style={styles.clarifyInput}
+                  placeholder="Your answer..."
+                  placeholderTextColor={T.t3}
+                  value={clarifyAnswers[idx] || ''}
+                  onChangeText={(v) => setClarifyAnswers(prev => ({ ...prev, [idx]: v }))}
+                  returnKeyType="done"
+                />
+              </View>
+            ))}
+            <View style={styles.clarifyActions}>
+              <Pressable style={styles.clarifyGenBtn} onPress={handleClarifyGenerate}>
+                <Feather name="zap" size={13} color="white" />
+                <Text style={styles.clarifyGenText}>Generate breakdown</Text>
+              </Pressable>
+              <Pressable style={styles.clarifySkipBtn} onPress={() => { setShowClarify(false); handleAiTasks(undefined, true); }}>
+                <Text style={styles.clarifySkipText}>Skip</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {sortedSteps.map((step, idx) => (
           <StepCard
             key={step.id}
             step={step}
             index={idx}
             itemId={item.id}
             accentColor={ac}
-            allSteps={steps}
+            allSteps={sortedSteps}
             isExpanded={expandedStep === step.id}
             onToggleExpand={() => setExpandedStep(expandedStep === step.id ? null : step.id)}
             onCycleStatus={() => cycleStatus(step)}
@@ -346,6 +402,10 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
             onToggleToday={() => updateStep(item.id, step.id, { today: !step.today })}
             onToggleStep={(done) => toggleStep(item.id, step.id, done)}
             onDeleteStep={() => confirmDelete('step', { stepId: step.id })}
+            onMoveUp={() => { reorderStep(item.id, step.id, 'up'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            onMoveDown={() => { reorderStep(item.id, step.id, 'down'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            isFirst={idx === 0}
+            isLast={idx === sortedSteps.length - 1}
             onToggleSubtask={(subId) => toggleSubtask(item.id, step.id, subId)}
             onDeleteSubtask={(subId) => confirmDelete('subtask', { stepId: step.id, subtaskId: subId })}
             addingSubFor={addingSubFor}
@@ -409,6 +469,10 @@ interface StepCardProps {
   onToggleToday: () => void;
   onToggleStep: (done: boolean) => void;
   onDeleteStep: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  isFirst: boolean;
+  isLast: boolean;
   onToggleSubtask: (subId: string) => void;
   onDeleteSubtask: (subId: string) => void;
   addingSubFor: string | null;
@@ -425,7 +489,8 @@ interface StepCardProps {
 function StepCard({
   step, index, itemId, accentColor: ac, allSteps, isExpanded,
   onToggleExpand, onCycleStatus, onCyclePriority, onCycleEffort, onToggleToday,
-  onToggleStep, onDeleteStep, onToggleSubtask, onDeleteSubtask,
+  onToggleStep, onDeleteStep, onMoveUp, onMoveDown, isFirst, isLast,
+  onToggleSubtask, onDeleteSubtask,
   addingSubFor, onStartAddSub, newSubText, onChangeSubText, onSubmitSub,
   onCancelAddSub, subInputRef, aiSubLoading, onAiSubtasks,
 }: StepCardProps) {
@@ -491,7 +556,7 @@ function StepCard({
             )}
             {step.effort && (
               <View style={[styles.microBadge, { backgroundColor: `${ef.color}10` }]}>
-                <Text style={[styles.microBadgeText, { color: ef.color }]}>{ef.label}</Text>
+                <Text style={[styles.microBadgeText, { color: ef.color }]}>{ef.label} · {ef.sub}</Text>
               </View>
             )}
             {subTotal > 0 && (
@@ -514,16 +579,24 @@ function StepCard({
               <Text style={[styles.chipText, { color: pr.color }]}>{pr.label}</Text>
             </Pressable>
             <Pressable style={[styles.chip, { borderColor: `${ef.color}25`, backgroundColor: `${ef.color}08` }]} onPress={onCycleEffort}>
-              <Text style={[styles.chipText, { color: ef.color }]}>{ef.label}</Text>
+              <Text style={[styles.chipText, { color: ef.color }]}>{ef.label} · {ef.sub}</Text>
             </Pressable>
             <Pressable style={[styles.chip, { backgroundColor: step.today ? `${T.brand}10` : T.fill }]} onPress={onToggleToday}>
               <Text style={[styles.chipText, { color: step.today ? T.brand : T.t3, fontWeight: step.today ? '700' as const : '500' as const }]}>
                 {step.today ? 'Today' : '+ Today'}
               </Text>
             </Pressable>
-            <Pressable style={[styles.chip, { borderColor: `${T.red}20`, backgroundColor: `${T.red}06`, marginLeft: 'auto' }]} onPress={onDeleteStep}>
-              <Feather name="trash-2" size={11} color={T.red} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 2, marginLeft: 'auto' }}>
+              <Pressable style={[styles.chip, { opacity: isFirst ? 0.3 : 1 }]} onPress={onMoveUp} disabled={isFirst}>
+                <Feather name="arrow-up" size={11} color={T.t3} />
+              </Pressable>
+              <Pressable style={[styles.chip, { opacity: isLast ? 0.3 : 1 }]} onPress={onMoveDown} disabled={isLast}>
+                <Feather name="arrow-down" size={11} color={T.t3} />
+              </Pressable>
+              <Pressable style={[styles.chip, { borderColor: `${T.red}20`, backgroundColor: `${T.red}06` }]} onPress={onDeleteStep}>
+                <Feather name="trash-2" size={11} color={T.red} />
+              </Pressable>
+            </View>
           </View>
 
           {subTotal > 0 && (
@@ -730,4 +803,17 @@ const styles = StyleSheet.create<Record<string, any>>({
   addTaskInput: { flex: 1, fontSize: 14, color: T.text, fontWeight: '500' as const, minHeight: 36 },
   addTaskBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 12 },
   addTaskBtnText: { fontSize: 13, fontWeight: '700' as const, color: '#fff' },
+
+  clarifySection:   { backgroundColor: T.brand + '08', borderRadius: 14, padding: 14, marginBottom: 12, marginHorizontal: S.md, borderWidth: 1, borderColor: T.brand + '18' },
+  clarifyHeader:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  clarifyTitle:     { fontSize: 14, fontWeight: '700' as const, color: T.brand },
+  clarifySubtext:   { fontSize: 12, color: T.t3, marginBottom: 10, lineHeight: 17 },
+  clarifyQRow:      { marginBottom: 10 },
+  clarifyQ:         { fontSize: 13, fontWeight: '600' as const, color: T.text, marginBottom: 4 },
+  clarifyInput:     { fontSize: 13, color: T.text, padding: 10, borderRadius: 10, backgroundColor: 'white', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
+  clarifyActions:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  clarifyGenBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: T.brand, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
+  clarifyGenText:   { fontSize: 13, fontWeight: '700' as const, color: 'white' },
+  clarifySkipBtn:   { paddingHorizontal: 12, paddingVertical: 9 },
+  clarifySkipText:  { fontSize: 13, fontWeight: '600' as const, color: T.t3 },
 });

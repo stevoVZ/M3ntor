@@ -136,6 +136,7 @@ interface AppState {
   removeStep:      (itemId: string, stepId: string) => void;
   updateStep:      (itemId: string, stepId: string, patch: Partial<Step>) => void;
   updateStepStatus:(itemId: string, stepId: string, status: string) => void;
+  reorderStep:     (itemId: string, stepId: string, direction: 'up' | 'down') => void;
 
   toggleSubtask:   (itemId: string, stepId: string, subtaskId: string) => void;
   addSubtask:      (itemId: string, stepId: string, subtask: Subtask) => void;
@@ -424,6 +425,35 @@ export const useStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured && supabase) {
       supabase.from('steps').update({ status, done }).eq('id', stepId)
         .then(({ error }) => { if (error) console.error(error); });
+    }
+  },
+
+  reorderStep: (itemId, stepId, direction) => {
+    set(s => ({
+      items: s.items.map(item => {
+        if (item.id !== itemId || !item.steps) return item;
+        const sorted = [...item.steps].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+        const idx = sorted.findIndex(st => st.id === stepId);
+        if (idx < 0) return item;
+        const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (swapIdx < 0 || swapIdx >= sorted.length) return item;
+        const tempOrder = sorted[idx].sort_order ?? idx;
+        sorted[idx] = { ...sorted[idx], sort_order: sorted[swapIdx].sort_order ?? swapIdx };
+        sorted[swapIdx] = { ...sorted[swapIdx], sort_order: tempOrder };
+        return { ...item, steps: sorted, updated_at: new Date().toISOString() };
+      }),
+    }));
+    const item = get().items.find(i => i.id === itemId);
+    if (isSupabaseConfigured && supabase && item?.steps) {
+      const step = item.steps.find(st => st.id === stepId);
+      const sorted = [...item.steps].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      const idx = sorted.findIndex(st => st.id === stepId);
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      const other = sorted[swapIdx];
+      if (step && other) {
+        supabase.from('steps').update({ sort_order: step.sort_order }).eq('id', step.id).then(() => {});
+        supabase.from('steps').update({ sort_order: other.sort_order }).eq('id', other.id).then(() => {});
+      }
     }
   },
 

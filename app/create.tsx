@@ -15,7 +15,7 @@ import { T, S, F } from '@/constants/theme';
 import { ITEM_AREAS } from '@/constants/config';
 import type { Priority, Effort } from '@/types';
 import { suggestArea, inferType } from '@/utils/nlp';
-import { getItemHint, generateGoal, generateProjectTasks } from '@/lib/ai';
+import { getItemHint, generateGoal, generateProjectTasks, assessProjectComplexity } from '@/lib/ai';
 import { createItem, createStep } from '@/utils/items';
 import { useStore } from '@/lib/store';
 import { getCountryByCode } from '@/constants/countries';
@@ -63,15 +63,15 @@ const PRIORITY_OPTIONS = [
 ] as const;
 
 const EFFORT_OPTIONS = [
-  { id: 'quick',  label: 'Quick',  icon: 'zap' as const,   color: T.green  },
-  { id: 'medium', label: 'Medium', icon: 'clock' as const,  color: T.orange },
-  { id: 'deep',   label: 'Deep',   icon: 'layers' as const, color: T.brand  },
+  { id: 'quick',  label: 'Quick',  sub: '< 15 min',  icon: 'zap' as const,   color: T.green  },
+  { id: 'medium', label: 'Medium', sub: '~1\u20132 hrs', icon: 'clock' as const,  color: T.orange },
+  { id: 'deep',   label: 'Deep',   sub: 'Half day+',  icon: 'layers' as const, color: T.brand  },
 ] as const;
 
-const EFFORT_CONFIG: Record<string, { icon: 'zap' | 'clock'; label: string; color: string }> = {
-  quick:  { icon: 'zap',   label: 'Quick win',      color: T.green  },
-  medium: { icon: 'clock', label: 'Medium effort',   color: T.orange },
-  deep:   { icon: 'zap',   label: 'Deep work',       color: T.brand  },
+const EFFORT_CONFIG: Record<string, { icon: 'zap' | 'clock'; label: string; sub: string; color: string }> = {
+  quick:  { icon: 'zap',   label: 'Quick win',      sub: '< 15 min',  color: T.green  },
+  medium: { icon: 'clock', label: 'Medium effort',   sub: '~1\u20132 hrs', color: T.orange },
+  deep:   { icon: 'zap',   label: 'Deep work',       sub: 'Half day+',  color: T.brand  },
 };
 
 export default function CreateScreen() {
@@ -103,10 +103,14 @@ export default function CreateScreen() {
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [goalSuggestion, setGoalSuggestion] = useState<{ why?: string; journeyHints?: string[]; firstSteps?: string[] } | null>(null);
   const [goalEnrichLoading, setGoalEnrichLoading] = useState(false);
-  const [breakdownSteps, setBreakdownSteps] = useState<{ id: string; text: string }[]>([]);
+  const [breakdownSteps, setBreakdownSteps] = useState<{ id: string; text: string; effort?: string }[]>([]);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [pinnedAiType, setPinnedAiType] = useState<string | null>(null);
+  const [clarifyQuestions, setClarifyQuestions] = useState<string[]>([]);
+  const [clarifyAnswers, setClarifyAnswers] = useState<Record<number, string>>({});
+  const [clarifyLoading, setClarifyLoading] = useState(false);
+  const [showClarify, setShowClarify] = useState(false);
 
   const inputRef    = useRef<TextInput>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -162,6 +166,10 @@ export default function CreateScreen() {
     }
 
     setAiPending(true);
+    setShowClarify(false);
+    setClarifyQuestions([]);
+    setClarifyAnswers({});
+    setClarifyLoading(false);
 
     debounceRef.current = setTimeout(async () => {
       setAiLoading(true);
@@ -173,16 +181,27 @@ export default function CreateScreen() {
       setAiHint(hint);
       if (hint.suggestedType && !selectedType) {
         setPinnedAiType(hint.suggestedType);
-        if (hint.suggestedType === 'project' && breakdownSteps.length === 0) {
-          setBreakdownLoading(true);
-          const result = await generateProjectTasks(text, [], countryName);
-          if (result.tasks.length > 0) {
-            setBreakdownSteps(result.tasks.map(t => ({
-              id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-              text: t,
-            })));
+        if (hint.suggestedType === 'project' && breakdownSteps.length === 0 && !showClarify) {
+          setClarifyLoading(true);
+          const complexity = await assessProjectComplexity(text, countryName);
+          if (complexity.complex && complexity.questions.length > 0) {
+            setClarifyQuestions(complexity.questions);
+            setClarifyAnswers({});
+            setShowClarify(true);
+            setClarifyLoading(false);
+          } else {
+            setClarifyLoading(false);
+            setBreakdownLoading(true);
+            const result = await generateProjectTasks(text, [], countryName);
+            if (result.tasks.length > 0) {
+              setBreakdownSteps(result.tasks.map(t => ({
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                text: t.title,
+                effort: t.effort,
+              })));
+            }
+            setBreakdownLoading(false);
           }
-          setBreakdownLoading(false);
         }
       }
       setAiLoading(false);
@@ -198,18 +217,52 @@ export default function CreateScreen() {
   function handleTypeSelect(id: string) {
     const newVal = selectedType === id ? null : id;
     setSelectedType(newVal);
-    if (newVal === 'project' && text.trim() && breakdownSteps.length === 0) {
-      setBreakdownLoading(true);
-      generateProjectTasks(text, [], countryName).then(result => {
-        if (result.tasks.length > 0) {
-          setBreakdownSteps(result.tasks.map(t => ({
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-            text: t,
-          })));
+    if (newVal !== 'project') {
+      setShowClarify(false);
+      setClarifyQuestions([]);
+      setClarifyAnswers({});
+    }
+    if (newVal === 'project' && text.trim() && breakdownSteps.length === 0 && !showClarify) {
+      setClarifyLoading(true);
+      assessProjectComplexity(text, countryName).then(complexity => {
+        if (complexity.complex && complexity.questions.length > 0) {
+          setClarifyQuestions(complexity.questions);
+          setClarifyAnswers({});
+          setShowClarify(true);
+          setClarifyLoading(false);
+        } else {
+          setClarifyLoading(false);
+          setBreakdownLoading(true);
+          generateProjectTasks(text, [], countryName).then(result => {
+            if (result.tasks.length > 0) {
+              setBreakdownSteps(result.tasks.map(t => ({
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                text: t.title,
+                effort: t.effort,
+              })));
+            }
+            setBreakdownLoading(false);
+          });
         }
-        setBreakdownLoading(false);
       });
     }
+  }
+
+  async function handleClarifyGenerate() {
+    const contextParts = clarifyQuestions.map((q, i) =>
+      `Q: ${q}\nA: ${clarifyAnswers[i] || '(not answered)'}`
+    ).join('\n');
+    setShowClarify(false);
+    setBreakdownLoading(true);
+    const result = await generateProjectTasks(text, [], countryName, contextParts);
+    if (result.tasks.length > 0) {
+      setBreakdownSteps(result.tasks.map(t => ({
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        text: t.title,
+        effort: t.effort,
+      })));
+    }
+    setBreakdownLoading(false);
   }
 
   async function handleSave() {
@@ -241,7 +294,11 @@ export default function CreateScreen() {
     const itemId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     const filteredSteps = breakdownSteps.filter(s => s.text.trim());
     const steps = type === 'project' && filteredSteps.length > 0
-      ? filteredSteps.map((s, idx) => createStep(itemId, { title: s.text.trim(), sort_order: idx }))
+      ? filteredSteps.map((s, idx) => createStep(itemId, {
+          title: s.text.trim(),
+          sort_order: idx,
+          effort: (s.effort as 'quick' | 'medium' | 'deep') || undefined,
+        }))
       : undefined;
 
     const item = createItem(effectiveUserId, {
@@ -376,7 +433,7 @@ export default function CreateScreen() {
                     color={EFFORT_CONFIG[aiHint.effort].color}
                   />
                   <Text style={[styles.hintDetailLabel, { color: EFFORT_CONFIG[aiHint.effort].color }]}>
-                    {EFFORT_CONFIG[aiHint.effort].label}
+                    {EFFORT_CONFIG[aiHint.effort].label} · {EFFORT_CONFIG[aiHint.effort].sub}
                   </Text>
                 </View>
               )}
@@ -420,6 +477,60 @@ export default function CreateScreen() {
         </Animated.View>
       </View>
 
+      {activeType === 'project' && showClarify && clarifyQuestions.length > 0 && (
+        <View style={styles.clarifySection}>
+          <View style={styles.clarifyHeader}>
+            <Feather name="help-circle" size={13} color={T.brand} />
+            <Text style={styles.clarifyTitle}>A few questions first</Text>
+          </View>
+          <Text style={styles.clarifySubtext}>This looks like a complex project. Answering these helps M3NTOR create a better breakdown.</Text>
+          {clarifyQuestions.map((q, idx) => (
+            <View key={idx} style={styles.clarifyQRow}>
+              <Text style={styles.clarifyQ}>{q}</Text>
+              <TextInput
+                style={styles.clarifyInput}
+                placeholder="Your answer..."
+                placeholderTextColor={T.t3}
+                value={clarifyAnswers[idx] || ''}
+                onChangeText={(v) => setClarifyAnswers(prev => ({ ...prev, [idx]: v }))}
+                returnKeyType="done"
+              />
+            </View>
+          ))}
+          <View style={styles.clarifyActions}>
+            <Pressable style={styles.clarifyGenBtn} onPress={handleClarifyGenerate}>
+              <Feather name="zap" size={13} color="white" />
+              <Text style={styles.clarifyGenText}>Generate breakdown</Text>
+            </Pressable>
+            <Pressable style={styles.clarifySkipBtn} onPress={() => {
+              setShowClarify(false);
+              setBreakdownLoading(true);
+              generateProjectTasks(text, [], countryName).then(result => {
+                if (result.tasks.length > 0) {
+                  setBreakdownSteps(result.tasks.map(t => ({
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                    text: t.title,
+                    effort: t.effort,
+                  })));
+                }
+                setBreakdownLoading(false);
+              });
+            }}>
+              <Text style={styles.clarifySkipText}>Skip</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {activeType === 'project' && clarifyLoading && !showClarify && breakdownSteps.length === 0 && !breakdownLoading && (
+        <View style={styles.breakdownSection}>
+          <View style={styles.breakdownHeader}>
+            <ActivityIndicator size="small" color={T.brand} />
+            <Text style={styles.breakdownTitle}>Analyzing complexity...</Text>
+          </View>
+        </View>
+      )}
+
       {activeType === 'project' && (breakdownSteps.length > 0 || breakdownLoading) && (
         <View style={styles.breakdownSection}>
           <View style={styles.breakdownHeader}>
@@ -427,34 +538,75 @@ export default function CreateScreen() {
             <Text style={styles.breakdownTitle}>Steps</Text>
             {breakdownLoading && <ActivityIndicator size="small" color={T.brand} />}
           </View>
-          {breakdownSteps.map((step) => (
-            <View key={step.id} style={styles.breakdownRow}>
-              <View style={styles.breakdownDot} />
-              {editingStepId === step.id ? (
-                <TextInput
-                  style={styles.breakdownStepInput}
-                  value={step.text}
-                  autoFocus
-                  onChangeText={(v) => setBreakdownSteps(prev =>
-                    prev.map(s => s.id === step.id ? { ...s, text: v } : s)
+          {breakdownSteps.map((step, stepIdx) => {
+            const efConf = step.effort ? EFFORT_CONFIG[step.effort] : null;
+            return (
+              <View key={step.id} style={styles.breakdownRow}>
+                <View style={styles.breakdownDot} />
+                <View style={{ flex: 1 }}>
+                  {editingStepId === step.id ? (
+                    <TextInput
+                      style={styles.breakdownStepInput}
+                      value={step.text}
+                      autoFocus
+                      onChangeText={(v) => setBreakdownSteps(prev =>
+                        prev.map(s => s.id === step.id ? { ...s, text: v } : s)
+                      )}
+                      onBlur={() => setEditingStepId(null)}
+                      onSubmitEditing={() => setEditingStepId(null)}
+                      returnKeyType="done"
+                    />
+                  ) : (
+                    <Pressable onPress={() => setEditingStepId(step.id)}>
+                      <Text style={styles.breakdownStepText} numberOfLines={2}>{step.text}</Text>
+                    </Pressable>
                   )}
-                  onBlur={() => setEditingStepId(null)}
-                  onSubmitEditing={() => setEditingStepId(null)}
-                  returnKeyType="done"
-                />
-              ) : (
-                <Pressable style={{ flex: 1 }} onPress={() => setEditingStepId(step.id)}>
-                  <Text style={styles.breakdownStepText} numberOfLines={2}>{step.text}</Text>
+                  {efConf && (
+                    <View style={[styles.breakdownEffort, { backgroundColor: efConf.color + '10' }]}>
+                      <Feather name={efConf.icon} size={9} color={efConf.color} />
+                      <Text style={[styles.breakdownEffortText, { color: efConf.color }]}>{efConf.sub}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.breakdownActions}>
+                  <Pressable
+                    hitSlop={4}
+                    disabled={stepIdx === 0}
+                    onPress={() => {
+                      setBreakdownSteps(prev => {
+                        const arr = [...prev];
+                        [arr[stepIdx - 1], arr[stepIdx]] = [arr[stepIdx], arr[stepIdx - 1]];
+                        return arr;
+                      });
+                    }}
+                    style={{ opacity: stepIdx === 0 ? 0.25 : 1 }}
+                  >
+                    <Feather name="chevron-up" size={13} color={T.t3} />
+                  </Pressable>
+                  <Pressable
+                    hitSlop={4}
+                    disabled={stepIdx === breakdownSteps.length - 1}
+                    onPress={() => {
+                      setBreakdownSteps(prev => {
+                        const arr = [...prev];
+                        [arr[stepIdx], arr[stepIdx + 1]] = [arr[stepIdx + 1], arr[stepIdx]];
+                        return arr;
+                      });
+                    }}
+                    style={{ opacity: stepIdx === breakdownSteps.length - 1 ? 0.25 : 1 }}
+                  >
+                    <Feather name="chevron-down" size={13} color={T.t3} />
+                  </Pressable>
+                </View>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => setBreakdownSteps(prev => prev.filter(s => s.id !== step.id))}
+                >
+                  <Feather name="x" size={13} color={T.t3} />
                 </Pressable>
-              )}
-              <Pressable
-                hitSlop={8}
-                onPress={() => setBreakdownSteps(prev => prev.filter(s => s.id !== step.id))}
-              >
-                <Feather name="x" size={13} color={T.t3} />
-              </Pressable>
-            </View>
-          ))}
+              </View>
+            );
+          })}
           <Pressable
             style={styles.addStepRow}
             onPress={() => {
@@ -553,6 +705,9 @@ export default function CreateScreen() {
                       <Feather name={e.icon} size={11} color={on ? e.color : T.t3} />
                       <Text style={[styles.optionChipLabel, on && { color: e.color, fontWeight: '700' as const }]}>
                         {e.label}
+                      </Text>
+                      <Text style={[styles.optionChipSub, on && { color: e.color + 'AA' }]}>
+                        {e.sub}
                       </Text>
                     </Pressable>
                   );
@@ -675,7 +830,25 @@ const styles = StyleSheet.create({
   optionRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   optionChip:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.07)', backgroundColor: 'rgba(0,0,0,0.03)' },
   optionChipLabel:{ fontSize: 12, fontWeight: '500', color: T.t3 },
+  optionChipSub:  { fontSize: 10, color: T.t3, opacity: 0.7 },
   deadlineInput:  { padding: 10, borderRadius: 12, backgroundColor: 'white', borderWidth: 1, borderColor: 'rgba(0,0,0,0.09)', fontSize: 14, color: T.text, marginTop: 2 },
+
+  clarifySection:   { backgroundColor: T.brand + '08', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: T.brand + '18' },
+  clarifyHeader:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  clarifyTitle:     { fontSize: 14, fontWeight: '700', color: T.brand },
+  clarifySubtext:   { fontSize: 12, color: T.t3, marginBottom: 10, lineHeight: 17 },
+  clarifyQRow:      { marginBottom: 10 },
+  clarifyQ:         { fontSize: 13, fontWeight: '600', color: T.text, marginBottom: 4 },
+  clarifyInput:     { fontSize: 13, color: T.text, padding: 10, borderRadius: 10, backgroundColor: 'white', borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
+  clarifyActions:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  clarifyGenBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: T.brand, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
+  clarifyGenText:   { fontSize: 13, fontWeight: '700', color: 'white' },
+  clarifySkipBtn:   { paddingHorizontal: 12, paddingVertical: 9 },
+  clarifySkipText:  { fontSize: 13, fontWeight: '600', color: T.t3 },
+
+  breakdownEffort:  { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start' as const },
+  breakdownEffortText: { fontSize: 10, fontWeight: '600' },
+  breakdownActions: { flexDirection: 'column', gap: 0, marginRight: 4 },
 
   saveBtn:        { borderRadius: 20, padding: 14, alignItems: 'center', justifyContent: 'center' },
   saveBtnInner:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
