@@ -1,12 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { View, Pressable, Text, StyleSheet, Platform, Keyboard, Image } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { T, shadow, R } from '../../constants/theme';
-import { FabActionSheet } from '../../components/add/FabActionSheet';
-import { ProjectAddSheet } from '../../components/add/ProjectAddSheet';
 
 // ── Tab icon SVG paths ────────────────────────────────────
 function TabIcon({ name, active }: { name: string; active: boolean }) {
@@ -123,13 +121,8 @@ function CustomTabBar({ state, navigation, onFabPress }: { state: any; navigatio
 }
 
 export default function TabsLayout() {
-  const [showAdd, setShowAdd] = useState(false);
-  const [addMode, setAddMode] = useState<'sheet' | 'project'>('sheet');
-  const [prefill, setPrefill] = useState('');
-
   const handleFabPress = useCallback(() => {
-    setAddMode('sheet');
-    setShowAdd(true);
+    router.push('/create');
   }, []);
 
   return (
@@ -142,18 +135,6 @@ export default function TabsLayout() {
         <Tabs.Screen name="discover" />
         <Tabs.Screen name="plan"     />
       </Tabs>
-
-      {showAdd && addMode === 'sheet' && (
-        <FabActionSheet
-          onClose={() => setShowAdd(false)}
-        />
-      )}
-      {showAdd && addMode === 'project' && (
-        <ProjectAddSheet
-          prefillText={prefill}
-          onClose={() => { setShowAdd(false); setAddMode('sheet'); }}
-        />
-      )}
     </View>
   );
 }

@@ -36,7 +36,7 @@ Preferred communication style: Simple, everyday language.
 components/
   ui/               Badge
   items/            ItemCard, TaskRow, ProgressBar
-  add/              FabActionSheet, ProjectAddSheet, AreaPicker
+  add/              AreaPicker, ProjectAddSheet
   today/            SessionView (briefing→mood→cards→completion), CompletionScreen
   plan/             GoalDetailPage, ProjectEditPage, ItemEditSheet
   discover/         AICoach (chat-style coach)
@@ -89,12 +89,13 @@ app/
   _layout.tsx          # Root layout with Zustand store, Supabase auth
   login.tsx            # Supabase auth screen
   (tabs)/
-    _layout.tsx        # Tab bar + FAB
+    _layout.tsx        # Tab bar + FAB (navigates to /create)
     index.tsx          # Redirects to today
     today.tsx          # Today dashboard + session mode
     mylife.tsx         # My Life — wheel/list, app scores, insights, profile
     discover.tsx       # Journey catalog + AI Coach
     plan.tsx           # Hierarchy/list views, goal detail, project edit
+  create.tsx           # Create item (formSheet presentation, native keyboard handling)
   item/[id].tsx        # Item detail with full editing
 ```
 
