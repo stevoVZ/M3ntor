@@ -68,7 +68,7 @@ export default function LoginScreen() {
           colors={[T.dark, '#1E1E2A']}
           style={styles.hero}>
           <Image
-            source={require('../assets/images/icon.png')}
+            source={require('../assets/images/m3ntor-logo.png')}
             style={styles.heroLogo}
             resizeMode="contain"
           />
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   kav:      { flex: 1 },
 
   hero:        { paddingTop: 56, paddingBottom: 40, paddingHorizontal: 32, alignItems: 'center' },
-  heroLogo:    { width: 140, height: 140, borderRadius: 28 },
+  heroLogo:    { width: 200, height: 120 },
   heroTagline: { fontSize: 15, color: 'rgba(255,255,255,0.55)', marginTop: 8, textAlign: 'center' },
 
   form: {
