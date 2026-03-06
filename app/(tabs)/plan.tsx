@@ -145,7 +145,7 @@ function DeleteConfirmModal({ item, visible, onConfirm, onCancel }: {
   );
 }
 
-function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reorderable = false, isFirst = false, isLast = false, onMoveUp, onMoveDown }: {
+function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reorderable = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, index }: {
   goal: Item;
   items: Item[];
   journeyProgresses: any[];
@@ -156,6 +156,7 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reordera
   isLast?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  index?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const area = ITEM_AREAS[goal.area];
@@ -190,6 +191,11 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reordera
 
   return (
     <View style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'stretch' }}>
+      {index != null && (
+        <View style={styles.goalOrderNumberCol}>
+          <Text style={[styles.goalOrderNumber, { color: ac }]}>{index}</Text>
+        </View>
+      )}
       {reorderable && (
         <View style={[styles.goalReorderCol, { backgroundColor: ac + '08', borderColor: ac + '15' }]}>
           <Pressable
@@ -340,7 +346,7 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reordera
   );
 }
 
-function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst = false, isLast = false, onMoveUp, onMoveDown }: {
+function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, index }: {
   item: Item;
   indented?: boolean;
   onMenu: (item: Item) => void;
@@ -349,6 +355,7 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
   isLast?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  index?: number;
 }) {
   const kind = itemKind(item);
   const kc = KIND_CONFIG[kind];
@@ -362,6 +369,9 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
       onPress={() => router.push(`/item/${item.id}`)}
       onLongPress={() => onMenu(item)}
     >
+      {index != null && (
+        <Text style={styles.orderNumber}>{index}</Text>
+      )}
       {reorderable && (
         <Pressable
           style={styles.reorderCol}
@@ -628,6 +638,7 @@ export default function PlanScreen() {
                     isLast={idx === goals.length - 1}
                     onMoveUp={() => reorderItem(goal.id, 'up', (i: Item) => i.status === 'someday')}
                     onMoveDown={() => reorderItem(goal.id, 'down', (i: Item) => i.status === 'someday')}
+                    index={idx + 1}
                   />
                 ))}
               </View>
@@ -651,6 +662,7 @@ export default function PlanScreen() {
                     isLast={idx === activeUnlinked.length - 1}
                     onMoveUp={() => reorderItem(item.id, 'up', (i: Item) => i.status === 'active' && !goals.some(g => g.linked_items?.includes(i.id)))}
                     onMoveDown={() => reorderItem(item.id, 'down', (i: Item) => i.status === 'active' && !goals.some(g => g.linked_items?.includes(i.id)))}
+                    index={idx + 1}
                   />
                 ))}
               </View>
@@ -669,6 +681,7 @@ export default function PlanScreen() {
                     isLast={idx === pausedUnlinked.length - 1}
                     onMoveUp={() => reorderItem(item.id, 'up', (i: Item) => i.status === 'paused' && !goals.some(g => g.linked_items?.includes(i.id)))}
                     onMoveDown={() => reorderItem(item.id, 'down', (i: Item) => i.status === 'paused' && !goals.some(g => g.linked_items?.includes(i.id)))}
+                    index={idx + 1}
                   />
                 ))}
               </View>
@@ -725,6 +738,7 @@ export default function PlanScreen() {
                   isLast={idx === filteredList.length - 1}
                   onMoveUp={() => reorderItem(item.id, 'up', scopeFilter)}
                   onMoveDown={() => reorderItem(item.id, 'down', scopeFilter)}
+                  index={idx + 1}
                 />
               ));
             })()}
@@ -979,6 +993,18 @@ const styles = StyleSheet.create({
   itemRecurrence: { fontSize: 10, color: T.t3 },
   pausedBadge: { fontSize: 10, color: T.orange, fontWeight: '600' as const },
 
+  orderNumber: {
+    fontSize: 12, fontWeight: '700' as const, color: T.t3,
+    width: 22, textAlign: 'center', marginRight: 2, marginLeft: -4,
+    opacity: 0.5,
+  },
+  goalOrderNumberCol: {
+    width: 26, alignItems: 'center', justifyContent: 'center',
+    marginRight: -2,
+  },
+  goalOrderNumber: {
+    fontSize: 13, fontWeight: '800' as const, opacity: 0.4,
+  },
   reorderCol: {
     flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     marginRight: 2, marginLeft: -4, gap: 0,
