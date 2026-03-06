@@ -357,15 +357,27 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
   onMoveDown?: () => void;
   index?: number;
 }) {
+  const updateItem = useStore(s => s.updateItem);
   const kind = itemKind(item);
   const kc = KIND_CONFIG[kind];
   const area = ITEM_AREAS[item.area];
   const pct = kind === 'project' ? Math.round(projectProgress(item) * 100) : 0;
   const isPaused = item.status === 'paused';
+  const isDone = item.status === 'done';
+  const hasDeadline = !!item.deadline;
+  const overdue = hasDeadline && isOverdue(item.deadline!);
+
+  function handleQuickToggle() {
+    if (isDone) {
+      updateItem(item.id, { status: 'active', completed_at: undefined });
+    } else {
+      updateItem(item.id, { status: 'done', completed_at: new Date().toISOString() });
+    }
+  }
 
   return (
     <Pressable
-      style={[styles.itemRow, shadow.xs, indented && { marginLeft: 16 }, isPaused && { opacity: 0.65 }]}
+      style={[styles.itemRow, shadow.xs, indented && { marginLeft: 16 }, isPaused && { opacity: 0.65 }, isDone && { opacity: 0.5 }]}
       onPress={() => router.push(`/item/${item.id}`)}
       onLongPress={() => onMenu(item)}
     >
@@ -396,19 +408,38 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
         </Pressable>
       )}
 
-      <Text style={styles.itemEmoji}>{item.emoji}</Text>
+      {kind !== 'goal' && (
+        <Pressable
+          style={styles.quickCheck}
+          onPress={(e) => { e.stopPropagation(); handleQuickToggle(); }}
+          hitSlop={4}
+        >
+          <View style={[styles.quickCheckBox, isDone && styles.quickCheckBoxDone]}>
+            {isDone && <Feather name="check" size={11} color="white" />}
+          </View>
+        </Pressable>
+      )}
+
+      <Text style={[styles.itemEmoji, isDone && { opacity: 0.5 }]}>{item.emoji}</Text>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={[styles.itemTitle, isDone && styles.itemTitleDone]} numberOfLines={1}>{item.title}</Text>
         <View style={styles.itemMetaRow}>
           <View style={[styles.kindBadge, { backgroundColor: kc.color + '12' }]}>
             <Text style={[styles.kindBadgeText, { color: kc.color }]}>{kc.label}</Text>
           </View>
           {area && <Text style={styles.itemAreaText}>{area.e} {area.n.split(' ')[0]}</Text>}
           {kind === 'project' && item.steps && (
-            <Text style={styles.itemStepCount}>{item.steps.filter(s => s.done).length}/{item.steps.length}</Text>
+            <Text style={[styles.itemStepCount, item.steps.filter(s => s.done).length === item.steps.length && item.steps.length > 0 && { color: T.green }]}>
+              {item.steps.filter(s => s.done).length}/{item.steps.length}
+            </Text>
           )}
           {kind === 'habit' && item.recurrence && (
             <Text style={styles.itemRecurrence}>{formatRecurrence(item)}</Text>
+          )}
+          {hasDeadline && (
+            <Text style={[styles.itemDeadline, overdue && { color: T.red }]}>
+              {formatDeadline(item.deadline)}
+            </Text>
           )}
           {isPaused && <Text style={styles.pausedBadge}>Paused</Text>}
         </View>
@@ -418,7 +449,7 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
         <View style={styles.miniProgressBg}>
           <View style={[styles.miniProgressFill, {
             width: `${pct}%` as any,
-            backgroundColor: area?.c || T.brand,
+            backgroundColor: pct === 100 ? T.green : (area?.c || T.brand),
           }]} />
         </View>
       ) : (
@@ -992,6 +1023,14 @@ const styles = StyleSheet.create({
   itemStepCount: { fontSize: 10, color: T.t3 },
   itemRecurrence: { fontSize: 10, color: T.t3 },
   pausedBadge: { fontSize: 10, color: T.orange, fontWeight: '600' as const },
+  itemDeadline: { fontSize: 10, color: T.orange },
+  itemTitleDone: { textDecorationLine: 'line-through' as const, color: T.t3 },
+  quickCheck: { marginRight: 2, marginLeft: -2 },
+  quickCheckBox: {
+    width: 20, height: 20, borderRadius: 6, borderWidth: 1.5,
+    borderColor: T.sep + '80', alignItems: 'center' as const, justifyContent: 'center' as const,
+  },
+  quickCheckBoxDone: { backgroundColor: T.green, borderColor: T.green },
 
   orderNumber: {
     fontSize: 12, fontWeight: '700' as const, color: T.t3,

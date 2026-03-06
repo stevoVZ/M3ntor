@@ -45,6 +45,7 @@ function StepRow({
   onMarkToday:     (today: boolean) => void;
   onDelete:        () => void;
   onStatusCycle:   () => void;
+  onStatusSet:     (status: Step['status']) => void;
   onPriorityCycle: () => void;
   onEffortCycle:   () => void;
   onAddSubtask:    (title: string) => void;
@@ -72,7 +73,10 @@ function StepRow({
   return (
     <View style={[styles.stepCard, step.done && styles.stepCardDone]}>
       <Pressable style={styles.stepMain} onPress={() => setExpanded(e => !e)}>
-        <Pressable style={styles.statusButton} onPress={onStatusCycle}>
+        <Pressable style={styles.statusButton} onPress={() => {
+          if (step.done) { onToggle(false); }
+          else { onToggle(true); }
+        }}>
           <View style={[
             styles.statusBox,
             step.done && styles.statusBoxDone,
@@ -96,21 +100,25 @@ function StepRow({
             {step.title}
           </Text>
           <View style={styles.stepMeta}>
-            <View style={[styles.metaBadge, { backgroundColor: statusConf.dot + '12' }]}>
-              <Text style={[styles.metaBadgeText, { color: statusConf.color }]}>{statusConf.label}</Text>
-            </View>
+            {!step.done && step.status !== 'todo' && (
+              <View style={[styles.metaBadge, { backgroundColor: statusConf.dot + '12' }]}>
+                <Text style={[styles.metaBadgeText, { color: statusConf.color }]}>{statusConf.label}</Text>
+              </View>
+            )}
             {step.priority && step.priority !== 'normal' && (
               <View style={[styles.metaBadge, { backgroundColor: prConf.bg }]}>
                 <Text style={[styles.metaBadgeText, { color: prConf.color }]}>{prConf.icon} {prConf.label}</Text>
               </View>
             )}
-            {step.effort && (
+            {step.effort && step.effort !== 'medium' && (
               <View style={[styles.metaBadge, { backgroundColor: efConf.color + '10' }]}>
-                <Text style={[styles.metaBadgeText, { color: efConf.color }]}>{efConf.emoji} {efConf.label}</Text>
+                <Text style={[styles.metaBadgeText, { color: efConf.color }]}>{efConf.emoji}</Text>
               </View>
             )}
             {subTotal > 0 && (
-              <Text style={{ fontSize: 10, color: T.t3 }}>{subDone}/{subTotal} sub</Text>
+              <View style={[styles.metaBadge, { backgroundColor: T.fill }]}>
+                <Text style={[styles.metaBadgeText, { color: subDone === subTotal ? T.green : T.t3 }]}>{subDone}/{subTotal}</Text>
+              </View>
             )}
             {step.today && !step.done && (
               <View style={styles.todayBadge}>
@@ -125,20 +133,35 @@ function StepRow({
 
       {expanded && (
         <Animated.View entering={FadeIn.duration(150)} style={styles.expandPanel}>
+          <View style={styles.statusPickerRow}>
+            {STATUS_ORDER.map(s => {
+              const sc = STEP_STATUS[s];
+              const active = step.status === s;
+              return (
+                <Pressable
+                  key={s}
+                  style={[styles.statusPill, active && { backgroundColor: sc.dot + '18', borderColor: sc.dot + '40' }]}
+                  onPress={() => onStatusSet(s)}
+                >
+                  <View style={[styles.statusPillDot, { backgroundColor: active ? sc.dot : T.sep }]} />
+                  <Text style={[styles.statusPillText, active && { color: sc.color, fontWeight: '700' as const }]}>{sc.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <View style={styles.chipRow}>
-            <Pressable style={[styles.chip, { backgroundColor: statusConf.dot + '10', borderColor: statusConf.dot + '30' }]} onPress={onStatusCycle}>
-              <View style={[styles.chipDot, { backgroundColor: statusConf.dot }]} />
-              <Text style={[styles.chipText, { color: statusConf.color }]}>{statusConf.label}</Text>
-            </Pressable>
             <Pressable style={[styles.chip, { backgroundColor: prConf.bg, borderColor: prConf.color + '20' }]} onPress={onPriorityCycle}>
-              <Text style={[styles.chipText, { color: prConf.color }]}>{prConf.icon ? `${prConf.icon} ${prConf.label}` : prConf.label}</Text>
+              <Feather name="flag" size={10} color={prConf.color} />
+              <Text style={[styles.chipText, { color: prConf.color }]}>{prConf.label}</Text>
             </Pressable>
             <Pressable style={[styles.chip, { backgroundColor: efConf.color + '08', borderColor: efConf.color + '20' }]} onPress={onEffortCycle}>
               <Text style={[styles.chipText, { color: efConf.color }]}>{efConf.emoji} {efConf.label}</Text>
             </Pressable>
             <Pressable style={[styles.chip, step.today ? { backgroundColor: T.brand + '10', borderColor: T.brand + '25' } : { backgroundColor: T.fill, borderColor: T.sep }]} onPress={() => onMarkToday(!step.today)}>
+              <Feather name={step.today ? 'sun' : 'plus'} size={10} color={step.today ? T.brand : T.t3} />
               <Text style={[styles.chipText, { color: step.today ? T.brand : T.t3, fontWeight: step.today ? '700' as const : '500' as const }]}>
-                {step.today ? 'In Today' : '+ Today'}
+                {step.today ? 'In Today' : 'Today'}
               </Text>
             </Pressable>
           </View>
@@ -364,6 +387,9 @@ export default function ItemDetailPage() {
     const next = STATUS_ORDER[(idx + 1) % STATUS_ORDER.length];
     updateStepAction(item.id, stepId, { status: next, done: next === 'done' });
   }
+  function setStepStatus(stepId: string, status: Step['status']) {
+    updateStepAction(item.id, stepId, { status, done: status === 'done' });
+  }
   function cycleStepPriority(stepId: string) {
     const step = steps.find(s => s.id === stepId);
     if (!step) return;
@@ -517,8 +543,20 @@ export default function ItemDetailPage() {
               <Pressable style={styles.closeBtn} onPress={() => router.back()}>
                 <Feather name="arrow-left" size={16} color={T.t3} />
               </Pressable>
-              <View style={[styles.kindBadge, { backgroundColor: kindConf.color + '14' }]}>
-                <Text style={[styles.kindBadgeText, { color: kindConf.color }]}>{kindConf.label}</Text>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <View style={[styles.kindBadge, { backgroundColor: kindConf.color + '14' }]}>
+                  <Text style={[styles.kindBadgeText, { color: kindConf.color }]}>{kindConf.label}</Text>
+                </View>
+                {item.status === 'done' && (
+                  <View style={[styles.kindBadge, { backgroundColor: T.green + '14' }]}>
+                    <Text style={[styles.kindBadgeText, { color: T.green }]}>Done</Text>
+                  </View>
+                )}
+                {item.status === 'paused' && (
+                  <View style={[styles.kindBadge, { backgroundColor: T.orange + '14' }]}>
+                    <Text style={[styles.kindBadgeText, { color: T.orange }]}>Paused</Text>
+                  </View>
+                )}
               </View>
               <Pressable style={styles.deleteBtn} onPress={handleDeleteItem}>
                 <Feather name="trash-2" size={14} color={T.red} />
@@ -793,26 +831,45 @@ export default function ItemDetailPage() {
                   <Text style={styles.emptyStepsText}>No tasks yet — generate or add one below</Text>
                 </View>
               ) : (
-                steps.map(step => (
-                  <StepRow
-                    key={step.id}
-                    step={step}
-                    itemId={item.id}
-                    projectTitle={item.title}
-                    allSteps={steps}
-                    onToggle={(done) => toggleStep(item.id, step.id, done)}
-                    onMarkToday={(today) => markStepToday(item.id, step.id, today)}
-                    onDelete={() => handleDeleteStep(step.id)}
-                    onStatusCycle={() => cycleStepStatus(step.id)}
-                    onPriorityCycle={() => cycleStepPriority(step.id)}
-                    onEffortCycle={() => cycleStepEffort(step.id)}
-                    onAddSubtask={(title) => handleAddSubtask(step.id, title)}
-                    onToggleSubtask={(subtaskId) => toggleSubtaskAction(item.id, step.id, subtaskId)}
-                    onDeleteSubtask={(subtaskId) => removeSubtaskAction(item.id, step.id, subtaskId)}
-                    onAiBreakdown={() => handleAiSubtasks(step.id)}
-                    aiSubLoading={aiSubLoadingId === step.id}
-                  />
-                ))
+                <>
+                  {steps.map((step, stepIdx) => (
+                    <StepRow
+                      key={step.id}
+                      step={step}
+                      itemId={item.id}
+                      projectTitle={item.title}
+                      allSteps={steps}
+                      onToggle={(done) => toggleStep(item.id, step.id, done)}
+                      onMarkToday={(today) => markStepToday(item.id, step.id, today)}
+                      onDelete={() => handleDeleteStep(step.id)}
+                      onStatusCycle={() => cycleStepStatus(step.id)}
+                      onStatusSet={(status) => setStepStatus(step.id, status)}
+                      onPriorityCycle={() => cycleStepPriority(step.id)}
+                      onEffortCycle={() => cycleStepEffort(step.id)}
+                      onAddSubtask={(title) => handleAddSubtask(step.id, title)}
+                      onToggleSubtask={(subtaskId) => toggleSubtaskAction(item.id, step.id, subtaskId)}
+                      onDeleteSubtask={(subtaskId) => removeSubtaskAction(item.id, step.id, subtaskId)}
+                      onAiBreakdown={() => handleAiSubtasks(step.id)}
+                      aiSubLoading={aiSubLoadingId === step.id}
+                    />
+                  ))}
+
+                  {steps.length > 0 && doneSteps === steps.length && item.status !== 'done' && (
+                    <Pressable
+                      style={styles.allDoneBanner}
+                      onPress={() => { updateItem(item.id, { status: 'done', completed_at: new Date().toISOString() }); router.back(); }}
+                    >
+                      <View style={styles.allDoneIcon}>
+                        <Feather name="award" size={18} color={T.green} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.allDoneTitle}>All tasks complete</Text>
+                        <Text style={styles.allDoneSub}>Tap to mark this project as done</Text>
+                      </View>
+                      <Feather name="chevron-right" size={16} color={T.green} />
+                    </Pressable>
+                  )}
+                </>
               )}
 
               <View style={styles.addTaskBar}>
@@ -1151,10 +1208,22 @@ const styles = StyleSheet.create({
   todayBadgeText: { fontSize: 9, fontWeight: '700', color: T.brand },
 
   expandPanel: { paddingHorizontal: S.md, paddingBottom: S.md, borderTopWidth: 0.5, borderTopColor: T.sep },
+  statusPickerRow: { flexDirection: 'row', gap: 4, marginTop: S.sm, marginBottom: 4 },
+  statusPill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: T.sep, backgroundColor: T.fill },
+  statusPillDot: { width: 6, height: 6, borderRadius: 3 },
+  statusPillText: { fontSize: 10, fontWeight: '500' as const, color: T.t3 },
   chipRow: { flexDirection: 'row', gap: 6, marginTop: S.sm, flexWrap: 'wrap' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: T.sep, backgroundColor: T.fill },
   chipDot: { width: 6, height: 6, borderRadius: 3 },
-  chipText: { fontSize: 11, fontWeight: '600', color: T.t2 },
+  chipText: { fontSize: 11, fontWeight: '600' as const, color: T.t2 },
+  allDoneBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 14, borderRadius: R.md, marginTop: 8, marginBottom: 4,
+    backgroundColor: T.green + '0A', borderWidth: 1.5, borderColor: T.green + '25',
+  },
+  allDoneIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: T.green + '15', alignItems: 'center', justifyContent: 'center' },
+  allDoneTitle: { fontSize: 14, fontWeight: '700' as const, color: T.green },
+  allDoneSub: { fontSize: 11, color: T.t3, marginTop: 1 },
 
   stepDesc: { fontSize: 12, color: T.t2, lineHeight: 18, paddingTop: S.sm, fontStyle: 'italic' },
 

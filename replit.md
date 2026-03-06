@@ -39,6 +39,7 @@ components/
   add/              AreaPicker, ProjectAddSheet
   today/            SessionView (briefing→mood→cards→completion), CompletionScreen
   plan/             GoalDetailPage, ProjectEditPage, ItemEditSheet
+  (Plan tab features: quick-complete checkbox, deadline display, position numbers, reorder arrows, auto-complete banner for projects)
   discover/         AICoach (chat-style coach)
   profile/          ProfileScreen
   WheelOfLife.tsx   SVG radar chart (self + app scores)
