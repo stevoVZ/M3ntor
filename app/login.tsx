@@ -182,7 +182,7 @@ export default function LoginScreen() {
               disabled={loading || !canSubmit}
               style={{ marginTop: mode === 'signin' ? 0 : 20, opacity: (!canSubmit && !loading) ? 0.5 : 1 }}>
               <LinearGradient
-                colors={[T.brand, '#7B79E8']}
+                colors={T.gradColors as unknown as string[]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.primaryBtn}>
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: 'rgba(88,86,214,0.08)',
+    backgroundColor: T.brand + '14',
   },
   orbBottomLeft: {
     position: 'absolute',
@@ -412,8 +412,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(88,86,214,0.2)',
-    backgroundColor: 'rgba(88,86,214,0.04)',
+    borderColor: T.brand + '33',
+    backgroundColor: T.brand + '0A',
   },
   guestBtnText: {
     fontSize: 16,

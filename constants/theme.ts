@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 export const T = {
-  brand:   '#5856D6',
+  brand:   '#4F46E5',
   green:   '#34C759',
   orange:  '#FF9500',
   red:     '#FF3B30',
@@ -12,15 +12,15 @@ export const T = {
   t2:      '#48484A',
   t3:      '#8E8E93',
 
-  sep:     '#E5E5EA',
-  fill:    '#F2F2F7',
+  sep:     '#E2E2EA',
+  fill:    '#F8F8FC',
   bg:      '#FFFFFF',
 
-  gradStart: '#5856D6',
-  gradEnd:   '#7B79E8',
-  gradColors: ['#5856D6', '#7B79E8'] as const,
+  gradStart: '#4F46E5',
+  gradEnd:   '#6366F1',
+  gradColors: ['#4F46E5', '#6366F1'] as const,
 
-  glass:     'rgba(242,242,247,0.72)',
+  glass:     'rgba(248,248,252,0.72)',
   glassHeavy:'rgba(255,255,255,0.94)',
 
   dark:    '#141419',

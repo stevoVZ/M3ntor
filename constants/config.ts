@@ -14,7 +14,7 @@ export const ITEM_AREAS: Record<string, { n: string; c: string; e: string }> = {
   home:          { n: 'Home & Living',     c: '#FF9500', e: '🏠' },
   career:        { n: 'Career & Work',     c: '#007AFF', e: '💼' },
   finance:       { n: 'Finance',           c: '#FFCC00', e: '💰' },
-  learning:      { n: 'Learning & Growth', c: '#5856D6', e: '📚' },
+  learning:      { n: 'Learning & Growth', c: '#4F46E5', e: '📚' },
   relationships: { n: 'Relationships',     c: '#FF2D55', e: '💜' },
   fun:           { n: 'Fun & Adventure',   c: '#FF9500', e: '✨' },
   life:          { n: 'Life Tasks',        c: '#8E8E93', e: '📌' },

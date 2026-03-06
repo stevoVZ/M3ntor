@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     borderRadius:    R.md,
   },
   tabItemActive: {
-    backgroundColor: T.brand + '10',
+    backgroundColor: T.brand + '14',
   },
   tabLabel: {
     fontSize:   10,

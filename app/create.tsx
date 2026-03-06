@@ -33,7 +33,7 @@ const TYPE_GROUPS = [
   {
     label: 'Planned',
     items: [
-      { id: 'goal',    label: 'Goal',    sub: 'A bigger ambition',         detail: 'A target you\'re working toward. Link projects and habits to track progress.', icon: 'target' as const, color: '#9B59B6' },
+      { id: 'goal',    label: 'Goal',    sub: 'A bigger ambition',         detail: 'A target you\'re working toward. Link projects and habits to track progress.', icon: 'target' as const, color: T.purple  },
       { id: 'project', label: 'Project', sub: 'Multiple steps',            detail: 'Something with several tasks. M3NTOR breaks it down into a step-by-step plan.', icon: 'layers' as const, color: T.brand  },
     ],
   },
@@ -1148,8 +1148,8 @@ const styles = StyleSheet.create({
   savedTitle:     { fontSize: F.lg, fontWeight: '800', color: T.text },
   savedSub:       { fontSize: F.sm, color: T.t3, textAlign: 'center' },
 
-  linkGoalBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#5856D6' + '0A', borderWidth: 1, borderColor: '#5856D6' + '18', marginBottom: 10 },
-  linkGoalText:   { fontSize: 12, fontWeight: '600' as const, color: '#5856D6', flex: 1 },
+  linkGoalBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: T.brand + '0A', borderWidth: 1, borderColor: T.brand + '18', marginBottom: 10 },
+  linkGoalText:   { fontSize: 12, fontWeight: '600' as const, color: T.brand, flex: 1 },
 
   headerRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 6, marginBottom: 12, gap: 8 },
   title:          { fontSize: 19, fontWeight: '800', color: T.text, letterSpacing: -0.5 },

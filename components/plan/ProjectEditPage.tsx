@@ -781,7 +781,7 @@ const styles = StyleSheet.create<Record<string, any>>({
     borderColor: 'rgba(0,0,0,0.04)',
     overflow: 'hidden',
   },
-  stepCardExpanded: { borderColor: 'rgba(88,86,214,0.15)' },
+  stepCardExpanded: { borderColor: T.brand + '26' },
   stepCardBlocked: { borderColor: 'rgba(229,62,62,0.15)', opacity: 0.85 },
   stepReorderCol: { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0, paddingLeft: 8, paddingVertical: 4 },
   stepReorderBtn: { width: 28, height: 22, alignItems: 'center', justifyContent: 'center' },

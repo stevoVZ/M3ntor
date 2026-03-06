@@ -236,7 +236,7 @@ export default function GoalDetailPage({ goalId, onBack }: GoalDetailPageProps) 
   }
 
   const area = ITEM_AREAS[goal.area];
-  const ac = area?.c || '#AF52DE';
+  const ac = area?.c || T.purple;
   const gp = goalProgress(goal, items, journeyProgresses, PRG);
   const gpPct = Math.round(gp * 100);
 

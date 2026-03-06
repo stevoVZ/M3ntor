@@ -160,7 +160,7 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reordera
 }) {
   const [expanded, setExpanded] = useState(false);
   const area = ITEM_AREAS[goal.area];
-  const ac = area?.c || '#AF52DE';
+  const ac = area?.c || T.purple;
 
   const gp = goalProgress(goal, items, journeyProgresses, PRG);
   const gpPct = Math.round(gp * 100);
@@ -521,7 +521,7 @@ export default function PlanScreen() {
 
   const filters: Array<{ id: FilterId; label: string; count?: number; activeColor?: string }> = [
     { id: 'all', label: 'All' },
-    { id: 'goals', label: 'Goals', count: goals.length, activeColor: '#AF52DE' },
+    { id: 'goals', label: 'Goals', count: goals.length, activeColor: T.purple },
     { id: 'active', label: 'Active', count: activeUnlinked.length, activeColor: T.brand },
     { id: 'paused', label: 'Paused', count: pausedUnlinked.length, activeColor: T.orange },
   ];
@@ -685,7 +685,7 @@ export default function PlanScreen() {
               <View style={{ marginBottom: 20 }}>
                 {filter !== 'goals' && (
                   <View style={styles.sectionLabelRow}>
-                    <Feather name="target" size={12} color="#AF52DE" />
+                    <Feather name="target" size={12} color={T.purple} />
                     <Text style={styles.sectionLabel}>GOALS</Text>
                     <Text style={styles.sectionCount}>{goals.length}</Text>
                   </View>

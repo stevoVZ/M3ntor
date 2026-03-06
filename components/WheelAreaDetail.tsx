@@ -317,8 +317,8 @@ export default function WheelAreaDetail({ area, appScore }: Props) {
             const gp = goalProgress(item, items, journeys, PRG);
             const linked = (item.linked_items || []).length + (item.linked_journeys || []).length;
             return (
-              <Pressable key={item.id} style={[styles.goalRow, { backgroundColor: 'rgba(155,89,182,0.03)', borderColor: 'rgba(155,89,182,0.1)' }]} onPress={() => router.push(`/item/${item.id}`)}>
-                <Feather name="target" size={14} color="#9B59B6" style={{ flexShrink: 0 }} />
+              <Pressable key={item.id} style={[styles.goalRow, { backgroundColor: T.purple + '08', borderColor: T.purple + '1A' }]} onPress={() => router.push(`/item/${item.id}`)}>
+                <Feather name="target" size={14} color={T.purple} style={{ flexShrink: 0 }} />
                 <View style={styles.goalInfo}>
                   <Text style={styles.goalName} numberOfLines={1}>{item.title}</Text>
                   {linked > 0 && (
