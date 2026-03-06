@@ -245,6 +245,16 @@ export default function GoalDetailPage({ goalId, onBack }: GoalDetailPageProps) 
   const linkedItems = linkedItemIds
     .map(id => items.find(i => i.id === id))
     .filter(Boolean) as Item[];
+
+  const handleReorderLinked = (itemId: string, direction: 'up' | 'down') => {
+    const current = [...linkedItemIds];
+    const idx = current.indexOf(itemId);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= current.length) return;
+    [current[idx], current[swapIdx]] = [current[swapIdx], current[idx]];
+    updateItem(goal.id, { linked_items: current });
+  };
   const linkedJourneyEntries = linkedJourneyIds
     .map(id => journeyProgresses.find(j => j.journey_id === id))
     .filter(Boolean) as JourneyProgress[];
@@ -536,15 +546,35 @@ export default function GoalDetailPage({ goalId, onBack }: GoalDetailPageProps) 
             </Pressable>
           ) : (
             <View style={{ gap: 6 }}>
-              {linkedItems.map(li => (
-                <View key={li.id} style={styles.linkedWrapper}>
-                  <LinkedItemRow
-                    item={li}
-                    areaColor={ac}
-                    onPress={() => router.push(`/item/${li.id}`)}
-                    isExpanded={expandedProjectId === li.id}
-                    onToggleExpand={() => setExpandedProjectId(expandedProjectId === li.id ? null : li.id)}
-                  />
+              {linkedItems.map((li, idx) => (
+                <View key={li.id} style={[styles.linkedWrapper, { flexDirection: 'row', alignItems: 'stretch' }]}>
+                  <View style={[styles.linkedReorderCol, { backgroundColor: ac + '08', borderColor: ac + '15' }]}>
+                    <Pressable
+                      onPress={() => handleReorderLinked(li.id, 'up')}
+                      hitSlop={4}
+                      style={[styles.linkedReorderBtn, idx === 0 && { opacity: 0.2 }]}
+                      disabled={idx === 0}
+                    >
+                      <Feather name="chevron-up" size={12} color={ac} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleReorderLinked(li.id, 'down')}
+                      hitSlop={4}
+                      style={[styles.linkedReorderBtn, idx === linkedItems.length - 1 && { opacity: 0.2 }]}
+                      disabled={idx === linkedItems.length - 1}
+                    >
+                      <Feather name="chevron-down" size={12} color={ac} />
+                    </Pressable>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <LinkedItemRow
+                      item={li}
+                      areaColor={ac}
+                      onPress={() => router.push(`/item/${li.id}`)}
+                      isExpanded={expandedProjectId === li.id}
+                      onToggleExpand={() => setExpandedProjectId(expandedProjectId === li.id ? null : li.id)}
+                    />
+                  </View>
                   <Pressable style={styles.unlinkBtn} onPress={() => handleUnlinkItem(li.id)}>
                     <Feather name="x" size={12} color={T.t3} />
                   </Pressable>
@@ -743,6 +773,14 @@ const styles = StyleSheet.create({
   emptyLinkedSub: { fontSize: 11, color: T.t3, marginTop: 4 },
 
   linkedWrapper: { position: 'relative' as const },
+  linkedReorderCol: {
+    flexDirection: 'column' as const, alignItems: 'center' as const, justifyContent: 'center' as const,
+    width: 28, borderWidth: 1, borderRightWidth: 0,
+    borderTopLeftRadius: 14, borderBottomLeftRadius: 14,
+  },
+  linkedReorderBtn: {
+    width: 24, height: 18, alignItems: 'center' as const, justifyContent: 'center' as const,
+  },
   linkedItemRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     padding: 14, borderRadius: 16, backgroundColor: 'white',

@@ -142,6 +142,7 @@ interface AppState {
   toggleSubtask:   (itemId: string, stepId: string, subtaskId: string) => void;
   addSubtask:      (itemId: string, stepId: string, subtask: Subtask) => void;
   removeSubtask:   (itemId: string, stepId: string, subtaskId: string) => void;
+  reorderSubtask:  (itemId: string, stepId: string, subtaskId: string, direction: 'up' | 'down') => void;
 
   enrollJourney:   (journeyId: string) => void;
   recordCompletion:(actionId: string, status: 'done' | 'skipped') => void;
@@ -541,6 +542,31 @@ export const useStore = create<AppState>((set, get) => ({
             if (step.id !== stepId || !step.subtasks) return step;
             return { ...step, subtasks: step.subtasks.filter(st => st.id !== subtaskId) };
           }),
+        };
+      }),
+    }));
+  },
+
+  reorderSubtask: (itemId, stepId, subtaskId, direction) => {
+    set(s => ({
+      items: s.items.map(item => {
+        if (item.id !== itemId || !item.steps) return item;
+        return {
+          ...item,
+          steps: item.steps.map(step => {
+            if (step.id !== stepId || !step.subtasks) return step;
+            const sorted = [...step.subtasks].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+            const idx = sorted.findIndex(st => st.id === subtaskId);
+            if (idx < 0) return step;
+            const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+            if (swapIdx < 0 || swapIdx >= sorted.length) return step;
+            const orderA = sorted[idx].sort_order ?? idx;
+            const orderB = sorted[swapIdx].sort_order ?? swapIdx;
+            sorted[idx] = { ...sorted[idx], sort_order: orderB };
+            sorted[swapIdx] = { ...sorted[swapIdx], sort_order: orderA };
+            return { ...step, subtasks: sorted };
+          }),
+          updated_at: new Date().toISOString(),
         };
       }),
     }));

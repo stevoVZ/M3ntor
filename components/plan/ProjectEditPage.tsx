@@ -38,6 +38,7 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
   const toggleSubtask = useStore(s => s.toggleSubtask);
   const addSubtask = useStore(s => s.addSubtask);
   const removeSubtask = useStore(s => s.removeSubtask);
+  const reorderSubtask = useStore(s => s.reorderSubtask);
   const pauseItem = useStore(s => s.pauseItem);
   const resumeItem = useStore(s => s.resumeItem);
   const completeItem = useStore(s => s.completeItem);
@@ -112,13 +113,16 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
 
   const doAddSubtask = (stepId: string) => {
     if (!newSubText.trim()) return;
+    const step = steps.find(s => s.id === stepId);
+    const existingSubs = step?.subtasks || [];
+    const maxOrder = existingSubs.reduce((m, s) => Math.max(m, s.sort_order ?? 0), 0);
     const sub: Subtask = {
       id: Crypto.randomUUID(),
       step_id: stepId,
       title: newSubText.trim(),
       done: false,
       assignees: [],
-      sort_order: 0,
+      sort_order: maxOrder + 1,
     };
     addSubtask(item.id, stepId, sub);
     setNewSubText('');
@@ -175,6 +179,8 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
     setAiSubLoading(stepId);
     try {
       const step = steps.find(s => s.id === stepId);
+      const existingSubs = step?.subtasks || [];
+      let nextOrder = existingSubs.reduce((m, s) => Math.max(m, s.sort_order ?? 0), 0) + 1;
       const subs = await generateSubtasks(step?.title || '', item.title);
       subs.forEach(t => {
         const sub: Subtask = {
@@ -183,7 +189,7 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
           title: t,
           done: false,
           assignees: [],
-          sort_order: 0,
+          sort_order: nextOrder++,
         };
         addSubtask(item.id, stepId, sub);
       });
@@ -408,6 +414,7 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
             isLast={idx === sortedSteps.length - 1}
             onToggleSubtask={(subId) => toggleSubtask(item.id, step.id, subId)}
             onDeleteSubtask={(subId) => confirmDelete('subtask', { stepId: step.id, subtaskId: subId })}
+            onReorderSubtask={(subId, dir) => { reorderSubtask(item.id, step.id, subId, dir); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
             addingSubFor={addingSubFor}
             onStartAddSub={() => { setAddingSubFor(step.id); setNewSubText(''); }}
             newSubText={newSubText}
@@ -475,6 +482,7 @@ interface StepCardProps {
   isLast: boolean;
   onToggleSubtask: (subId: string) => void;
   onDeleteSubtask: (subId: string) => void;
+  onReorderSubtask: (subId: string, direction: 'up' | 'down') => void;
   addingSubFor: string | null;
   onStartAddSub: () => void;
   newSubText: string;
@@ -490,14 +498,14 @@ function StepCard({
   step, index, itemId, accentColor: ac, allSteps, isExpanded,
   onToggleExpand, onCycleStatus, onCyclePriority, onCycleEffort, onToggleToday,
   onToggleStep, onDeleteStep, onMoveUp, onMoveDown, isFirst, isLast,
-  onToggleSubtask, onDeleteSubtask,
+  onToggleSubtask, onDeleteSubtask, onReorderSubtask,
   addingSubFor, onStartAddSub, newSubText, onChangeSubText, onSubmitSub,
   onCancelAddSub, subInputRef, aiSubLoading, onAiSubtasks,
 }: StepCardProps) {
   const ss = STEP_STATUS[step.status || 'todo'];
   const pr = PRIORITY[(step.priority || 'normal') as keyof typeof PRIORITY];
   const ef = EFFORT[(step.effort || 'medium') as keyof typeof EFFORT];
-  const subs = step.subtasks || [];
+  const subs = [...(step.subtasks || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   const subDone = subs.filter(st => st.done).length;
   const subTotal = subs.length;
   const isBlocked = step.status === 'blocked';
@@ -618,8 +626,26 @@ function StepCard({
 
           {subTotal > 0 && (
             <View style={[styles.subtaskList, { borderLeftColor: `${ac}20` }]}>
-              {subs.map(st => (
+              {subs.map((st, si) => (
                 <View key={st.id} style={styles.subtaskRow}>
+                  <View style={styles.subReorderCol}>
+                    <Pressable
+                      onPress={() => onReorderSubtask(st.id, 'up')}
+                      hitSlop={3}
+                      style={[styles.subReorderBtn, si === 0 && { opacity: 0.2 }]}
+                      disabled={si === 0}
+                    >
+                      <Feather name="chevron-up" size={11} color={ac} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => onReorderSubtask(st.id, 'down')}
+                      hitSlop={3}
+                      style={[styles.subReorderBtn, si === subs.length - 1 && { opacity: 0.2 }]}
+                      disabled={si === subs.length - 1}
+                    >
+                      <Feather name="chevron-down" size={11} color={ac} />
+                    </Pressable>
+                  </View>
                   <Pressable
                     onPress={() => onToggleSubtask(st.id)}
                     hitSlop={6}
@@ -778,8 +804,10 @@ const styles = StyleSheet.create<Record<string, any>>({
   chipDot: { width: 6, height: 6, borderRadius: 3 },
   chipText: { fontSize: 11, fontWeight: '600' as const },
 
-  subtaskList: { marginLeft: 34, borderLeftWidth: 2, paddingLeft: 12, marginBottom: 10 },
-  subtaskRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
+  subtaskList: { marginLeft: 34, borderLeftWidth: 2, paddingLeft: 8, marginBottom: 10 },
+  subtaskRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5 },
+  subReorderCol: { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 20 },
+  subReorderBtn: { width: 20, height: 14, alignItems: 'center', justifyContent: 'center' },
   subCheckbox: { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: T.sep, alignItems: 'center', justifyContent: 'center' },
   subTitle: { flex: 1, fontSize: 13, color: T.text },
   subTitleDone: { textDecorationLine: 'line-through', color: T.t3 },

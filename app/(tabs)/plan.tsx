@@ -145,12 +145,17 @@ function DeleteConfirmModal({ item, visible, onConfirm, onCancel }: {
   );
 }
 
-function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal }: {
+function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reorderable = false, isFirst = false, isLast = false, onMoveUp, onMoveDown }: {
   goal: Item;
   items: Item[];
   journeyProgresses: any[];
   onMenu: (item: Item) => void;
   onOpenGoal: (id: string) => void;
+  reorderable?: boolean;
+  isFirst?: boolean;
+  isLast?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const area = ITEM_AREAS[goal.area];
@@ -175,9 +180,30 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal }: {
   const leftDeg = clamp <= 50 ? -180 : ((clamp - 50) / 50) * 180 - 180;
 
   return (
-    <View style={{ marginBottom: 10 }}>
+    <View style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'stretch' }}>
+      {reorderable && (
+        <View style={[styles.goalReorderCol, { backgroundColor: ac + '08', borderColor: ac + '15' }]}>
+          <Pressable
+            onPress={onMoveUp}
+            hitSlop={4}
+            style={[styles.goalReorderBtn, isFirst && { opacity: 0.2 }]}
+            disabled={isFirst}
+          >
+            <Feather name="chevron-up" size={14} color={ac} />
+          </Pressable>
+          <Pressable
+            onPress={onMoveDown}
+            hitSlop={4}
+            style={[styles.goalReorderBtn, isLast && { opacity: 0.2 }]}
+            disabled={isLast}
+          >
+            <Feather name="chevron-down" size={14} color={ac} />
+          </Pressable>
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
       <Pressable
-        style={[styles.goalCard, shadow.sm, expanded && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}
+        style={[styles.goalCard, shadow.sm, expanded && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }, reorderable && { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }]}
         onPress={() => onOpenGoal(goal.id)}
         onLongPress={() => onMenu(goal)}
       >
@@ -276,6 +302,7 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal }: {
           )}
         </View>
       )}
+      </View>
     </View>
   );
 }
@@ -366,6 +393,8 @@ export default function PlanScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('hierarchy');
   const [filter, setFilter] = useState<FilterId>('all');
   const [listSort, setListSort] = useState<ListSort>('custom');
+
+  const [editMode, setEditMode] = useState(false);
 
   const [menuItem, setMenuItem] = useState<Item | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -519,17 +548,26 @@ export default function PlanScreen() {
             })}
           </ScrollView>
 
+          {viewMode === 'hierarchy' && (
+            <Pressable
+              style={[styles.editToggleBtn, editMode && styles.editToggleBtnActive]}
+              onPress={() => setEditMode(e => !e)}
+            >
+              <Feather name="move" size={13} color={editMode ? '#fff' : T.t3} />
+            </Pressable>
+          )}
+
           <View style={styles.viewToggle}>
             <Pressable
               style={[styles.viewToggleBtn, viewMode === 'hierarchy' && styles.viewToggleBtnActive]}
-              onPress={() => setViewMode('hierarchy')}
+              onPress={() => { setViewMode('hierarchy'); }}
             >
               <Feather name="git-merge" size={13}
                 color={viewMode === 'hierarchy' ? T.brand : T.t3} />
             </Pressable>
             <Pressable
               style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActive]}
-              onPress={() => setViewMode('list')}
+              onPress={() => { setViewMode('list'); setEditMode(false); }}
             >
               <Feather name="list" size={13}
                 color={viewMode === 'list' ? T.brand : T.t3} />
@@ -544,7 +582,7 @@ export default function PlanScreen() {
                 {filter !== 'goals' && (
                   <Text style={styles.sectionLabel}>GOALS</Text>
                 )}
-                {goals.map(goal => (
+                {goals.map((goal, idx) => (
                   <GoalCard
                     key={goal.id}
                     goal={goal}
@@ -552,6 +590,11 @@ export default function PlanScreen() {
                     journeyProgresses={journeyProgresses}
                     onMenu={handleOpenMenu}
                     onOpenGoal={setOpenGoalId}
+                    reorderable={editMode}
+                    isFirst={idx === 0}
+                    isLast={idx === goals.length - 1}
+                    onMoveUp={() => reorderItem(goal.id, 'up', (i: Item) => i.status === 'someday')}
+                    onMoveDown={() => reorderItem(goal.id, 'down', (i: Item) => i.status === 'someday')}
                   />
                 ))}
               </View>
@@ -565,8 +608,17 @@ export default function PlanScreen() {
                     <Text style={styles.sectionHintText}>Link these to a goal</Text>
                   </View>
                 </View>
-                {activeUnlinked.map(item => (
-                  <ItemRow key={item.id} item={item} onMenu={handleOpenMenu} />
+                {activeUnlinked.map((item, idx) => (
+                  <ItemRow
+                    key={item.id}
+                    item={item}
+                    onMenu={handleOpenMenu}
+                    reorderable={editMode}
+                    isFirst={idx === 0}
+                    isLast={idx === activeUnlinked.length - 1}
+                    onMoveUp={() => reorderItem(item.id, 'up', (i: Item) => i.status === 'active' && !goals.some(g => g.linked_items?.includes(i.id)))}
+                    onMoveDown={() => reorderItem(item.id, 'down', (i: Item) => i.status === 'active' && !goals.some(g => g.linked_items?.includes(i.id)))}
+                  />
                 ))}
               </View>
             )}
@@ -574,8 +626,17 @@ export default function PlanScreen() {
             {(filter === 'all' || filter === 'paused') && pausedUnlinked.length > 0 && (
               <View style={{ marginBottom: 20 }}>
                 <Text style={styles.sectionLabel}>ON HOLD</Text>
-                {pausedUnlinked.map(item => (
-                  <ItemRow key={item.id} item={item} onMenu={handleOpenMenu} />
+                {pausedUnlinked.map((item, idx) => (
+                  <ItemRow
+                    key={item.id}
+                    item={item}
+                    onMenu={handleOpenMenu}
+                    reorderable={editMode}
+                    isFirst={idx === 0}
+                    isLast={idx === pausedUnlinked.length - 1}
+                    onMoveUp={() => reorderItem(item.id, 'up', (i: Item) => i.status === 'paused' && !goals.some(g => g.linked_items?.includes(i.id)))}
+                    onMoveDown={() => reorderItem(item.id, 'down', (i: Item) => i.status === 'paused' && !goals.some(g => g.linked_items?.includes(i.id)))}
+                  />
                 ))}
               </View>
             )}
@@ -776,6 +837,21 @@ const styles = StyleSheet.create({
   filterCountActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
   filterCountText: { fontSize: 10, fontWeight: '700' as const, color: T.t3 },
 
+  editToggleBtn: {
+    width: 30, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: T.fill,
+  },
+  editToggleBtnActive: {
+    backgroundColor: T.brand,
+  },
+  goalReorderCol: {
+    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    width: 32, borderWidth: 1, borderRightWidth: 0,
+    borderTopLeftRadius: 16, borderBottomLeftRadius: 16,
+  },
+  goalReorderBtn: {
+    width: 28, height: 22, alignItems: 'center', justifyContent: 'center',
+  },
   viewToggle: {
     flexDirection: 'row', backgroundColor: T.fill, borderRadius: 10, padding: 2,
   },
