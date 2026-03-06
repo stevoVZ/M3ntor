@@ -42,12 +42,10 @@ const TYPE_GROUPS = [
 const ALL_TYPES = TYPE_GROUPS.flatMap(g => g.items);
 
 const PROMOS = [
-  { text: 'Call Mum this week',      type: 'action',  hint: 'Action' },
-  { text: 'Meditate every morning',  type: 'habit',   hint: 'Habit'  },
-  { text: 'Run a 5K by June',        type: 'goal',    hint: 'Goal'   },
-  { text: 'Redesign the website',    type: 'project', hint: 'Project'},
-  { text: 'Read 12 books this year', type: 'goal',    hint: 'Goal'   },
-  { text: 'Build a sleep routine',   type: 'habit',   hint: 'Habit'  },
+  { text: 'Call Mum this week',      type: 'action',  hint: 'Action'  },
+  { text: 'Meditate every morning',  type: 'habit',   hint: 'Habit'   },
+  { text: 'Run a 5K by June',        type: 'goal',    hint: 'Goal'    },
+  { text: 'Redesign the website',    type: 'project', hint: 'Project' },
 ];
 
 const TOD_OPTIONS = [
@@ -467,7 +465,10 @@ export default function CreateScreen() {
       automaticallyAdjustKeyboardInsets={true}
       contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: horizontalPad }}>
       <View style={styles.headerRow}>
-        <Text style={[styles.title, isCompact && { fontSize: 17 }]}>What's next?</Text>
+        <View>
+          <Text style={[styles.title, isCompact && { fontSize: 17 }]}>What are you working on?</Text>
+          <Text style={styles.subtitle}>Describe it and M3NTOR will help you plan it</Text>
+        </View>
         <Pressable style={styles.closeBtn} onPress={() => router.back()} hitSlop={8}>
           <Feather name="x" size={14} color={T.t3} />
         </Pressable>
@@ -554,24 +555,23 @@ export default function CreateScreen() {
         )}
         {!aiPending && !aiLoading && !aiHint && !text.trim() && (
           <View style={styles.promoSection}>
-            <Text style={styles.promoLabel}>Try one of these to get started</Text>
-            <View style={styles.promoRow}>
-              {PROMOS.map(p => {
-                const tc = ALL_TYPES.find(t => t.id === p.type);
-                return (
-                  <Pressable key={p.text} style={styles.promoChip}
-                    onPress={() => { setText(p.text); setSelectedType(p.type); }}>
-                    <Text style={styles.promoChipText}>{p.text}</Text>
-                    {tc && (
-                      <View style={[styles.promoChipBadge, { backgroundColor: tc.color + '14' }]}>
-                        <Feather name={tc.icon} size={9} color={tc.color} />
-                        <Text style={[styles.promoChipBadgeText, { color: tc.color }]}>{p.hint}</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Text style={styles.promoLabel}>Or tap an example to get started</Text>
+            {PROMOS.map(p => {
+              const tc = ALL_TYPES.find(t => t.id === p.type);
+              return (
+                <Pressable key={p.text} style={[styles.promoCard, { borderColor: (tc?.color ?? T.t3) + '20' }]}
+                  onPress={() => { setText(p.text); setSelectedType(p.type); }}>
+                  <View style={[styles.promoCardIcon, { backgroundColor: (tc?.color ?? T.t3) + '10' }]}>
+                    <Feather name={tc?.icon ?? 'check'} size={14} color={tc?.color ?? T.t3} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.promoCardText}>{p.text}</Text>
+                    <Text style={[styles.promoCardHint, { color: tc?.color ?? T.t3 }]}>{tc?.sub ?? p.hint}</Text>
+                  </View>
+                  <Feather name="arrow-right" size={12} color={T.t3} />
+                </Pressable>
+              );
+            })}
           </View>
         )}
       </View>
@@ -1151,9 +1151,10 @@ const styles = StyleSheet.create({
   linkGoalBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#5856D6' + '0A', borderWidth: 1, borderColor: '#5856D6' + '18', marginBottom: 10 },
   linkGoalText:   { fontSize: 12, fontWeight: '600' as const, color: '#5856D6', flex: 1 },
 
-  headerRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, marginBottom: 12, gap: 8 },
+  headerRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingTop: 6, marginBottom: 12, gap: 8 },
   title:          { fontSize: 19, fontWeight: '800', color: T.text, letterSpacing: -0.5 },
-  closeBtn:       { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  subtitle:       { fontSize: 12, color: T.t3, marginTop: 2 },
+  closeBtn:       { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
 
   inputWrap:      { borderRadius: 18, borderWidth: 2, marginBottom: 10, overflow: 'hidden' },
   input:          { fontSize: 16, color: T.text, padding: 14, fontWeight: '400' },
@@ -1170,13 +1171,12 @@ const styles = StyleSheet.create({
   hintDetail:     { flexDirection: 'row', gap: 5, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.72)', padding: 5, borderRadius: 8 },
   hintDetailLabel:{ fontSize: 10, fontWeight: '700' },
   hintDetailText: { fontSize: 11, color: T.text, flex: 1, lineHeight: 15 },
-  promoSection:   { marginBottom: 4 },
-  promoLabel:     { fontSize: 11, fontWeight: '600' as const, color: T.t3, marginBottom: 8, letterSpacing: 0.2 },
-  promoRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  promoChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 13, paddingRight: 5, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(108,92,231,0.06)', borderWidth: 1, borderColor: 'rgba(108,92,231,0.13)' },
-  promoChipText:  { fontSize: 12, color: T.t2 },
-  promoChipBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  promoChipBadgeText: { fontSize: 9, fontWeight: '700' as const },
+  promoSection:   { marginBottom: 4, gap: 6 },
+  promoLabel:     { fontSize: 11, fontWeight: '600' as const, color: T.t3, marginBottom: 2, letterSpacing: 0.2 },
+  promoCard:      { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.02)', borderWidth: 1 },
+  promoCardIcon:  { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  promoCardText:  { fontSize: 13, fontWeight: '600' as const, color: T.text },
+  promoCardHint:  { fontSize: 11, marginTop: 1 },
 
   approachSection:{ marginBottom: 8 },
   approachLabel:  { fontSize: 11, fontWeight: '600' as const, color: T.t3, marginBottom: 8, letterSpacing: 0.2 },
