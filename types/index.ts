@@ -29,7 +29,12 @@ export interface Step {
   assignees: string[];
   sort_order: number;
   subtasks?: Subtask[];
-  created_at?: string;
+  created_at: string;
+  updated_at?: string;
+  completed_at?: string;
+  due_date?: string;
+  notes?: string;
+  estimated_minutes?: number;
 }
 
 export interface Recurrence {
@@ -56,12 +61,18 @@ export interface Item {
   deadline?: string;
   priority: Priority;
   effort: Effort;
+  started_at?: string;
   paused_at?: string;
   completed_at?: string;
   steps?: Step[];
   linked_items?: string[];
   linked_journeys?: string[];
   sort_order?: number;
+  notes?: string;
+  tags?: string[];
+  estimated_minutes?: number;
+  actual_minutes?: number;
+  review_date?: string;
   created_at: string;
   updated_at: string;
 }

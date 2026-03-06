@@ -19,6 +19,7 @@ function convertSubtask(st: SampleSubtask, stepId: string, idx: number): Subtask
 }
 
 function convertStep(s: SampleStep, itemId: string, idx: number): Step {
+  const now = new Date().toISOString();
   return {
     id: s.id,
     item_id: itemId,
@@ -33,6 +34,8 @@ function convertStep(s: SampleStep, itemId: string, idx: number): Step {
     assignees: s.assignees,
     sort_order: idx,
     subtasks: s.subtasks?.map((st, si) => convertSubtask(st, s.id, si)),
+    created_at: now,
+    completed_at: s.done ? now : undefined,
   };
 }
 
@@ -51,6 +54,7 @@ function convertSampleItem(si: SampleItem): Item {
     priority: 'normal',
     effort: 'medium',
     deadline: si.deadline,
+    started_at: si.status === 'active' ? now : undefined,
     steps: si.steps?.map((s, idx) => convertStep(s, si.id, idx)),
     linked_items: si.linkedItems,
     linked_journeys: si.linkedJourneys,
@@ -340,9 +344,10 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   resumeItem: (id) => {
+    const now = new Date().toISOString();
     set(s => ({
       items: s.items.map(i =>
-        i.id === id ? { ...i, status: 'active' as const, paused_at: undefined, updated_at: new Date().toISOString() } : i
+        i.id === id ? { ...i, status: 'active' as const, paused_at: undefined, started_at: i.started_at || now, updated_at: now } : i
       ),
     }));
     syncItem(get().items.find(i => i.id === id));
@@ -366,13 +371,15 @@ export const useStore = create<AppState>((set, get) => ({
           const newSubtasks = done && step.subtasks
             ? step.subtasks.map(st => ({ ...st, done: true }))
             : step.subtasks;
-          return { ...step, done, status: (done ? 'done' : 'todo') as Step['status'], subtasks: newSubtasks };
+          const now = new Date().toISOString();
+          return { ...step, done, status: (done ? 'done' : 'todo') as Step['status'], subtasks: newSubtasks, updated_at: now, completed_at: done ? now : undefined };
         });
-        return { ...item, steps };
+        return { ...item, steps, updated_at: new Date().toISOString() };
       }),
     }));
     if (isSupabaseConfigured && supabase) {
-      supabase.from('steps').update({ done, status: done ? 'done' : 'todo' })
+      const now = new Date().toISOString();
+      supabase.from('steps').update({ done, status: done ? 'done' : 'todo', updated_at: now, completed_at: done ? now : null })
         .eq('id', stepId).then(({ error }) => { if (error) console.error(error); });
     }
   },

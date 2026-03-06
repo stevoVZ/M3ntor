@@ -13,7 +13,7 @@ import Animated, {
 import { T, S, F, R, shadow } from '../../constants/theme';
 import { ITEM_AREAS, KIND_CONFIG, PRIORITY, EFFORT, STEP_STATUS, PRG, WA } from '../../constants/config';
 import { itemKind, projectProgress, createStep, formatRecurrence, formatDuration } from '../../utils/items';
-import { formatDeadline, isOverdue } from '../../utils/dates';
+import { formatDeadline, isOverdue, formatDate, fromNow } from '../../utils/dates';
 import { generateProjectTasks, generateSubtasks } from '../../lib/ai';
 import { useStore } from '../../lib/store';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
@@ -679,6 +679,68 @@ export default function ItemDetailPage() {
               </View>
             </View>
 
+            <View style={styles.detailsSection}>
+              <View style={styles.detailRow}>
+                <Feather name="clock" size={12} color={T.t3} />
+                <Text style={styles.detailLabel}>Created</Text>
+                <Text style={styles.detailValue}>{formatDate(item.created_at)}</Text>
+              </View>
+              {item.started_at && (
+                <View style={styles.detailRow}>
+                  <Feather name="play" size={12} color={T.t3} />
+                  <Text style={styles.detailLabel}>Started</Text>
+                  <Text style={styles.detailValue}>{formatDate(item.started_at)}</Text>
+                </View>
+              )}
+              {item.completed_at && (
+                <View style={styles.detailRow}>
+                  <Feather name="check-circle" size={12} color={T.green} />
+                  <Text style={styles.detailLabel}>Completed</Text>
+                  <Text style={styles.detailValue}>{formatDate(item.completed_at)}</Text>
+                </View>
+              )}
+              {item.paused_at && item.status === 'paused' && (
+                <View style={styles.detailRow}>
+                  <Feather name="pause-circle" size={12} color={T.orange} />
+                  <Text style={styles.detailLabel}>Paused</Text>
+                  <Text style={styles.detailValue}>{formatDate(item.paused_at)}</Text>
+                </View>
+              )}
+              <View style={styles.detailRow}>
+                <Feather name="refresh-cw" size={12} color={T.t3} />
+                <Text style={styles.detailLabel}>Updated</Text>
+                <Text style={styles.detailValue}>{fromNow(item.updated_at)}</Text>
+              </View>
+              {item.estimated_minutes != null && (
+                <View style={styles.detailRow}>
+                  <Feather name="target" size={12} color={T.t3} />
+                  <Text style={styles.detailLabel}>Estimate</Text>
+                  <Text style={styles.detailValue}>{item.estimated_minutes} min</Text>
+                </View>
+              )}
+              {item.actual_minutes != null && (
+                <View style={styles.detailRow}>
+                  <Feather name="activity" size={12} color={T.t3} />
+                  <Text style={styles.detailLabel}>Actual</Text>
+                  <Text style={styles.detailValue}>{item.actual_minutes} min</Text>
+                </View>
+              )}
+              {item.review_date && (
+                <View style={styles.detailRow}>
+                  <Feather name="eye" size={12} color={T.t3} />
+                  <Text style={styles.detailLabel}>Review</Text>
+                  <Text style={styles.detailValue}>{formatDate(item.review_date)}</Text>
+                </View>
+              )}
+              {item.tags && item.tags.length > 0 && (
+                <View style={styles.detailRow}>
+                  <Feather name="tag" size={12} color={T.t3} />
+                  <Text style={styles.detailLabel}>Tags</Text>
+                  <Text style={styles.detailValue}>{item.tags.join(', ')}</Text>
+                </View>
+              )}
+            </View>
+
             <View style={styles.statusRow}>
               {item.status !== 'done' && (
                 <Pressable style={[styles.statusBtn, styles.statusBtnDone]}
@@ -1036,11 +1098,20 @@ const styles = StyleSheet.create({
 
   metaSection: { marginTop: S.sm, paddingTop: S.sm, borderTopWidth: 0.5, borderTopColor: T.sep },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 6 },
-  metaLabel: { fontSize: 13, color: T.t3, fontWeight: '500' },
-  metaValue: { fontSize: 13, fontWeight: '600', color: T.text },
+  metaLabel: { fontSize: 13, color: T.t3, fontWeight: '500' as const },
+  metaValue: { fontSize: 13, fontWeight: '600' as const, color: T.text },
+
+  detailsSection: {
+    marginTop: S.sm, paddingTop: S.sm, borderTopWidth: 0.5, borderTopColor: T.sep,
+  },
+  detailRow: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8, paddingVertical: 4,
+  },
+  detailLabel: { fontSize: 12, color: T.t3, fontWeight: '500' as const, width: 70 },
+  detailValue: { fontSize: 12, color: T.t2, flex: 1 },
 
   pickerOption: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: T.sep, backgroundColor: T.fill },
-  pickerOptionText: { fontSize: 12, fontWeight: '600', color: T.t2 },
+  pickerOptionText: { fontSize: 12, fontWeight: '600' as const, color: T.t2 },
 
   statusRow: { flexDirection: 'row', gap: 8, marginTop: S.sm },
   statusBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: R.md, borderWidth: 1 },

@@ -20,7 +20,7 @@ Preferred communication style: Simple, everyday language.
 - **Supabase Integration**: `lib/supabase.ts` provides client initialization with graceful fallback if not configured
 - **NLP Utilities**: `utils/nlp.ts` provides instant local area suggestion and type inference from text
 - **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers
-- **Item Utilities**: `utils/items.ts` provides `itemKind()`, `createItem()`, `createStep()` factories, progress calculations, recurrence helpers
+- **Item Utilities**: `utils/items.ts` provides `itemKind()`, `createItem()`, `createStep()` factories, progress calculations, recurrence helpers. Items track: `created_at`, `updated_at`, `started_at`, `completed_at`, `paused_at`, `notes`, `tags`, `estimated_minutes`, `actual_minutes`, `review_date`. Steps track: `created_at`, `updated_at`, `completed_at`, `due_date`, `notes`, `estimated_minutes`
 - **Score Utilities**: `utils/scores.ts` provides `computeAppScore()` (multi-area weighted scoring), `goalProgress()`, `linkedItemProgress()`, `areaWeight()`, `journeyAreaWeight()`, `appScoreInsight()`, `getUnlinkedItems()`
 - **Today Utilities**: `utils/today.ts` provides `getTodayActions()`, `groupByTimeOfDay()`, `pickSessionActions()`, `sortedTimeSlots` for action generation and grouping
 - **Design System**: `constants/theme.ts` exports `T` (colors/tokens — indigo `#5856D6` brand), `S` (spacing), `F` (font sizes), `R` (border radii), `shadow` (platform shadows)

@@ -93,17 +93,20 @@ export function createItem(
   userId: string,
   fields: Partial<Item> & { title: string; area: string }
 ): Item {
+  const now = new Date().toISOString();
+  const status = fields.status || 'active';
   return {
     id:          Crypto.randomUUID(),
     user_id:     userId,
     emoji:       '✓',
     description: '',
-    status:      'active',
+    status,
     source:      'self',
     priority:    'normal',
     effort:      'medium',
-    created_at:  new Date().toISOString(),
-    updated_at:  new Date().toISOString(),
+    started_at:  status === 'active' ? now : undefined,
+    created_at:  now,
+    updated_at:  now,
     ...fields,
   };
 }
@@ -112,6 +115,7 @@ export function createStep(
   itemId: string,
   fields: Partial<Step> & { title: string }
 ): Step {
+  const now = new Date().toISOString();
   return {
     id:         Crypto.randomUUID(),
     item_id:    itemId,
@@ -123,6 +127,7 @@ export function createStep(
     blocked_by: [],
     assignees:  [],
     sort_order: 0,
+    created_at: now,
     ...fields,
   };
 }
