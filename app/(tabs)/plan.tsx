@@ -17,7 +17,7 @@ import type { Item } from '../../types';
 
 type FilterId = 'all' | 'goals' | 'active' | 'paused';
 type ViewMode = 'hierarchy' | 'list';
-type ListSort = 'area' | 'kind' | 'progress';
+type ListSort = 'custom' | 'area' | 'kind' | 'progress';
 
 function ActionMenuModal({ item, visible, onClose, onEdit, onDelete, onOpenProject }: {
   item: Item;
@@ -280,7 +280,16 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal }: {
   );
 }
 
-function ItemRow({ item, indented = false, onMenu }: { item: Item; indented?: boolean; onMenu: (item: Item) => void }) {
+function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst = false, isLast = false, onMoveUp, onMoveDown }: {
+  item: Item;
+  indented?: boolean;
+  onMenu: (item: Item) => void;
+  reorderable?: boolean;
+  isFirst?: boolean;
+  isLast?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+}) {
   const kind = itemKind(item);
   const kc = KIND_CONFIG[kind];
   const area = ITEM_AREAS[item.area];
@@ -293,6 +302,30 @@ function ItemRow({ item, indented = false, onMenu }: { item: Item; indented?: bo
       onPress={() => router.push(`/item/${item.id}`)}
       onLongPress={() => onMenu(item)}
     >
+      {reorderable && (
+        <Pressable
+          style={styles.reorderCol}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <Pressable
+            onPress={(e) => { e.stopPropagation(); onMoveUp?.(); }}
+            hitSlop={6}
+            style={[styles.reorderBtn, isFirst && { opacity: 0.2 }]}
+            disabled={isFirst}
+          >
+            <Feather name="chevron-up" size={14} color={T.brand} />
+          </Pressable>
+          <Pressable
+            onPress={(e) => { e.stopPropagation(); onMoveDown?.(); }}
+            hitSlop={6}
+            style={[styles.reorderBtn, isLast && { opacity: 0.2 }]}
+            disabled={isLast}
+          >
+            <Feather name="chevron-down" size={14} color={T.brand} />
+          </Pressable>
+        </Pressable>
+      )}
+
       <Text style={styles.itemEmoji}>{item.emoji}</Text>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
@@ -332,7 +365,7 @@ function ItemRow({ item, indented = false, onMenu }: { item: Item; indented?: bo
 export default function PlanScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('hierarchy');
   const [filter, setFilter] = useState<FilterId>('all');
-  const [listSort, setListSort] = useState<ListSort>('area');
+  const [listSort, setListSort] = useState<ListSort>('custom');
 
   const [menuItem, setMenuItem] = useState<Item | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -344,11 +377,15 @@ export default function PlanScreen() {
   const journeyProgresses = useStore(s => s.journeys);
   const updateItem = useStore(s => s.updateItem);
   const removeItem = useStore(s => s.removeItem);
+  const reorderItem = useStore(s => s.reorderItem);
 
-  const goals = useMemo(() => items.filter(i => i.status === 'someday'), [items]);
+  const sortByOrder = useCallback((arr: Item[]) =>
+    [...arr].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), []);
+
+  const goals = useMemo(() => sortByOrder(items.filter(i => i.status === 'someday')), [items, sortByOrder]);
   const unlinked = useMemo(() => getUnlinkedItems(items), [items]);
-  const activeUnlinked = useMemo(() => unlinked.filter(i => i.status === 'active'), [unlinked]);
-  const pausedUnlinked = useMemo(() => unlinked.filter(i => i.status === 'paused'), [unlinked]);
+  const activeUnlinked = useMemo(() => sortByOrder(unlinked.filter(i => i.status === 'active')), [unlinked, sortByOrder]);
+  const pausedUnlinked = useMemo(() => sortByOrder(unlinked.filter(i => i.status === 'paused')), [unlinked, sortByOrder]);
 
   const filters: Array<{ id: FilterId; label: string; count?: number }> = [
     { id: 'all', label: 'All' },
@@ -373,7 +410,9 @@ export default function PlanScreen() {
       return true;
     });
 
-    if (listSort === 'area') {
+    if (listSort === 'custom') {
+      visible = [...visible].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    } else if (listSort === 'area') {
       visible = [...visible].sort((a, b) => (a.area || '').localeCompare(b.area || ''));
     } else if (listSort === 'kind') {
       visible = [...visible].sort((a, b) =>
@@ -555,9 +594,10 @@ export default function PlanScreen() {
           <View style={styles.section}>
             <View style={styles.sortRow}>
               {([
-                { id: 'area' as ListSort, label: 'By area' },
-                { id: 'kind' as ListSort, label: 'By type' },
-                { id: 'progress' as ListSort, label: 'By progress' },
+                { id: 'custom' as ListSort, label: 'Custom', icon: 'menu' as const },
+                { id: 'area' as ListSort, label: 'By area', icon: 'grid' as const },
+                { id: 'kind' as ListSort, label: 'By type', icon: 'layers' as const },
+                { id: 'progress' as ListSort, label: 'By progress', icon: 'bar-chart-2' as const },
               ]).map(s => (
                 <Pressable key={s.id}
                   style={[styles.sortPill, listSort === s.id && styles.sortPillActive]}
@@ -569,15 +609,31 @@ export default function PlanScreen() {
               ))}
             </View>
 
-            {filteredList.length === 0 ? (
-              <View style={styles.empty}>
-                <Text style={styles.emptySub}>Nothing here</Text>
-              </View>
-            ) : (
-              filteredList.map(item => (
-                <ItemRow key={item.id} item={item} onMenu={handleOpenMenu} />
-              ))
-            )}
+            {(() => {
+              if (filteredList.length === 0) {
+                return (
+                  <View style={styles.empty}>
+                    <Text style={styles.emptySub}>Nothing here</Text>
+                  </View>
+                );
+              }
+              const scopeIds = new Set(filteredList.map(i => i.id));
+              const scopeFilter = filter !== 'all'
+                ? (i: Item) => scopeIds.has(i.id)
+                : undefined;
+              return filteredList.map((item, idx) => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  onMenu={handleOpenMenu}
+                  reorderable={listSort === 'custom'}
+                  isFirst={idx === 0}
+                  isLast={idx === filteredList.length - 1}
+                  onMoveUp={() => reorderItem(item.id, 'up', scopeFilter)}
+                  onMoveDown={() => reorderItem(item.id, 'down', scopeFilter)}
+                />
+              ));
+            })()}
           </View>
         )}
 
@@ -805,6 +861,14 @@ const styles = StyleSheet.create({
   itemStepCount: { fontSize: 10, color: T.t3 },
   itemRecurrence: { fontSize: 10, color: T.t3 },
   pausedBadge: { fontSize: 10, color: T.orange, fontWeight: '600' as const },
+
+  reorderCol: {
+    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    marginRight: 2, marginLeft: -4, gap: 0,
+  },
+  reorderBtn: {
+    width: 24, height: 18, alignItems: 'center', justifyContent: 'center',
+  },
 
   miniProgressBg: {
     width: 34, height: 4, borderRadius: 2,

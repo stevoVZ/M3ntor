@@ -61,6 +61,7 @@ export interface Item {
   steps?: Step[];
   linked_items?: string[];
   linked_journeys?: string[];
+  sort_order?: number;
   created_at: string;
   updated_at: string;
 }

@@ -137,6 +137,7 @@ interface AppState {
   updateStep:      (itemId: string, stepId: string, patch: Partial<Step>) => void;
   updateStepStatus:(itemId: string, stepId: string, status: string) => void;
   reorderStep:     (itemId: string, stepId: string, direction: 'up' | 'down') => void;
+  reorderItem:     (itemId: string, direction: 'up' | 'down', scopeFilter?: (item: Item) => boolean) => void;
 
   toggleSubtask:   (itemId: string, stepId: string, subtaskId: string) => void;
   addSubtask:      (itemId: string, stepId: string, subtask: Subtask) => void;
@@ -274,9 +275,11 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addItem: (item) => {
-    set(s => ({ items: [item, ...s.items] }));
-    if (item.user_id && item.user_id !== 'guest') {
-      upsertItem(item as unknown as Record<string, unknown>)
+    const maxOrder = get().items.reduce((max, i) => Math.max(max, i.sort_order ?? 0), 0);
+    const withOrder = item.sort_order != null ? item : { ...item, sort_order: maxOrder + 1 };
+    set(s => ({ items: [withOrder, ...s.items] }));
+    if (withOrder.user_id && withOrder.user_id !== 'guest') {
+      upsertItem(withOrder as unknown as Record<string, unknown>)
         .then(() => {
           if (item.steps?.length) {
             const stepsWithItemId = item.steps.map(s => ({ ...s, item_id: item.id }));
@@ -453,6 +456,40 @@ export const useStore = create<AppState>((set, get) => ({
       if (step && other) {
         supabase.from('steps').update({ sort_order: step.sort_order }).eq('id', step.id).then(() => {});
         supabase.from('steps').update({ sort_order: other.sort_order }).eq('id', other.id).then(() => {});
+      }
+    }
+  },
+
+  reorderItem: (itemId, direction, scopeFilter) => {
+    set(s => {
+      const scope = scopeFilter ? s.items.filter(scopeFilter) : s.items;
+      const sorted = [...scope].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      const idx = sorted.findIndex(i => i.id === itemId);
+      if (idx < 0) return s;
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= sorted.length) return s;
+      const orderA = sorted[idx].sort_order ?? idx;
+      const orderB = sorted[swapIdx].sort_order ?? swapIdx;
+      const now = new Date().toISOString();
+      return {
+        items: s.items.map(item => {
+          if (item.id === sorted[idx].id) return { ...item, sort_order: orderB, updated_at: now };
+          if (item.id === sorted[swapIdx].id) return { ...item, sort_order: orderA, updated_at: now };
+          return item;
+        }),
+      };
+    });
+    const items = get().items;
+    if (isSupabaseConfigured && supabase) {
+      const moved = items.find(i => i.id === itemId);
+      const scope = scopeFilter ? items.filter(scopeFilter) : items;
+      const sorted = [...scope].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      const idx = sorted.findIndex(i => i.id === itemId);
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      const other = sorted[swapIdx];
+      if (moved && other) {
+        supabase.from('items').update({ sort_order: moved.sort_order }).eq('id', moved.id).then(() => {});
+        supabase.from('items').update({ sort_order: other.sort_order }).eq('id', other.id).then(() => {});
       }
     }
   },
