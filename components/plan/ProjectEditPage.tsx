@@ -508,65 +508,88 @@ function StepCard({
       isExpanded && styles.stepCardExpanded,
       isBlocked && styles.stepCardBlocked,
     ]}>
-      <Pressable style={styles.stepMainRow} onPress={onToggleExpand}>
-        <Pressable
-          onPress={() => onCycleStatus()}
-          hitSlop={6}
-          style={[
-            styles.statusDot,
-            step.done
-              ? { backgroundColor: T.green, borderColor: T.green }
-              : step.status === 'doing'
-              ? { backgroundColor: `${T.brand}15`, borderColor: `${T.brand}50` }
-              : step.status === 'blocked'
-              ? { backgroundColor: '#FFF5F5', borderColor: '#E53E3E50' }
-              : { borderColor: `${ss.dot}50` },
-          ]}
-        >
-          {step.done ? (
-            <Feather name="check" size={13} color="#fff" />
-          ) : step.status === 'blocked' ? (
-            <Feather name="alert-triangle" size={11} color="#E53E3E" />
-          ) : step.status === 'doing' ? (
-            <View style={[styles.doingDot, { backgroundColor: T.brand }]} />
-          ) : (
-            <Text style={[styles.stepIndex, { color: `${ac}70` }]}>{index + 1}</Text>
-          )}
-        </Pressable>
-
-        <View style={styles.stepContent}>
-          <Text
-            style={[
-              styles.stepTitle,
-              step.done && styles.stepTitleDone,
-              isBlocked && { color: '#E53E3E' },
-            ]}
-            numberOfLines={2}
+      <View style={styles.stepMainRow}>
+        <View style={[styles.stepReorderCol, { backgroundColor: `${ac}08`, borderRightWidth: 1, borderRightColor: `${ac}12` }]}>
+          <Pressable
+            onPress={onMoveUp}
+            hitSlop={4}
+            style={[styles.stepReorderBtn, isFirst && { opacity: 0.2 }]}
+            disabled={isFirst}
+            testID={`step-up-${index}`}
           >
-            {step.title}
-          </Text>
-          <View style={styles.stepBadges}>
-            <View style={[styles.microBadge, { backgroundColor: `${ss.dot}15` }]}>
-              <Text style={[styles.microBadgeText, { color: ss.color }]}>{ss.label}</Text>
-            </View>
-            {step.priority && step.priority !== 'normal' && (
-              <View style={[styles.microBadge, { backgroundColor: `${pr.color}10` }]}>
-                <Text style={[styles.microBadgeText, { color: pr.color }]}>{pr.label}</Text>
-              </View>
-            )}
-            {step.effort && (
-              <View style={[styles.microBadge, { backgroundColor: `${ef.color}10` }]}>
-                <Text style={[styles.microBadgeText, { color: ef.color }]}>{ef.label} · {ef.sub}</Text>
-              </View>
-            )}
-            {subTotal > 0 && (
-              <Text style={styles.subCount}>{subDone}/{subTotal} sub</Text>
-            )}
-          </View>
+            <Feather name="chevron-up" size={14} color={ac} />
+          </Pressable>
+          <Pressable
+            onPress={onMoveDown}
+            hitSlop={4}
+            style={[styles.stepReorderBtn, isLast && { opacity: 0.2 }]}
+            disabled={isLast}
+            testID={`step-down-${index}`}
+          >
+            <Feather name="chevron-down" size={14} color={ac} />
+          </Pressable>
         </View>
 
-        <Feather name={isExpanded ? 'chevron-down' : 'chevron-right'} size={14} color={T.t3} style={{ opacity: 0.5 }} />
-      </Pressable>
+        <Pressable style={styles.stepMainRowContent} onPress={onToggleExpand}>
+          <Pressable
+            onPress={onCycleStatus}
+            hitSlop={6}
+            style={[
+              styles.statusDot,
+              step.done
+                ? { backgroundColor: T.green, borderColor: T.green }
+                : step.status === 'doing'
+                ? { backgroundColor: `${T.brand}15`, borderColor: `${T.brand}50` }
+                : step.status === 'blocked'
+                ? { backgroundColor: '#FFF5F5', borderColor: '#E53E3E50' }
+                : { borderColor: `${ss.dot}50` },
+            ]}
+          >
+            {step.done ? (
+              <Feather name="check" size={13} color="#fff" />
+            ) : step.status === 'blocked' ? (
+              <Feather name="alert-triangle" size={11} color="#E53E3E" />
+            ) : step.status === 'doing' ? (
+              <View style={[styles.doingDot, { backgroundColor: T.brand }]} />
+            ) : (
+              <Text style={[styles.stepIndex, { color: `${ac}70` }]}>{index + 1}</Text>
+            )}
+          </Pressable>
+
+          <View style={styles.stepContent}>
+            <Text
+              style={[
+                styles.stepTitle,
+                step.done && styles.stepTitleDone,
+                isBlocked && { color: '#E53E3E' },
+              ]}
+              numberOfLines={2}
+            >
+              {step.title}
+            </Text>
+            <View style={styles.stepBadges}>
+              <View style={[styles.microBadge, { backgroundColor: `${ss.dot}15` }]}>
+                <Text style={[styles.microBadgeText, { color: ss.color }]}>{ss.label}</Text>
+              </View>
+              {step.priority && step.priority !== 'normal' && (
+                <View style={[styles.microBadge, { backgroundColor: `${pr.color}10` }]}>
+                  <Text style={[styles.microBadgeText, { color: pr.color }]}>{pr.label}</Text>
+                </View>
+              )}
+              {step.effort && (
+                <View style={[styles.microBadge, { backgroundColor: `${ef.color}10` }]}>
+                  <Text style={[styles.microBadgeText, { color: ef.color }]}>{ef.label} · {ef.sub}</Text>
+                </View>
+              )}
+              {subTotal > 0 && (
+                <Text style={styles.subCount}>{subDone}/{subTotal} sub</Text>
+              )}
+            </View>
+          </View>
+
+          <Feather name={isExpanded ? 'chevron-down' : 'chevron-right'} size={14} color={T.t3} style={{ opacity: 0.5 }} />
+        </Pressable>
+      </View>
 
       {isExpanded && (
         <View style={styles.expandedPanel}>
@@ -587,12 +610,6 @@ function StepCard({
               </Text>
             </Pressable>
             <View style={{ flexDirection: 'row', gap: 2, marginLeft: 'auto' }}>
-              <Pressable style={[styles.chip, { opacity: isFirst ? 0.3 : 1 }]} onPress={onMoveUp} disabled={isFirst}>
-                <Feather name="arrow-up" size={11} color={T.t3} />
-              </Pressable>
-              <Pressable style={[styles.chip, { opacity: isLast ? 0.3 : 1 }]} onPress={onMoveDown} disabled={isLast}>
-                <Feather name="arrow-down" size={11} color={T.t3} />
-              </Pressable>
               <Pressable style={[styles.chip, { borderColor: `${T.red}20`, backgroundColor: `${T.red}06` }]} onPress={onDeleteStep}>
                 <Feather name="trash-2" size={11} color={T.red} />
               </Pressable>
@@ -740,7 +757,10 @@ const styles = StyleSheet.create<Record<string, any>>({
   },
   stepCardExpanded: { borderColor: 'rgba(88,86,214,0.15)' },
   stepCardBlocked: { borderColor: 'rgba(229,62,62,0.15)', opacity: 0.85 },
-  stepMainRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
+  stepReorderCol: { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0, paddingLeft: 8, paddingVertical: 4 },
+  stepReorderBtn: { width: 28, height: 22, alignItems: 'center', justifyContent: 'center' },
+  stepMainRow: { flexDirection: 'row', alignItems: 'center' },
+  stepMainRowContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, paddingLeft: 8 },
   statusDot: { width: 24, height: 24, borderRadius: 8, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   doingDot: { width: 8, height: 8, borderRadius: 4 },
   stepIndex: { fontSize: 9, fontWeight: '700' as const },
