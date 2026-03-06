@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Item, Step, Subtask, JourneyProgress, Profile, CompletionLog, MoodEntry, MoodValue } from '../types';
 import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase, isSupabaseConfigured, fetchItems, fetchJourneyProgress, upsertItem, deleteItem, upsertStep, upsertCompletionLog, fetchCompletionLogs, upsertMoodEntry, fetchMoodEntries } from './supabase';
+import { supabase, isSupabaseConfigured, fetchItems, fetchJourneyProgress, upsertItem, deleteItem, upsertStep, upsertSubtask, upsertCompletionLog, fetchCompletionLogs, upsertMoodEntry, fetchMoodEntries } from './supabase';
 import { SAMPLE_ITEMS, SAMPLE_COMMITTED } from '../constants/sample-data';
 import { PRG } from '../constants/config';
 import type { SampleItem, SampleStep, SampleSubtask, CommittedEntry } from '../constants/sample-data';
@@ -121,7 +121,6 @@ interface AppState {
   moodLog:       MoodEntry[];
 
   setUserId:       (id: string | null) => void;
-  setProfile:      (p: Profile | null) => void;
   setCountry:      (country: string | null) => void;
   loadAll:         (userId: string) => Promise<void>;
 
@@ -150,8 +149,6 @@ interface AppState {
   recordMood:      (mood: MoodValue) => void;
 
   streak:          () => number;
-  weeklyData:      () => { label: string; date: string; done: number; total: number; isToday: boolean }[];
-  pausedItems:     () => Item[];
   getItem:         (id: string) => Item | undefined;
 }
 
@@ -172,7 +169,6 @@ export const useStore = create<AppState>((set, get) => ({
   moodLog:       [],
 
   setUserId:  (id) => set({ userId: id }),
-  setProfile: (p)  => set({ profile: p }),
   setCountry: (country) => {
     set(s => ({
       profile: s.profile ? { ...s.profile, country: country ?? undefined } : null,
@@ -539,6 +535,17 @@ export const useStore = create<AppState>((set, get) => ({
         return { ...item, steps: newSteps };
       }),
     }));
+    const item = get().items.find(i => i.id === itemId);
+    if (item && item.user_id !== 'guest' && isSupabaseConfigured) {
+      const step = item.steps?.find(s => s.id === stepId);
+      const sub = step?.subtasks?.find(st => st.id === subtaskId);
+      if (sub) {
+        upsertSubtask({ id: sub.id, step_id: stepId, title: sub.title, done: sub.done, sort_order: sub.sort_order ?? 0 }).catch(console.error);
+      }
+      if (step) {
+        upsertStep({ id: step.id, item_id: itemId, title: step.title, done: step.done, status: step.status, sort_order: step.sort_order ?? 0 }).catch(console.error);
+      }
+    }
   },
 
   addSubtask: (itemId, stepId, subtask) => {
@@ -554,6 +561,10 @@ export const useStore = create<AppState>((set, get) => ({
         };
       }),
     }));
+    const item = get().items.find(i => i.id === itemId);
+    if (item && item.user_id !== 'guest' && isSupabaseConfigured) {
+      upsertSubtask({ id: subtask.id, step_id: stepId, title: subtask.title, done: subtask.done, sort_order: subtask.sort_order ?? 0 }).catch(console.error);
+    }
   },
 
   removeSubtask: (itemId, stepId, subtaskId) => {
@@ -686,25 +697,5 @@ export const useStore = create<AppState>((set, get) => ({
     return count;
   },
 
-  weeklyData: () => {
-    const log = get().completionLog;
-    const days = [];
-    for (let d = 6; d >= 0; d--) {
-      const dt = new Date();
-      dt.setDate(dt.getDate() - d);
-      const key = dt.toISOString().slice(0, 10);
-      const entry = log[key];
-      days.push({
-        label: dt.toLocaleDateString('en-AU', { weekday: 'short' }).slice(0, 2),
-        date: key,
-        done: entry?.done || 0,
-        total: entry?.total || 0,
-        isToday: d === 0,
-      });
-    }
-    return days;
-  },
-
-  pausedItems:  () => get().items.filter(i => i.status === 'paused'),
   getItem: (id) => get().items.find(i => i.id === id),
 }));

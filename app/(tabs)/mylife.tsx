@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useStore } from '@/lib/store';
 import { T, S, F, R, shadow } from '@/constants/theme';
-import { AREAS, normalizeAreaId, PRG, HISTORY } from '@/constants/config';
+import { AREAS, normalizeAreaId, PRG } from '@/constants/config';
 import type { LifeArea } from '@/constants/config';
 import WheelOfLife, { scoreLabel, scoreTier } from '@/components/WheelOfLife';
 import WheelAreaDetail from '@/components/WheelAreaDetail';
@@ -61,14 +61,15 @@ export default function MyLifeScreen() {
 
   const compareScores = useMemo(() => {
     if (timePeriod === 'now') return null;
-    const historyKey = timePeriod === 'start' ? 'year' : timePeriod;
-    const historyData = HISTORY[historyKey as keyof typeof HISTORY];
-    if (!historyData) return null;
-    const scores: Record<string, number> = {};
-    areas.forEach(a => {
-      scores[a.id] = (historyData.scores as Record<string, number>)[a.id] ?? a.start;
-    });
-    return scores;
+    if (timePeriod === 'start') {
+      const scores: Record<string, number> = {};
+      areas.forEach(a => {
+        const base = AREAS.find(ar => ar.id === a.id);
+        scores[a.id] = base?.start ?? 5;
+      });
+      return scores;
+    }
+    return null;
   }, [timePeriod, areas]);
 
   const compareLabel = useMemo(() => {

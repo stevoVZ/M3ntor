@@ -6,6 +6,7 @@ import { T, S, R, shadow } from '../../constants/theme';
 import { ITEM_AREAS, PRG, MOODS } from '../../constants/config';
 import { formatDuration } from '../../utils/items';
 import { pickSessionActions } from '../../utils/today';
+import { getApiUrl } from '../../lib/query-client';
 import type { TodayAction, MoodValue, JourneyProgress } from '../../types';
 import CompletionScreen from './CompletionScreen';
 
@@ -273,7 +274,8 @@ export default function SessionView({
     setBriefingLoading(true);
     const fallbackText = `${sessionActions.length} actions for your ${prog?.t || 'journey'} session today. Each one builds on the last. Let's make Day ${dayNum} count.`;
     try {
-      const res = await fetch('/api/ai/briefing', {
+      const briefingUrl = new URL('/api/ai/briefing', getApiUrl());
+      const res = await fetch(briefingUrl.toString(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

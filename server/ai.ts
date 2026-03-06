@@ -114,3 +114,31 @@ export async function generateSubtasks(stepTitle: string, projectTitle: string):
     return [];
   }
 }
+
+export async function generateBriefing(context: {
+  journeyTitle: string;
+  weekNum: number;
+  dayNum: number;
+  dayTitle: string;
+  actionCount: number;
+  streak: number;
+}): Promise<string> {
+  try {
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 200,
+      system: 'You are M3NTOR, a motivational life coach. Write a short, warm morning briefing (2-3 sentences). Be specific to the context given. No emojis. No bullet points.',
+      messages: [{
+        role: 'user',
+        content: `Write a brief morning briefing for someone on Day ${context.dayNum}, Week ${context.weekNum} of their "${context.journeyTitle}" journey. Today's focus: "${context.dayTitle}". They have ${context.actionCount} actions today. ${context.streak > 1 ? `They're on a ${context.streak}-day streak.` : ''} Keep it concise and motivating.`,
+      }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== 'text') return '';
+    return block.text.trim();
+  } catch (error) {
+    console.error('generateBriefing error:', error);
+    return '';
+  }
+}

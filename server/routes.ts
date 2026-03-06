@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "node:http";
-import { aiAssist, getItemHint, generateProjectTasks, generateSubtasks } from "./ai";
+import { aiAssist, getItemHint, generateProjectTasks, generateSubtasks, generateBriefing } from "./ai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/ai/assist", async (req, res) => {
@@ -56,6 +56,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("AI subtasks route error:", error);
       return res.status(500).json({ error: "AI subtasks failed" });
+    }
+  });
+
+  app.post("/api/ai/briefing", async (req, res) => {
+    try {
+      const { journeyTitle, weekNum, dayNum, dayTitle, actionCount, streak } = req.body;
+      const briefing = await generateBriefing({
+        journeyTitle: journeyTitle || '',
+        weekNum: weekNum || 1,
+        dayNum: dayNum || 1,
+        dayTitle: dayTitle || '',
+        actionCount: actionCount || 0,
+        streak: streak || 0,
+      });
+      return res.json({ briefing });
+    } catch (error) {
+      console.error("AI briefing route error:", error);
+      return res.status(500).json({ error: "AI briefing failed" });
     }
   });
 
