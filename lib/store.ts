@@ -4,6 +4,7 @@ import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured, fetchItems, fetchJourneyProgress, upsertItem, deleteItem, upsertStep, upsertCompletionLog, fetchCompletionLogs, upsertMoodEntry, fetchMoodEntries } from './supabase';
 import { SAMPLE_ITEMS, SAMPLE_COMMITTED } from '../constants/sample-data';
+import { PRG } from '../constants/config';
 import type { SampleItem, SampleStep, SampleSubtask, CommittedEntry } from '../constants/sample-data';
 
 function convertSubtask(st: SampleSubtask, stepId: string, idx: number): Subtask {
@@ -253,9 +254,32 @@ export const useStore = create<AppState>((set, get) => ({
         }
       }
 
+      const loadedItems = (items ?? []) as Item[];
+      const loadedJourneys = journeys ?? [];
+      const itemIds = new Set(loadedItems.map(i => i.id));
+      const syntheticJourneyItems: Item[] = [];
+      for (const jp of loadedJourneys) {
+        if (!itemIds.has(jp.journey_id)) {
+          const prog = PRG.find(p => p.id === jp.journey_id);
+          syntheticJourneyItems.push({
+            id: jp.journey_id,
+            user_id: effectiveUserId,
+            title: prog?.t || jp.journey_id,
+            emoji: '',
+            area: prog?.a || 'learning',
+            status: jp.status === 'done' ? 'done' : jp.status === 'paused' ? 'paused' : 'active',
+            source: 'journey',
+            priority: 'normal',
+            effort: 'medium',
+            created_at: jp.enrolled_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+
       set({
-        items: (items ?? []) as Item[],
-        journeys: journeys ?? [],
+        items: [...loadedItems, ...syntheticJourneyItems],
+        journeys: loadedJourneys,
         completionLog,
         moodLog,
         loading: false,
@@ -573,13 +597,36 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   enrollJourney: (journeyId) => {
+    const existing = get().journeys.find(j => j.journey_id === journeyId);
+    if (existing) return;
     const uid = get().userId ?? 'guest';
+    const now = new Date().toISOString();
     const entry: JourneyProgress = {
       id: Crypto.randomUUID(), user_id: uid, journey_id: journeyId,
       status: 'active', current_week: 1, current_day: 1, streak: 0,
-      enrolled_at: new Date().toISOString(),
+      enrolled_at: now,
     };
-    set(s => ({ journeys: [...s.journeys, entry] }));
+    const prog = PRG.find(p => p.id === journeyId);
+    const syntheticItem: Item = {
+      id: journeyId,
+      user_id: uid,
+      title: prog?.t || journeyId,
+      emoji: '',
+      area: prog?.a || 'learning',
+      status: 'active',
+      source: 'journey',
+      priority: 'normal',
+      effort: 'medium',
+      created_at: now,
+      updated_at: now,
+    };
+    set(s => {
+      const alreadyExists = s.items.some(i => i.id === journeyId);
+      return {
+        journeys: [...s.journeys, entry],
+        items: alreadyExists ? s.items : [...s.items, syntheticItem],
+      };
+    });
     if (uid !== 'guest' && isSupabaseConfigured && supabase) {
       supabase.from('journey_progress').upsert({
         user_id: uid, journey_id: journeyId,

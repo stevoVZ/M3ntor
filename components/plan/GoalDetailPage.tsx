@@ -585,7 +585,7 @@ export default function GoalDetailPage({ goalId, onBack }: GoalDetailPageProps) 
                   <LinkedJourneyRow
                     jp={jp}
                     areaColor={ac}
-                    onPress={() => {}}
+                    onPress={() => router.push(`/item/${jp.journey_id}`)}
                   />
                   <Pressable style={styles.unlinkBtn} onPress={() => handleUnlinkJourney(jp.journey_id)}>
                     <Feather name="x" size={12} color={T.t3} />

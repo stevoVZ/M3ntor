@@ -16,7 +16,7 @@ Preferred communication style: Simple, everyday language.
 
 - **Framework**: Expo (React Native) with expo-router for file-based navigation
 - **Navigation**: Tab-based layout with 4 main tabs: Today, My Life, Discover, and Plan. Modal sheets for adding items and viewing item details. Login screen for Supabase auth (optional)
-- **State Management**: Zustand store (`lib/store.ts`) provides item CRUD, auth state, journey progress, completion/mood logging, streak tracking, pause/resume/complete/activate actions, step/subtask management (including `reorderStep` for up/down reordering), item reordering (`reorderItem` with optional scope filtering), and derived selectors
+- **State Management**: Zustand store (`lib/store.ts`) provides item CRUD, auth state, journey progress, completion/mood logging, streak tracking, pause/resume/complete/activate actions, step/subtask management (including `reorderStep`, `reorderSubtask` for up/down reordering), item reordering (`reorderItem` with optional scope filtering), and derived selectors. Journey enrollment (`enrollJourney`) creates both a `JourneyProgress` entry and a synthetic `Item` with `source: 'journey'` so journeys are navigable via `/item/[id]`. On store initialization, synthetic items are auto-created for any enrolled journeys missing them.
 - **Supabase Integration**: `lib/supabase.ts` provides client initialization with graceful fallback if not configured
 - **NLP Utilities**: `utils/nlp.ts` provides instant local area suggestion and type inference from text
 - **Date Utilities**: `utils/dates.ts` provides dayjs-powered date formatting helpers

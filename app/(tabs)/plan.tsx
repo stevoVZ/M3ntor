@@ -169,6 +169,15 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reordera
     .map(id => items.find(i => i.id === id))
     .filter(Boolean) as Item[];
 
+  const linkedJourneyIds = goal.linked_journeys || [];
+  const linkedJourneyEntries = linkedJourneyIds
+    .map(jid => {
+      const jp = journeyProgresses.find((j: any) => j.journey_id === jid);
+      const prog = PRG.find(p => p.id === jid);
+      return jp && prog ? { jp, prog } : null;
+    })
+    .filter(Boolean) as { jp: any; prog: any }[];
+
   const deadlineStr = goal.deadline ? formatDeadline(goal.deadline) : null;
   const overdue = goal.deadline ? isOverdue(goal.deadline) : false;
 
@@ -278,22 +287,46 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reordera
 
       {expanded && (
         <View style={[styles.goalLinkedContainer, { backgroundColor: ac + '06', borderColor: ac + '15' }]}>
-          {linkedItems.length > 0 ? (
-            linkedItems.map(li => {
-              const liKind = itemKind(li);
-              const liKc = KIND_CONFIG[liKind];
-              const liArea = ITEM_AREAS[li.area];
-              const liColor = liArea?.c || liKc.color || T.t3;
-              const liPct = linkedItemProgress(li);
-              return (
-                <View key={li.id} style={styles.goalLinkedItem}>
-                  <ItemRow item={li} indented onMenu={onMenu} />
-                  <View style={styles.goalLinkedItemBar}>
-                    <ProgressBar progress={liPct} color={liColor} height={2} />
+          {linkedItems.length > 0 || linkedJourneyEntries.length > 0 ? (
+            <>
+              {linkedItems.map(li => {
+                const liKind = itemKind(li);
+                const liKc = KIND_CONFIG[liKind];
+                const liArea = ITEM_AREAS[li.area];
+                const liColor = liArea?.c || liKc.color || T.t3;
+                const liPct = linkedItemProgress(li);
+                return (
+                  <View key={li.id} style={styles.goalLinkedItem}>
+                    <ItemRow item={li} indented onMenu={onMenu} />
+                    <View style={styles.goalLinkedItemBar}>
+                      <ProgressBar progress={liPct} color={liColor} height={2} />
+                    </View>
                   </View>
-                </View>
-              );
-            })
+                );
+              })}
+              {linkedJourneyEntries.map(({ jp, prog }) => {
+                const jPct = Math.min(1, jp.current_week / prog.w);
+                return (
+                  <Pressable
+                    key={jp.journey_id}
+                    style={styles.goalLinkedJourney}
+                    onPress={() => router.push(`/item/${jp.journey_id}`)}
+                  >
+                    <Feather name="compass" size={14} color={ac} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.goalLinkedJourneyTitle} numberOfLines={1}>{prog.t}</Text>
+                      <Text style={styles.goalLinkedJourneySub}>
+                        Week {jp.current_week} of {prog.w}
+                      </Text>
+                    </View>
+                    <View style={styles.goalLinkedJourneyBar}>
+                      <ProgressBar progress={jPct} color={ac} height={2} />
+                    </View>
+                    <Feather name="chevron-right" size={12} color={T.t3} />
+                  </Pressable>
+                );
+              })}
+            </>
           ) : (
             <View style={styles.goalLinkedEmpty}>
               <Text style={styles.goalLinkedEmptyText}>Nothing linked to this goal</Text>
@@ -919,6 +952,14 @@ const styles = StyleSheet.create({
   },
   goalLinkedItem: { position: 'relative' as const },
   goalLinkedItemBar: { paddingHorizontal: 14, paddingBottom: 4 },
+  goalLinkedJourney: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, paddingHorizontal: 14,
+    borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.04)',
+  },
+  goalLinkedJourneyTitle: { fontSize: 13, fontWeight: '600' as const, color: T.text },
+  goalLinkedJourneySub: { fontSize: 11, color: T.t3, marginTop: 1 },
+  goalLinkedJourneyBar: { width: 40 },
   goalLinkedEmpty: { padding: 14, alignItems: 'center' },
   goalLinkedEmptyText: { fontSize: 13, color: T.t3, fontWeight: '500' as const, marginBottom: 4 },
   goalLinkedEmptySub: { fontSize: 11, color: T.t3 },
