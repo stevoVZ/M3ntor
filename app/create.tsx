@@ -576,43 +576,43 @@ export default function CreateScreen() {
         )}
       </View>
 
-      <View style={styles.approachSection}>
-        {!text.trim() && (
+      {!!text.trim() && (
+        <View style={styles.approachSection}>
           <Text style={styles.approachLabel}>How would you like to approach this?</Text>
-        )}
-        <Animated.View style={[styles.typeGrid, aiPending && !aiHint ? pulseStyle : undefined]}>
-          {ALL_TYPES.map(t => {
-            const on = activeType === t.id && !!text.trim();
-            return (
-              <Pressable key={t.id} style={[styles.typeCard, on && {
-                backgroundColor: t.color + '10',
-                borderColor: t.color + '40',
-              }]} onPress={() => handleTypeSelect(t.id)}>
-                <View style={[styles.typeIconWrap, { backgroundColor: (on ? t.color : T.t3) + '12' }]}>
-                  <Feather name={t.icon} size={14} color={on ? t.color : T.t3} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.typeCardLabel, on && { color: t.color }]}>
-                    {t.label}
-                  </Text>
-                  <Text style={[styles.typeCardSub, on && { color: t.color + 'AA' }]}>
-                    {t.sub}
-                  </Text>
-                </View>
-                {on && <Feather name="check" size={14} color={t.color} />}
-              </Pressable>
-            );
-          })}
-        </Animated.View>
-        {activeType && text.trim() && (
-          <View style={[styles.typeDetailCard, { backgroundColor: (typeConf?.color ?? T.brand) + '08', borderColor: (typeConf?.color ?? T.brand) + '18' }]}>
-            <Feather name="info" size={12} color={(typeConf?.color ?? T.brand) + 'AA'} />
-            <Text style={[styles.typeDetailText, { color: (typeConf?.color ?? T.brand) + 'CC' }]}>
-              {ALL_TYPES.find(t => t.id === activeType)?.detail}
-            </Text>
-          </View>
-        )}
-      </View>
+          <Animated.View style={[styles.typeGrid, aiPending && !aiHint ? pulseStyle : undefined]}>
+            {ALL_TYPES.map(t => {
+              const on = activeType === t.id;
+              return (
+                <Pressable key={t.id} style={[styles.typeCard, on && {
+                  backgroundColor: t.color + '10',
+                  borderColor: t.color + '40',
+                }]} onPress={() => handleTypeSelect(t.id)}>
+                  <View style={[styles.typeIconWrap, { backgroundColor: (on ? t.color : T.t3) + '12' }]}>
+                    <Feather name={t.icon} size={14} color={on ? t.color : T.t3} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.typeCardLabel, on && { color: t.color }]}>
+                      {t.label}
+                    </Text>
+                    <Text style={[styles.typeCardSub, on && { color: t.color + 'AA' }]}>
+                      {t.sub}
+                    </Text>
+                  </View>
+                  {on && <Feather name="check" size={14} color={t.color} />}
+                </Pressable>
+              );
+            })}
+          </Animated.View>
+          {activeType && (
+            <View style={[styles.typeDetailCard, { backgroundColor: (typeConf?.color ?? T.brand) + '08', borderColor: (typeConf?.color ?? T.brand) + '18' }]}>
+              <Feather name="info" size={12} color={(typeConf?.color ?? T.brand) + 'AA'} />
+              <Text style={[styles.typeDetailText, { color: (typeConf?.color ?? T.brand) + 'CC' }]}>
+                {ALL_TYPES.find(t => t.id === activeType)?.detail}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {activeType && text.trim() && (
         <View style={styles.modeSection}>
