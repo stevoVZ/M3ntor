@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -71,6 +71,7 @@ function JourneyCard({
   onStartSession: (journeyId: string) => void;
 }) {
   const prog = PRG.find(p => p.id === jp.journey_id);
+  const unenrollJourney = useStore(s => s.unenrollJourney);
   if (!prog) return null;
 
   const area = ITEM_AREAS[prog.a];
@@ -81,6 +82,17 @@ function JourneyCard({
   const totalMins = journeyActions.reduce((sum, a) => sum + (a.duration || 0), 0);
   const weekNum = jp.current_week;
   const dayTitle = journeyActions[0]?.dayTitle || '';
+
+  const handleLeave = () => {
+    Alert.alert(
+      'Leave journey?',
+      'Your progress will be saved — you can come back anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => unenrollJourney(jp.journey_id) },
+      ]
+    );
+  };
 
   return (
     <View style={[styles.journeyCard, { borderLeftColor: ac }]}>
@@ -101,6 +113,9 @@ function JourneyCard({
             {dayTitle ? <Text style={styles.journeyDayTitle} numberOfLines={1}>{dayTitle}</Text> : null}
           </View>
         </View>
+        <Pressable onPress={handleLeave} hitSlop={8} style={{ padding: 4 }}>
+          <Feather name="more-vertical" size={16} color={T.t3} />
+        </Pressable>
         {allDone ? (
           <View style={[styles.journeyDoneBadge, { backgroundColor: T.green + '12', borderColor: T.green + '20' }]}>
             <Feather name="check" size={11} color={T.green} />

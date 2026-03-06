@@ -37,7 +37,49 @@ export async function fetchItems(userId: string) {
     .from('items')
     .select('*, steps(*, subtasks(*))')
     .eq('user_id', userId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchDeletedItems(userId: string) {
+  if (!_supabase) return [];
+  const { data, error } = await _supabase
+    .from('items')
+    .select('*, steps(*, subtasks(*))')
+    .eq('user_id', userId)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
+  if (error) return [];
+  return data;
+}
+
+export async function softDeleteItem(id: string) {
+  if (!_supabase) return;
+  const { error } = await _supabase
+    .from('items')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function restoreDeletedItem(id: string) {
+  if (!_supabase) return;
+  const { error } = await _supabase
+    .from('items')
+    .update({ deleted_at: null })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function upsertJourneyProgress(progress: Record<string, unknown>) {
+  if (!_supabase) return null;
+  const { data, error } = await _supabase
+    .from('journey_progress')
+    .upsert(progress)
+    .select()
+    .single();
   if (error) throw error;
   return data;
 }
@@ -46,7 +88,7 @@ const ITEM_COLUMNS = [
   'id', 'user_id', 'title', 'emoji', 'description', 'area', 'secondary_areas',
   'status', 'source', 'recurrence', 'habit_time_of_day', 'habit_duration',
   'deadline', 'priority', 'effort', 'paused_at', 'completed_at',
-  'created_at', 'updated_at',
+  'deleted_at', 'created_at', 'updated_at',
 ];
 
 export async function upsertItem(item: Record<string, unknown>) {

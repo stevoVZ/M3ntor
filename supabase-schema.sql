@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS items (
                     CHECK (effort IN ('quick','medium','deep')),
   paused_at         TIMESTAMPTZ,
   completed_at      TIMESTAMPTZ,
+  deleted_at        TIMESTAMPTZ,
   created_at        TIMESTAMPTZ DEFAULT NOW(),
   updated_at        TIMESTAMPTZ DEFAULT NOW()
 );

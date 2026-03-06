@@ -2,9 +2,10 @@ import { create } from 'zustand';
 import type { Item, Step, Subtask, JourneyProgress, Profile, CompletionLog, MoodEntry, MoodValue } from '../types';
 import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase, isSupabaseConfigured, fetchItems, fetchJourneyProgress, upsertItem, deleteItem, upsertStep, upsertSubtask, upsertCompletionLog, fetchCompletionLogs, upsertMoodEntry, fetchMoodEntries } from './supabase';
+import { supabase, isSupabaseConfigured, fetchItems, fetchDeletedItems, fetchJourneyProgress, upsertItem, deleteItem, softDeleteItem, restoreDeletedItem, upsertStep, upsertSubtask, upsertCompletionLog, fetchCompletionLogs, upsertMoodEntry, fetchMoodEntries, upsertJourneyProgress } from './supabase';
 import { SAMPLE_ITEMS, SAMPLE_COMMITTED } from '../constants/sample-data';
 import { PRG } from '../constants/config';
+import { WA } from '../constants/weekly-actions';
 import type { SampleItem, SampleStep, SampleSubtask, CommittedEntry } from '../constants/sample-data';
 
 function convertSubtask(st: SampleSubtask, stepId: string, idx: number): Subtask {
@@ -116,6 +117,7 @@ async function loadMoodLogFromStorage(): Promise<MoodEntry[]> {
 
 interface AppState {
   items:         Item[];
+  deletedItems:  Item[];
   journeys:      JourneyProgress[];
   profile:       Profile | null;
   userId:        string | null;
@@ -131,6 +133,8 @@ interface AppState {
   addItem:         (item: Item) => void;
   updateItem:      (id: string, patch: Partial<Item>) => void;
   removeItem:      (id: string) => void;
+  restoreItem:     (id: string) => void;
+  permanentlyDeleteItem: (id: string) => void;
   pauseItem:       (id: string) => void;
   resumeItem:      (id: string) => void;
   completeItem:    (id: string) => void;
@@ -149,6 +153,9 @@ interface AppState {
   reorderSubtask:  (itemId: string, stepId: string, subtaskId: string, direction: 'up' | 'down') => void;
 
   enrollJourney:   (journeyId: string) => void;
+  unenrollJourney: (journeyId: string) => void;
+  reEnrollJourney: (journeyId: string, reset: boolean) => void;
+  advanceJourneyDay: (journeyId: string) => void;
   recordCompletion:(actionId: string, status: 'done' | 'skipped') => void;
   recordMood:      (mood: MoodValue) => void;
 
@@ -164,6 +171,7 @@ function syncItem(item: Item | undefined) {
 
 export const useStore = create<AppState>((set, get) => ({
   items:         [],
+  deletedItems:  [],
   journeys:      [],
   profile:       null,
   userId:        null,
@@ -214,9 +222,10 @@ export const useStore = create<AppState>((set, get) => ({
         return;
       }
 
-      const [items, journeys] = await Promise.all([
+      const [items, journeys, deleted] = await Promise.all([
         fetchItems(effectiveUserId),
         fetchJourneyProgress(effectiveUserId),
+        fetchDeletedItems(effectiveUserId),
       ]);
 
       let completionLog = localCompletionLog;
@@ -279,6 +288,7 @@ export const useStore = create<AppState>((set, get) => ({
 
       set({
         items: [...loadedItems, ...syntheticJourneyItems],
+        deletedItems: (deleted ?? []) as Item[],
         journeys: loadedJourneys,
         completionLog,
         moodLog,
@@ -328,8 +338,35 @@ export const useStore = create<AppState>((set, get) => ({
 
   removeItem: (id) => {
     const item = get().items.find(i => i.id === id);
-    set(s => ({ items: s.items.filter(i => i.id !== id) }));
-    if (item?.user_id !== 'guest') {
+    if (!item) return;
+    const now = new Date().toISOString();
+    const deletedItem = { ...item, deleted_at: now };
+    set(s => ({
+      items: s.items.filter(i => i.id !== id),
+      deletedItems: [deletedItem, ...s.deletedItems],
+    }));
+    if (item.user_id !== 'guest') {
+      softDeleteItem(id).catch(console.error);
+    }
+  },
+
+  restoreItem: (id) => {
+    const item = get().deletedItems.find(i => i.id === id);
+    if (!item) return;
+    const restored = { ...item, deleted_at: undefined };
+    set(s => ({
+      deletedItems: s.deletedItems.filter(i => i.id !== id),
+      items: [restored, ...s.items],
+    }));
+    if (item.user_id !== 'guest') {
+      restoreDeletedItem(id).catch(console.error);
+    }
+  },
+
+  permanentlyDeleteItem: (id) => {
+    const item = get().deletedItems.find(i => i.id === id);
+    set(s => ({ deletedItems: s.deletedItems.filter(i => i.id !== id) }));
+    if (item && item.user_id !== 'guest') {
       deleteItem(id).catch(console.error);
     }
   },
@@ -616,9 +653,15 @@ export const useStore = create<AppState>((set, get) => ({
 
   enrollJourney: (journeyId) => {
     const existing = get().journeys.find(j => j.journey_id === journeyId);
-    if (existing) return;
+    if (existing && existing.status === 'active') return;
     const uid = get().userId ?? 'guest';
     const now = new Date().toISOString();
+
+    if (existing && existing.status === 'paused') {
+      get().reEnrollJourney(journeyId, false);
+      return;
+    }
+
     const entry: JourneyProgress = {
       id: Crypto.randomUUID(), user_id: uid, journey_id: journeyId,
       status: 'active', current_week: 1, current_day: 1, streak: 0,
@@ -650,6 +693,135 @@ export const useStore = create<AppState>((set, get) => ({
         user_id: uid, journey_id: journeyId,
         status: 'active', current_week: 1, current_day: 1, streak: 0,
       }).then(({ error }) => { if (error) console.error(error); });
+    }
+  },
+
+  unenrollJourney: (journeyId) => {
+    const uid = get().userId ?? 'guest';
+    set(s => ({
+      journeys: s.journeys.map(j =>
+        j.journey_id === journeyId ? { ...j, status: 'paused' as const } : j
+      ),
+      items: s.items.map(i =>
+        i.id === journeyId && i.source === 'journey'
+          ? { ...i, status: 'paused' as const, paused_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+          : i
+      ),
+    }));
+    if (uid !== 'guest' && isSupabaseConfigured && supabase) {
+      supabase.from('journey_progress')
+        .update({ status: 'paused' })
+        .eq('journey_id', journeyId)
+        .eq('user_id', uid)
+        .then(({ error }) => { if (error) console.error(error); });
+      upsertItem({ id: journeyId, user_id: uid, status: 'paused', paused_at: new Date().toISOString(), updated_at: new Date().toISOString() }).catch(console.error);
+    }
+  },
+
+  reEnrollJourney: (journeyId, reset) => {
+    const uid = get().userId ?? 'guest';
+    const now = new Date().toISOString();
+    const prog = PRG.find(p => p.id === journeyId);
+
+    const newJp = reset
+      ? { status: 'active' as const, current_week: 1, current_day: 1, streak: 0 }
+      : { status: 'active' as const };
+
+    set(s => {
+      const updated = s.journeys.map(j => {
+        if (j.journey_id !== journeyId) return j;
+        return reset
+          ? { ...j, ...newJp, last_session_at: undefined }
+          : { ...j, status: 'active' as const };
+      });
+      const alreadyExists = s.items.some(i => i.id === journeyId);
+      const syntheticItem: Item = {
+        id: journeyId,
+        user_id: uid,
+        title: prog?.t || journeyId,
+        emoji: '',
+        area: prog?.a || 'learning',
+        status: 'active',
+        source: 'journey',
+        priority: 'normal',
+        effort: 'medium',
+        created_at: now,
+        updated_at: now,
+      };
+      return {
+        journeys: updated,
+        items: alreadyExists ? s.items.map(i => i.id === journeyId ? { ...i, status: 'active' as const, paused_at: undefined, updated_at: now } : i) : [...s.items, syntheticItem],
+      };
+    });
+
+    if (uid !== 'guest' && isSupabaseConfigured && supabase) {
+      const updatedJp = get().journeys.find(j => j.journey_id === journeyId);
+      upsertJourneyProgress({
+        user_id: uid,
+        journey_id: journeyId,
+        status: 'active',
+        current_week: updatedJp?.current_week ?? 1,
+        current_day: updatedJp?.current_day ?? 1,
+        streak: updatedJp?.streak ?? 0,
+      }).catch(console.error);
+      upsertItem({ id: journeyId, user_id: uid, status: 'active', paused_at: null, updated_at: now }).catch(console.error);
+    }
+  },
+
+  advanceJourneyDay: (journeyId) => {
+    const uid = get().userId ?? 'guest';
+    const prog = PRG.find(p => p.id === journeyId);
+    if (!prog) return;
+
+    let updatedJp: JourneyProgress | undefined;
+    let journeyDone = false;
+
+    set(s => {
+      const updated = s.journeys.map(j => {
+        if (j.journey_id !== journeyId || j.status !== 'active') return j;
+        const now = new Date().toISOString();
+        const currentDay = j.current_day ?? 1;
+        const totalWeeks = prog.w;
+
+        const wa = WA[journeyId];
+        const weekIndex = Math.min(j.current_week - 1, (wa?.length ?? 1) - 1);
+        const daysInWeek = wa?.[weekIndex]?.length ?? 7;
+
+        let result: JourneyProgress;
+        if (currentDay >= daysInWeek) {
+          if (j.current_week >= totalWeeks) {
+            result = { ...j, status: 'done' as const, current_day: currentDay, last_session_at: now };
+            journeyDone = true;
+          } else {
+            result = { ...j, current_week: j.current_week + 1, current_day: 1, streak: j.streak + 1, last_session_at: now };
+          }
+        } else {
+          result = { ...j, current_day: currentDay + 1, streak: j.streak + 1, last_session_at: now };
+        }
+        updatedJp = result;
+        return result;
+      });
+
+      const items = journeyDone
+        ? s.items.map(i => i.id === journeyId ? { ...i, status: 'done' as const, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() } : i)
+        : s.items;
+
+      return { journeys: updated, items };
+    });
+
+    if (uid !== 'guest' && isSupabaseConfigured && supabase && updatedJp) {
+      upsertJourneyProgress({
+        user_id: uid,
+        journey_id: journeyId,
+        status: updatedJp.status,
+        current_week: updatedJp.current_week,
+        current_day: updatedJp.current_day ?? 1,
+        streak: updatedJp.streak,
+      }).catch(console.error);
+      if (journeyDone) {
+        const item = get().items.find(i => i.id === journeyId);
+        if (item) syncItem(item);
+      }
     }
   },
 

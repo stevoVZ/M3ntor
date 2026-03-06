@@ -129,7 +129,7 @@ function DeleteConfirmModal({ item, visible, onConfirm, onCancel }: {
           </View>
           <Text style={menuStyles.confirmTitle}>Delete item?</Text>
           <Text style={menuStyles.confirmSub} numberOfLines={2}>
-            "{item.title}" will be permanently removed. This can't be undone.
+            "{item.title}" will be moved to Recently Deleted. You can restore it later.
           </Text>
           <View style={menuStyles.confirmActions}>
             <Pressable style={menuStyles.cancelBtn} onPress={onCancel}>
@@ -506,10 +506,15 @@ export default function PlanScreen() {
   const [openProjectId, setOpenProjectId] = useState<string | null>(null);
 
   const items = useStore(s => s.items);
+  const deletedItems = useStore(s => s.deletedItems);
   const journeyProgresses = useStore(s => s.journeys);
   const updateItem = useStore(s => s.updateItem);
   const removeItem = useStore(s => s.removeItem);
+  const restoreItem = useStore(s => s.restoreItem);
+  const permanentlyDeleteItem = useStore(s => s.permanentlyDeleteItem);
   const reorderItem = useStore(s => s.reorderItem);
+
+  const [showTrash, setShowTrash] = useState(false);
 
   const sortByOrder = useCallback((arr: Item[]) =>
     [...arr].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), []);
@@ -813,6 +818,78 @@ export default function PlanScreen() {
                 />
               ));
             })()}
+          </View>
+        )}
+
+        {deletedItems.length > 0 && (
+          <View style={{ marginTop: 10, paddingHorizontal: S.md }}>
+            <Pressable
+              style={styles.trashToggle}
+              onPress={() => setShowTrash(v => !v)}
+            >
+              <Feather name="trash-2" size={13} color={T.t3} />
+              <Text style={styles.trashToggleText}>Recently deleted</Text>
+              <View style={styles.trashCount}>
+                <Text style={styles.trashCountText}>{deletedItems.length}</Text>
+              </View>
+              <Feather
+                name="chevron-down"
+                size={12}
+                color={T.t3}
+                style={{ marginLeft: 'auto', transform: [{ rotate: showTrash ? '0deg' : '-90deg' }] }}
+              />
+            </Pressable>
+
+            {showTrash && (
+              <View style={styles.trashSection}>
+                <Text style={styles.trashHint}>Items can be restored or permanently deleted</Text>
+                {deletedItems.map(item => {
+                  const area = ITEM_AREAS[item.area];
+                  const kind = itemKind(item);
+                  const kc = KIND_CONFIG[kind] || KIND_CONFIG.action;
+                  const deletedDate = item.deleted_at
+                    ? new Date(item.deleted_at).toLocaleDateString('en-AU', { month: 'short', day: 'numeric' })
+                    : '';
+                  return (
+                    <View key={item.id} style={styles.trashItem}>
+                      <View style={[styles.trashAccent, { backgroundColor: area?.c || T.t3 }]} />
+                      <View style={styles.trashItemBody}>
+                        <View style={styles.trashItemTop}>
+                          <Feather name={kc.icon as any} size={12} color={T.t3} />
+                          <Text style={styles.trashItemTitle} numberOfLines={1}>{item.title}</Text>
+                          {deletedDate ? <Text style={styles.trashItemDate}>{deletedDate}</Text> : null}
+                        </View>
+                        <View style={styles.trashItemActions}>
+                          <Pressable
+                            style={styles.trashRestoreBtn}
+                            onPress={() => restoreItem(item.id)}
+                          >
+                            <Feather name="rotate-ccw" size={11} color={T.brand} />
+                            <Text style={styles.trashRestoreText}>Restore</Text>
+                          </Pressable>
+                          <Pressable
+                            style={styles.trashDeleteBtn}
+                            onPress={() => {
+                              Alert.alert(
+                                'Delete permanently?',
+                                `"${item.title}" will be gone forever.`,
+                                [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  { text: 'Delete', style: 'destructive', onPress: () => permanentlyDeleteItem(item.id) },
+                                ]
+                              );
+                            }}
+                          >
+                            <Feather name="x" size={11} color={T.red} />
+                            <Text style={styles.trashDeleteText}>Delete</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
 
@@ -1131,4 +1208,35 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 48 },
   emptyTitle: { fontSize: F.lg, fontWeight: '700' as const, color: T.text, marginBottom: S.sm },
   emptySub: { fontSize: F.md, color: T.t2, lineHeight: 22 },
+
+  trashToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 14, paddingHorizontal: 4,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.sep,
+  },
+  trashToggleText: { fontSize: 13, fontWeight: '600' as const, color: T.t3 },
+  trashCount: {
+    backgroundColor: T.fill, borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 1,
+  },
+  trashCountText: { fontSize: 10, fontWeight: '700' as const, color: T.t3 },
+  trashSection: { gap: 6, paddingBottom: 8 },
+  trashHint: { fontSize: 11, color: T.t3, marginBottom: 4, paddingLeft: 4 },
+  trashItem: {
+    flexDirection: 'row', backgroundColor: 'white', borderRadius: 12,
+    overflow: 'hidden' as const, opacity: 0.75,
+  },
+  trashAccent: { width: 3 },
+  trashItemBody: { flex: 1, paddingVertical: 10, paddingHorizontal: 12 },
+  trashItemTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  trashItemTitle: {
+    fontSize: 13, fontWeight: '600' as const, color: T.t2, flex: 1,
+    textDecorationLine: 'line-through' as const,
+  },
+  trashItemDate: { fontSize: 10, color: T.t3 },
+  trashItemActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  trashRestoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  trashRestoreText: { fontSize: 11, fontWeight: '600' as const, color: T.brand },
+  trashDeleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  trashDeleteText: { fontSize: 11, fontWeight: '600' as const, color: T.red },
 });

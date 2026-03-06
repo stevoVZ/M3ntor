@@ -73,6 +73,7 @@ export interface Item {
   estimated_minutes?: number;
   actual_minutes?: number;
   review_date?: string;
+  deleted_at?: string;
   created_at: string;
   updated_at: string;
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { T, S, F, R, shadow } from '../../constants/theme';
@@ -11,8 +11,35 @@ import AICoach from '../../components/discover/AICoach';
 function JourneyCard({ journey }: { journey: Journey }) {
   const area = ITEM_AREAS[journey.a] ?? ITEM_AREAS.learning;
   const enrollJourney = useStore(s => s.enrollJourney);
-  const journeys      = useStore(s => s.journeys);
-  const enrolled      = journeys.some(j => j.journey_id === journey.id);
+  const unenrollJourney = useStore(s => s.unenrollJourney);
+  const reEnrollJourney = useStore(s => s.reEnrollJourney);
+  const journeys = useStore(s => s.journeys);
+  const jp = journeys.find(j => j.journey_id === journey.id);
+  const isActive = jp?.status === 'active';
+  const isPaused = jp?.status === 'paused';
+  const isDone = jp?.status === 'done';
+
+  const handleLeave = () => {
+    Alert.alert(
+      'Leave journey?',
+      'Your progress will be saved — you can come back anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => unenrollJourney(journey.id) },
+      ]
+    );
+  };
+
+  const handleStartOver = () => {
+    Alert.alert(
+      'Start over?',
+      'This will reset your progress to Week 1, Day 1.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Start over', style: 'destructive', onPress: () => reEnrollJourney(journey.id, true) },
+      ]
+    );
+  };
 
   return (
     <Pressable style={[styles.card, shadow.sm]}>
@@ -65,10 +92,55 @@ function JourneyCard({ journey }: { journey: Journey }) {
             )}
           </View>
         )}
-        <Pressable style={[styles.enrollBtn, { backgroundColor: enrolled ? T.green : area.c }]}
-          onPress={() => !enrolled && enrollJourney(journey.id)} disabled={enrolled}>
-          <Text style={styles.enrollBtnText}>{enrolled ? "✓ Enrolled" : "Enrol in journey"}</Text>
-        </Pressable>
+
+        {isPaused && jp && (
+          <View style={styles.pausedInfo}>
+            <Feather name="clock" size={11} color={T.t3} />
+            <Text style={styles.pausedInfoText}>
+              Paused at Week {jp.current_week}, Day {jp.current_day ?? 1}
+            </Text>
+          </View>
+        )}
+
+        {!jp ? (
+          <Pressable style={[styles.enrollBtn, { backgroundColor: area.c }]}
+            onPress={() => enrollJourney(journey.id)}>
+            <Text style={styles.enrollBtnText}>Enrol in journey</Text>
+          </Pressable>
+        ) : isActive ? (
+          <View style={styles.enrolledActions}>
+            <View style={[styles.enrolledBadge, { backgroundColor: T.green + '14' }]}>
+              <Feather name="check" size={11} color={T.green} />
+              <Text style={[styles.enrolledBadgeText, { color: T.green }]}>Enrolled</Text>
+            </View>
+            <Pressable style={styles.leaveBtn} onPress={handleLeave}>
+              <Feather name="log-out" size={12} color={T.t3} />
+              <Text style={styles.leaveBtnText}>Leave</Text>
+            </Pressable>
+          </View>
+        ) : isPaused ? (
+          <View style={styles.enrolledActions}>
+            <Pressable style={[styles.enrollBtn, { backgroundColor: area.c, flex: 1 }]}
+              onPress={() => reEnrollJourney(journey.id, false)}>
+              <Text style={styles.enrollBtnText}>Resume</Text>
+            </Pressable>
+            <Pressable style={[styles.enrollBtn, { backgroundColor: T.fill, flex: 1 }]}
+              onPress={handleStartOver}>
+              <Text style={[styles.enrollBtnText, { color: T.t2 }]}>Start over</Text>
+            </Pressable>
+          </View>
+        ) : isDone ? (
+          <View style={styles.enrolledActions}>
+            <View style={[styles.enrolledBadge, { backgroundColor: T.green + '14' }]}>
+              <Feather name="award" size={11} color={T.green} />
+              <Text style={[styles.enrolledBadgeText, { color: T.green }]}>Completed</Text>
+            </View>
+            <Pressable style={[styles.enrollBtn, { backgroundColor: T.fill, flex: 0 }]}
+              onPress={handleStartOver}>
+              <Text style={[styles.enrollBtnText, { color: T.t2 }]}>Restart</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -226,6 +298,13 @@ const styles = StyleSheet.create({
   cardMetaDot:  { fontSize: 11, color: T.t3 },
   enrollBtn:    { borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   enrollBtnText:{ fontSize: 13, fontWeight: '700', color: 'white' },
+  enrolledActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  enrolledBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, flex: 1 },
+  enrolledBadgeText: { fontSize: 13, fontWeight: '700' },
+  leaveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: T.fill },
+  leaveBtnText: { fontSize: 12, fontWeight: '600', color: T.t3 },
+  pausedInfo: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 },
+  pausedInfoText: { fontSize: 11, color: T.t3, fontWeight: '500' },
 
   coachCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
