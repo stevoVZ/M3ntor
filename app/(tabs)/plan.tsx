@@ -364,8 +364,11 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
   const pct = kind === 'project' ? Math.round(projectProgress(item) * 100) : 0;
   const isPaused = item.status === 'paused';
   const isDone = item.status === 'done';
+  const isActive = !isPaused && !isDone;
   const hasDeadline = !!item.deadline;
   const overdue = hasDeadline && isOverdue(item.deadline!);
+
+  const accentColor = isDone ? T.green : isPaused ? T.t3 : (area?.c || T.brand);
 
   function handleQuickToggle() {
     if (isDone) {
@@ -377,12 +380,19 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
 
   return (
     <Pressable
-      style={[styles.itemRow, shadow.xs, indented && { marginLeft: 16 }, isPaused && { opacity: 0.65 }, isDone && { opacity: 0.5 }]}
+      style={[
+        styles.itemRow, shadow.xs,
+        indented && { marginLeft: 16 },
+        isDone && styles.itemRowDone,
+        isPaused && styles.itemRowPaused,
+      ]}
       onPress={() => router.push(`/item/${item.id}`)}
       onLongPress={() => onMenu(item)}
     >
+      <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
+
       {index != null && (
-        <Text style={styles.orderNumber}>{index}</Text>
+        <Text style={[styles.orderNumber, isPaused && { opacity: 0.3 }]}>{index}</Text>
       )}
       {reorderable && (
         <Pressable
@@ -410,22 +420,32 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
 
       {kind !== 'goal' && (
         <Pressable
+          testID="quick-check"
+          accessibilityRole="checkbox"
           style={styles.quickCheck}
           onPress={(e) => { e.stopPropagation(); handleQuickToggle(); }}
           hitSlop={4}
         >
-          <View style={[styles.quickCheckBox, isDone && styles.quickCheckBoxDone]}>
+          <View style={[
+            styles.quickCheckBox,
+            isActive && { borderColor: accentColor + '60' },
+            isDone && styles.quickCheckBoxDone,
+          ]}>
             {isDone && <Feather name="check" size={11} color="white" />}
           </View>
         </Pressable>
       )}
 
-      <Text style={[styles.itemEmoji, isDone && { opacity: 0.5 }]}>{item.emoji}</Text>
+      <Text style={[styles.itemEmoji, (isDone || isPaused) && { opacity: 0.45 }]}>{item.emoji}</Text>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[styles.itemTitle, isDone && styles.itemTitleDone]} numberOfLines={1}>{item.title}</Text>
+        <Text style={[
+          styles.itemTitle,
+          isDone && styles.itemTitleDone,
+          isPaused && styles.itemTitlePaused,
+        ]} numberOfLines={1}>{item.title}</Text>
         <View style={styles.itemMetaRow}>
-          <View style={[styles.kindBadge, { backgroundColor: kc.color + '12' }]}>
-            <Text style={[styles.kindBadgeText, { color: kc.color }]}>{kc.label}</Text>
+          <View style={[styles.kindBadge, { backgroundColor: (isPaused ? T.t3 : kc.color) + '12' }]}>
+            <Text style={[styles.kindBadgeText, { color: isPaused ? T.t3 : kc.color }]}>{kc.label}</Text>
           </View>
           {area && <Text style={styles.itemAreaText}>{area.e} {area.n.split(' ')[0]}</Text>}
           {kind === 'project' && item.steps && (
@@ -441,20 +461,29 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
               {formatDeadline(item.deadline)}
             </Text>
           )}
-          {isPaused && <Text style={styles.pausedBadge}>Paused</Text>}
+          {isPaused && (
+            <View style={styles.pausedBadgeWrap}>
+              <Feather name="pause-circle" size={9} color={T.orange} />
+              <Text style={styles.pausedBadge}>Paused</Text>
+            </View>
+          )}
+          {isDone && (
+            <View style={styles.doneBadgeWrap}>
+              <Feather name="check-circle" size={9} color={T.green} />
+              <Text style={styles.doneBadgeText}>Done</Text>
+            </View>
+          )}
         </View>
       </View>
 
-      {pct > 0 ? (
+      {kind === 'project' && item.steps && item.steps.length > 0 ? (
         <View style={styles.miniProgressBg}>
           <View style={[styles.miniProgressFill, {
             width: `${pct}%` as any,
             backgroundColor: pct === 100 ? T.green : (area?.c || T.brand),
           }]} />
         </View>
-      ) : (
-        <View style={[styles.miniDot, { backgroundColor: area?.c || T.t3 }]} />
-      )}
+      ) : null}
 
       <Pressable onPress={() => onMenu(item)} hitSlop={8}>
         <Feather name="more-vertical" size={14} color={T.t3} style={{ opacity: 0.5 }} />
@@ -490,11 +519,11 @@ export default function PlanScreen() {
   const activeUnlinked = useMemo(() => sortByOrder(unlinked.filter(i => i.status === 'active')), [unlinked, sortByOrder]);
   const pausedUnlinked = useMemo(() => sortByOrder(unlinked.filter(i => i.status === 'paused')), [unlinked, sortByOrder]);
 
-  const filters: Array<{ id: FilterId; label: string; count?: number }> = [
+  const filters: Array<{ id: FilterId; label: string; count?: number; activeColor?: string }> = [
     { id: 'all', label: 'All' },
-    { id: 'goals', label: 'Goals', count: goals.length },
-    { id: 'active', label: 'Active', count: activeUnlinked.length },
-    { id: 'paused', label: 'Paused', count: pausedUnlinked.length },
+    { id: 'goals', label: 'Goals', count: goals.length, activeColor: '#AF52DE' },
+    { id: 'active', label: 'Active', count: activeUnlinked.length, activeColor: T.brand },
+    { id: 'paused', label: 'Paused', count: pausedUnlinked.length, activeColor: T.orange },
   ];
 
   const allFlat = useMemo(() => {
@@ -603,9 +632,10 @@ export default function PlanScreen() {
             contentContainerStyle={styles.filterPills}>
             {filters.map(f => {
               const on = filter === f.id;
+              const pillColor = f.activeColor || T.brand;
               return (
                 <Pressable key={f.id}
-                  style={[styles.filterPill, on && styles.filterPillActive]}
+                  style={[styles.filterPill, on && [styles.filterPillActive, { backgroundColor: pillColor }]]}
                   onPress={() => setFilter(f.id)}>
                   <Text style={[styles.filterPillText, on && styles.filterPillTextActive]}>
                     {f.label}
@@ -654,7 +684,11 @@ export default function PlanScreen() {
             {(filter === 'all' || filter === 'goals') && goals.length > 0 && (
               <View style={{ marginBottom: 20 }}>
                 {filter !== 'goals' && (
-                  <Text style={styles.sectionLabel}>GOALS</Text>
+                  <View style={styles.sectionLabelRow}>
+                    <Feather name="target" size={12} color="#AF52DE" />
+                    <Text style={styles.sectionLabel}>GOALS</Text>
+                    <Text style={styles.sectionCount}>{goals.length}</Text>
+                  </View>
                 )}
                 {goals.map((goal, idx) => (
                   <GoalCard
@@ -678,9 +712,11 @@ export default function PlanScreen() {
             {(filter === 'all' || filter === 'active') && activeUnlinked.length > 0 && (
               <View style={{ marginBottom: 20 }}>
                 <View style={styles.sectionLabelRow}>
-                  <Text style={styles.sectionLabel}>ACTIVE — NO GOAL YET</Text>
+                  <Feather name="zap" size={12} color={T.brand} />
+                  <Text style={styles.sectionLabel}>ACTIVE</Text>
+                  <Text style={styles.sectionCount}>{activeUnlinked.length}</Text>
                   <View style={styles.sectionHint}>
-                    <Text style={styles.sectionHintText}>Link these to a goal</Text>
+                    <Text style={styles.sectionHintText}>No goal linked</Text>
                   </View>
                 </View>
                 {activeUnlinked.map((item, idx) => (
@@ -701,7 +737,11 @@ export default function PlanScreen() {
 
             {(filter === 'all' || filter === 'paused') && pausedUnlinked.length > 0 && (
               <View style={{ marginBottom: 20 }}>
-                <Text style={styles.sectionLabel}>ON HOLD</Text>
+                <View style={styles.sectionLabelRow}>
+                  <Feather name="pause-circle" size={12} color={T.orange} />
+                  <Text style={[styles.sectionLabel, { color: T.t3 }]}>ON HOLD</Text>
+                  <Text style={styles.sectionCount}>{pausedUnlinked.length}</Text>
+                </View>
                 {pausedUnlinked.map((item, idx) => (
                   <ItemRow
                     key={item.id}
@@ -948,11 +988,17 @@ const styles = StyleSheet.create({
   section: { paddingTop: 0 },
 
   sectionLabel: {
-    fontSize: 11, fontWeight: '700' as const, color: T.t3,
-    letterSpacing: 0.5, marginBottom: 10,
+    fontSize: 11, fontWeight: '800' as const, color: T.t2,
+    letterSpacing: 0.5,
   },
   sectionLabelRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10,
+  },
+  sectionCount: {
+    fontSize: 10, fontWeight: '700' as const, color: T.t3,
+    backgroundColor: T.fill, borderRadius: 5,
+    paddingHorizontal: 5, paddingVertical: 1,
+    overflow: 'hidden' as const,
   },
   sectionHint: {
     backgroundColor: T.fill, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
@@ -1011,24 +1057,39 @@ const styles = StyleSheet.create({
 
   itemRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 11, paddingHorizontal: 14, borderRadius: 14,
-    backgroundColor: 'white', marginBottom: 4,
+    padding: 11, paddingHorizontal: 14, paddingLeft: 0, borderRadius: 14,
+    backgroundColor: 'white', marginBottom: 6, overflow: 'hidden' as const,
+  },
+  itemRowDone: {
+    backgroundColor: T.green + '06', opacity: 0.7,
+  },
+  itemRowPaused: {
+    backgroundColor: T.fill,
+  },
+  accentBar: {
+    width: 3.5, alignSelf: 'stretch' as const,
+    borderTopLeftRadius: 14, borderBottomLeftRadius: 14,
+    marginRight: 6,
   },
   itemEmoji: { fontSize: 18 },
   itemTitle: { fontSize: 13, fontWeight: '650' as const, color: T.text },
+  itemTitlePaused: { color: T.t3 },
   itemMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2, flexWrap: 'wrap' },
   kindBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
   kindBadgeText: { fontSize: 10, fontWeight: '600' as const },
   itemAreaText: { fontSize: 10, color: T.t3 },
   itemStepCount: { fontSize: 10, color: T.t3 },
   itemRecurrence: { fontSize: 10, color: T.t3 },
+  pausedBadgeWrap: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3 },
   pausedBadge: { fontSize: 10, color: T.orange, fontWeight: '600' as const },
+  doneBadgeWrap: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 3 },
+  doneBadgeText: { fontSize: 10, color: T.green, fontWeight: '600' as const },
   itemDeadline: { fontSize: 10, color: T.orange },
   itemTitleDone: { textDecorationLine: 'line-through' as const, color: T.t3 },
   quickCheck: { marginRight: 2, marginLeft: -2 },
   quickCheckBox: {
     width: 20, height: 20, borderRadius: 6, borderWidth: 1.5,
-    borderColor: T.sep + '80', alignItems: 'center' as const, justifyContent: 'center' as const,
+    borderColor: T.t3 + '40', alignItems: 'center' as const, justifyContent: 'center' as const,
   },
   quickCheckBoxDone: { backgroundColor: T.green, borderColor: T.green },
 
@@ -1057,7 +1118,6 @@ const styles = StyleSheet.create({
     backgroundColor: T.sep, overflow: 'hidden',
   },
   miniProgressFill: { height: '100%', borderRadius: 2 },
-  miniDot: { width: 7, height: 7, borderRadius: 4, opacity: 0.4 },
 
   sortRow: { flexDirection: 'row', gap: 5, marginBottom: 14 },
   sortPill: {
