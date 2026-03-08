@@ -154,6 +154,7 @@ interface AppState {
 
   enrollJourney:   (journeyId: string) => void;
   unenrollJourney: (journeyId: string) => void;
+  removeJourney:   (journeyId: string) => void;
   reEnrollJourney: (journeyId: string, reset: boolean) => void;
   advanceJourneyDay: (journeyId: string) => void;
   recordCompletion:(actionId: string, status: 'done' | 'skipped') => void;
@@ -717,6 +718,22 @@ export const useStore = create<AppState>((set, get) => ({
         .eq('user_id', uid)
         .then(({ error }) => { if (error) console.error(error); });
       upsertItem({ id: journeyId, user_id: uid, status: 'paused', paused_at: new Date().toISOString(), updated_at: new Date().toISOString() }).catch(console.error);
+    }
+  },
+
+  removeJourney: (journeyId) => {
+    const uid = get().userId ?? 'guest';
+    set(s => ({
+      journeys: s.journeys.filter(j => j.journey_id !== journeyId),
+      items: s.items.filter(i => !(i.id === journeyId && i.source === 'journey')),
+    }));
+    if (uid !== 'guest' && isSupabaseConfigured && supabase) {
+      supabase.from('journey_progress')
+        .delete()
+        .eq('journey_id', journeyId)
+        .eq('user_id', uid)
+        .then(({ error }) => { if (error) console.error(error); });
+      deleteItem(journeyId).catch(console.error);
     }
   },
 

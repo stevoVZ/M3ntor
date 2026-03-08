@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Pressable, TextInput,
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
@@ -17,7 +17,7 @@ import { formatDeadline, isOverdue, formatDate, fromNow } from '../../utils/date
 import { generateProjectTasks, generateSubtasks, expandProjectPhase } from '../../lib/ai';
 import { useStore } from '../../lib/store';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import type { Step, Subtask, JourneyProgress, Journey } from '../../types';
+import type { Step, Subtask, JourneyProgress, Journey, Item } from '../../types';
 import * as Crypto from 'expo-crypto';
 
 function isValidDate(s: string): boolean {
@@ -187,8 +187,37 @@ export default function ItemDetailPage() {
   const removeSubtaskAction = useStore(s => s.removeSubtask);
   const allItems = useStore(s => s.items);
   const journeys = useStore(s => s.journeys);
+  const addItem = useStore(s => s.addItem);
 
-  const item = getItem(id);
+  const storeItem = getItem(id);
+
+  const item = useMemo(() => {
+    if (storeItem) return storeItem;
+    if (!id) return undefined;
+    const jp = journeys.find(j => j.journey_id === id);
+    if (!jp) return undefined;
+    const prog = PRG.find(p => p.id === id);
+    if (!prog) return undefined;
+    return {
+      id,
+      user_id: jp.user_id,
+      title: prog.t,
+      emoji: '',
+      area: prog.a || 'learning',
+      status: jp.status === 'done' ? 'done' : jp.status === 'paused' ? 'paused' : 'active',
+      source: 'journey' as const,
+      priority: 'normal' as const,
+      effort: 'medium' as const,
+      created_at: jp.enrolled_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Item;
+  }, [storeItem, id, journeys]);
+
+  useEffect(() => {
+    if (item && !storeItem) {
+      addItem(item);
+    }
+  }, [item, storeItem, addItem]);
 
   const [newStepText, setNewStepText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);

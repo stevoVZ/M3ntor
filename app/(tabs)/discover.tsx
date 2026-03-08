@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { T, S, F, R, shadow } from '../../constants/theme';
 import { useStore } from '../../lib/store';
 import { ITEM_AREAS, PRG, DIFF, JOURNEY_ICONS, WA } from '../../constants/config';
@@ -12,6 +13,7 @@ type Tab = 'explore' | 'mine';
 
 function MyJourneyRow({ jp, program }: { jp: JourneyProgress; program: Journey }) {
   const area = ITEM_AREAS[program.a] ?? ITEM_AREAS.learning;
+  const router = useRouter();
   const unenrollJourney = useStore(s => s.unenrollJourney);
   const reEnrollJourney = useStore(s => s.reEnrollJourney);
   const totalDays = program.w * 7;
@@ -44,7 +46,7 @@ function MyJourneyRow({ jp, program }: { jp: JourneyProgress; program: Journey }
   };
 
   return (
-    <View style={[styles.myRow, { borderLeftColor: area.c }]}>
+    <Pressable style={[styles.myRow, { borderLeftColor: area.c }]} onPress={() => router.push(`/item/${program.id}`)}>
       <View style={styles.myRowTop}>
         <View style={[styles.myRowIcon, { backgroundColor: area.c + '14' }]}>
           <Text style={{ fontSize: 16 }}>{JOURNEY_ICONS[program.id] || area.e}</Text>
@@ -54,10 +56,11 @@ function MyJourneyRow({ jp, program }: { jp: JourneyProgress; program: Journey }
           <Text style={styles.myRowExpert}>{program.e}</Text>
         </View>
         {isActive && (
-          <Pressable onPress={handleLeave} hitSlop={8} style={styles.myRowLeave}>
+          <Pressable onPress={(e) => { e.stopPropagation(); handleLeave(); }} hitSlop={8} style={styles.myRowLeave}>
             <Feather name="pause" size={12} color={T.t3} />
           </Pressable>
         )}
+        <Feather name="chevron-right" size={14} color={T.t3} />
       </View>
 
       {isActive && (
@@ -84,12 +87,12 @@ function MyJourneyRow({ jp, program }: { jp: JourneyProgress; program: Journey }
           </View>
           <View style={styles.myRowActions}>
             <Pressable style={[styles.myRowActionBtn, { backgroundColor: area.c }]}
-              onPress={() => reEnrollJourney(program.id, false)}>
+              onPress={(e) => { e.stopPropagation(); reEnrollJourney(program.id, false); }}>
               <Feather name="play" size={12} color="white" />
               <Text style={styles.myRowActionBtnText}>Resume</Text>
             </Pressable>
             <Pressable style={[styles.myRowActionBtn, { backgroundColor: T.fill }]}
-              onPress={handleStartOver}>
+              onPress={(e) => { e.stopPropagation(); handleStartOver(); }}>
               <Feather name="refresh-cw" size={11} color={T.t2} />
               <Text style={[styles.myRowActionBtnText, { color: T.t2 }]}>Start over</Text>
             </Pressable>
@@ -104,13 +107,13 @@ function MyJourneyRow({ jp, program }: { jp: JourneyProgress; program: Journey }
             <Text style={styles.myRowDoneText}>Completed</Text>
           </View>
           <Pressable style={[styles.myRowActionBtn, { backgroundColor: T.fill }]}
-            onPress={handleStartOver}>
+            onPress={(e) => { e.stopPropagation(); handleStartOver(); }}>
             <Feather name="refresh-cw" size={11} color={T.t2} />
             <Text style={[styles.myRowActionBtnText, { color: T.t2 }]}>Restart</Text>
           </Pressable>
         </View>
       )}
-    </View>
+    </Pressable>
   );
 }
 
@@ -296,7 +299,9 @@ export default function DiscoverScreen() {
   const pausedJourneys = myJourneys.filter(j => j.jp.status === 'paused');
   const doneJourneys = myJourneys.filter(j => j.jp.status === 'done');
 
+  const enrolledIds = new Set(journeys.map(j => j.journey_id));
   const filtered = PRG.filter(j => {
+    if (enrolledIds.has(j.id)) return false;
     const matchSearch = !search.trim() || j.t.toLowerCase().includes(search.toLowerCase()) || j.e.toLowerCase().includes(search.toLowerCase());
     const matchFilter = !filter || j.a === filter;
     return matchSearch && matchFilter;

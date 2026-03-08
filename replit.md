@@ -15,7 +15,7 @@ Preferred communication style: Simple, everyday language.
 ### Frontend Architecture
 
 - **Framework**: Expo (React Native) with `expo-router` for file-based navigation.
-- **State Management**: Zustand store manages item CRUD, authentication, journey progress, completion/mood logging, streak tracking, and item reordering. Journeys are managed with `enrollJourney`, `unenrollJourney`, and `advanceJourneyDay`.
+- **State Management**: Zustand store manages item CRUD, authentication, journey progress, completion/mood logging, streak tracking, and item reordering. Journeys are managed with `enrollJourney`, `unenrollJourney`, `removeJourney` (permanent deletion), `reEnrollJourney`, and `advanceJourneyDay`.
 - **Soft Delete / Trash**: Items are soft-deleted and can be restored or permanently deleted.
 - **AI Utilities**: `lib/ai.ts` provides client-side AI functions.
 - **Design System**: `constants/theme.ts` defines colors, spacing, fonts, and shadows.
@@ -70,7 +70,7 @@ Uses `expo-router` for file-based routing:
 
 - **Today**: Displays time-of-day grouped actions, journey session mode, and streak tracking.
 - **Plan**: Offers dual hierarchy/list views, goal and project management with progress tracking, and AI generation of steps/subtasks.
-- **Discover**: Provides a journey catalog and AI Coach.
+- **Discover**: Provides a journey catalog with segmented Explore/My Journeys tabs. Enrolled journeys are filtered out of Explore. My Journeys rows are tappable to navigate to journey detail. AI Coach branded as "Ask M3NTOR".
 - **My Life**: Features the Wheel of Life for self and app scores, insights, and profile management.
 
 ## External Dependencies

@@ -68,6 +68,7 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
     : new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
 
   const reEnrollJourney = useStore(s => s.reEnrollJourney);
+  const removeJourney = useStore(s => s.removeJourney);
   const activeJourneys = journeys.filter(j => j.status === 'active');
   const pausedJourneys = journeys.filter(j => j.status === 'paused');
   const completedJourneys = journeys.filter(j => j.status === 'done');
@@ -90,6 +91,22 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
         { text: 'Restart', onPress: () => reEnrollJourney(journeyId, true) },
       ],
     );
+  }
+
+  function handleRemove(journeyId: string) {
+    Alert.alert(
+      'Remove journey?',
+      'This will permanently remove this journey and its progress. You can always re-enrol from Discover.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => removeJourney(journeyId) },
+      ],
+    );
+  }
+
+  function navigateToJourney(journeyId: string) {
+    onClose();
+    router.push(`/item/${journeyId}`);
   }
 
   function navigateToDiscover() {
@@ -140,7 +157,7 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
                 const areaColor = getAreaColor(program.a);
 
                 return (
-                  <Pressable key={jp.id} style={[styles.programRow, idx < activeJourneys.length - 1 && styles.programRowBorder]} onPress={navigateToDiscover}>
+                  <Pressable key={jp.id} style={[styles.programRow, idx < activeJourneys.length - 1 && styles.programRowBorder]} onPress={() => navigateToJourney(jp.journey_id)}>
                     <View style={[styles.programAccent, { backgroundColor: areaColor }]} />
                     <View style={[styles.programIcon, { backgroundColor: areaColor + '14' }]}>
                       <Feather name="compass" size={16} color={areaColor} />
@@ -175,7 +192,7 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
                 const areaColor = getAreaColor(program.a);
 
                 return (
-                  <View key={jp.id} style={[styles.programRow, idx < pausedJourneys.length - 1 && styles.programRowBorder]}>
+                  <Pressable key={jp.id} style={[styles.programRow, idx < pausedJourneys.length - 1 && styles.programRowBorder]} onPress={() => navigateToJourney(jp.journey_id)}>
                     <View style={[styles.programAccent, { backgroundColor: areaColor, opacity: 0.5 }]} />
                     <View style={[styles.programIcon, { backgroundColor: areaColor + '14' }]}>
                       <Feather name="pause-circle" size={16} color={areaColor} />
@@ -189,11 +206,14 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
                         <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: areaColor, opacity: 0.5 }]} />
                       </View>
                     </View>
-                    <Pressable style={styles.resumeBtn} onPress={() => handleResume(jp.journey_id)} hitSlop={8}>
+                    <Pressable style={styles.resumeBtn} onPress={(e) => { e.stopPropagation(); handleResume(jp.journey_id); }} hitSlop={8}>
                       <Feather name="play" size={14} color={T.brand} />
                       <Text style={styles.resumeBtnText}>Resume</Text>
                     </Pressable>
-                  </View>
+                    <Pressable style={styles.removeBtn} onPress={(e) => { e.stopPropagation(); handleRemove(jp.journey_id); }} hitSlop={8}>
+                      <Feather name="trash-2" size={13} color={T.t3} />
+                    </Pressable>
+                  </Pressable>
                 );
               })}
             </View>
@@ -210,7 +230,7 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
                 const areaColor = getAreaColor(program.a);
 
                 return (
-                  <View key={jp.id} style={[styles.programRow, idx < completedJourneys.length - 1 && styles.programRowBorder]}>
+                  <Pressable key={jp.id} style={[styles.programRow, idx < completedJourneys.length - 1 && styles.programRowBorder]} onPress={() => navigateToJourney(jp.journey_id)}>
                     <View style={[styles.programAccent, { backgroundColor: T.green }]} />
                     <View style={[styles.programIcon, { backgroundColor: T.green + '14' }]}>
                       <Feather name="award" size={16} color={T.green} />
@@ -227,10 +247,13 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
                         {program.w} weeks completed
                       </Text>
                     </View>
-                    <Pressable style={styles.restartBtn} onPress={() => handleRestart(jp.journey_id)} hitSlop={8}>
+                    <Pressable style={styles.restartBtn} onPress={(e) => { e.stopPropagation(); handleRestart(jp.journey_id); }} hitSlop={8}>
                       <Feather name="refresh-cw" size={13} color={T.t2} />
                     </Pressable>
-                  </View>
+                    <Pressable style={styles.removeBtn} onPress={(e) => { e.stopPropagation(); handleRemove(jp.journey_id); }} hitSlop={8}>
+                      <Feather name="trash-2" size={13} color={T.t3} />
+                    </Pressable>
+                  </Pressable>
                 );
               })}
             </View>
@@ -559,6 +582,13 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 8,
     backgroundColor: T.fill,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  removeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
