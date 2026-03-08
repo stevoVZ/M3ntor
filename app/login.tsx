@@ -14,6 +14,17 @@ import { T, S, F, R, shadow } from '../constants/theme';
 
 type Mode = 'signin' | 'signup';
 
+function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
+  if (Platform.OS === 'web') {
+    return <View style={[styles.glassCardWeb, style]}>{children}</View>;
+  }
+  return (
+    <BlurView intensity={60} tint="light" style={[styles.glassCard, style]}>
+      {children}
+    </BlurView>
+  );
+}
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -61,17 +72,6 @@ export default function LoginScreen() {
   const canSubmit = email.trim().length > 0 && password.trim().length > 0;
   const topPad = Math.max(insets.top, Platform.OS === 'web' ? 67 : 0);
   const bottomPad = Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 0);
-
-  const GlassCard = ({ children, style }: { children: React.ReactNode; style?: any }) => {
-    if (Platform.OS === 'web') {
-      return <View style={[styles.glassCardWeb, style]}>{children}</View>;
-    }
-    return (
-      <BlurView intensity={60} tint="light" style={[styles.glassCard, style]}>
-        {children}
-      </BlurView>
-    );
-  };
 
   return (
     <View style={styles.root}>
