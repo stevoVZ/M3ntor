@@ -172,9 +172,12 @@ export default function AICoach({ onClose }: AICoachProps) {
         <Pressable style={styles.backBtn} onPress={onClose}>
           <Feather name="chevron-left" size={20} color={T.text} />
         </Pressable>
-        <View>
-          <Text style={styles.headerTitle}>Find Your Journey</Text>
-          <Text style={styles.headerSub}>Tell me what you want to work on</Text>
+        <View style={styles.headerAvatar}>
+          <Text style={styles.headerAvatarText}>M3</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Ask M3NTOR</Text>
+          <Text style={styles.headerSub}>Tell me your goals and I'll find the right journey</Text>
         </View>
       </View>
 
@@ -221,8 +224,14 @@ export default function AICoach({ onClose }: AICoachProps) {
               <Text style={styles.botName}>M3NTOR</Text>
             </View>
             <Text style={styles.emptyDesc}>
-              Describe a goal, challenge, or something you want to improve. I will recommend the best journeys for you.
+              Describe a goal, challenge, or something you want to improve. I'll recommend the best journeys for you.
             </Text>
+            {!country && (
+              <View style={styles.regionHint}>
+                <Feather name="globe" size={12} color={T.t3} />
+                <Text style={styles.regionHintText}>Set your region in Profile for local recommendations</Text>
+              </View>
+            )}
             <Text style={styles.suggestLabel}>TRY SOMETHING LIKE</Text>
             {suggestions.map((s, i) => (
               <Pressable
@@ -307,7 +316,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: T.bg },
 
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: S.md, paddingVertical: 10 },
-  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: T.fill, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: T.fill, alignItems: 'center' as const, justifyContent: 'center' as const },
+  headerAvatar: { width: 30, height: 30, borderRadius: 8, backgroundColor: T.brand, alignItems: 'center' as const, justifyContent: 'center' as const },
+  headerAvatarText: { fontSize: 10, fontWeight: '800' as const, color: 'white' },
   headerTitle: { fontSize: 17, fontWeight: '700' as const, color: T.text },
   headerSub: { fontSize: 12, color: T.t3 },
 
@@ -328,6 +339,8 @@ const styles = StyleSheet.create({
   botAvatarText: { fontSize: 11, fontWeight: '800' as const, color: 'white' },
   botName: { fontSize: 14, fontWeight: '700' as const, color: T.text },
   emptyDesc: { fontSize: 15, color: T.t2, lineHeight: 24, marginBottom: S.md },
+  regionHint: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, backgroundColor: T.fill, borderRadius: 8, padding: 10, marginBottom: 12 },
+  regionHintText: { fontSize: 12, color: T.t3, flex: 1 },
   suggestLabel: { fontSize: 12, fontWeight: '600' as const, color: T.t3, letterSpacing: 0.5, marginBottom: 8 },
   suggestion: {
     paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12,

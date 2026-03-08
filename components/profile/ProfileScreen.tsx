@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useStore } from '@/lib/store';
 import { T, S, F, R, shadow } from '@/constants/theme';
-import { PRG } from '@/constants/config';
+import { PRG, ITEM_AREAS } from '@/constants/config';
 import { COUNTRIES, getCountryByCode } from '@/constants/countries';
 
 const SETTINGS_SECTIONS = [
@@ -67,8 +67,35 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
     ? new Date(profile.created_at).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
     : new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
 
+  const reEnrollJourney = useStore(s => s.reEnrollJourney);
   const activeJourneys = journeys.filter(j => j.status === 'active');
+  const pausedJourneys = journeys.filter(j => j.status === 'paused');
+  const completedJourneys = journeys.filter(j => j.status === 'done');
   const currentCountry = profile?.country ? getCountryByCode(profile.country) : null;
+
+  function getAreaColor(areaId: string): string {
+    return ITEM_AREAS[areaId]?.c || T.brand;
+  }
+
+  function handleResume(journeyId: string) {
+    reEnrollJourney(journeyId, false);
+  }
+
+  function handleRestart(journeyId: string) {
+    Alert.alert(
+      'Restart Program',
+      'This will reset your progress and start from Week 1, Day 1. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Restart', onPress: () => reEnrollJourney(journeyId, true) },
+      ],
+    );
+  }
+
+  function navigateToDiscover() {
+    onClose();
+    router.push('/(tabs)/discover');
+  }
 
   const filteredCountries = countrySearch.trim()
     ? COUNTRIES.filter(c => c.name.toLowerCase().includes(countrySearch.toLowerCase()))
@@ -110,11 +137,13 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
                 const totalDays = program.w * 7;
                 const completedDays = ((jp.current_week - 1) * 7) + (jp.current_day || 1);
                 const progress = Math.min(1, completedDays / totalDays);
+                const areaColor = getAreaColor(program.a);
 
                 return (
-                  <View key={jp.id} style={[styles.programRow, idx < activeJourneys.length - 1 && styles.programRowBorder]}>
-                    <View style={[styles.programIcon, { backgroundColor: T.brand + '14' }]}>
-                      <Feather name="compass" size={16} color={T.brand} />
+                  <Pressable key={jp.id} style={[styles.programRow, idx < activeJourneys.length - 1 && styles.programRowBorder]} onPress={navigateToDiscover}>
+                    <View style={[styles.programAccent, { backgroundColor: areaColor }]} />
+                    <View style={[styles.programIcon, { backgroundColor: areaColor + '14' }]}>
+                      <Feather name="compass" size={16} color={areaColor} />
                     </View>
                     <View style={styles.programInfo}>
                       <Text style={styles.programTitle} numberOfLines={1}>{program.t}</Text>
@@ -122,9 +151,48 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
                         Week {jp.current_week} of {program.w} {'\u00B7'} Day {jp.current_day || 1}
                       </Text>
                       <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+                        <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: areaColor }]} />
                       </View>
                     </View>
+                    <Feather name="chevron-right" size={14} color={T.t3} />
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {pausedJourneys.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Paused Programs</Text>
+            <View style={[styles.sectionCard, shadow.xs]}>
+              {pausedJourneys.map((jp, idx) => {
+                const program = PRG.find(p => p.id === jp.journey_id);
+                if (!program) return null;
+                const totalDays = program.w * 7;
+                const completedDays = ((jp.current_week - 1) * 7) + (jp.current_day || 1);
+                const progress = Math.min(1, completedDays / totalDays);
+                const areaColor = getAreaColor(program.a);
+
+                return (
+                  <View key={jp.id} style={[styles.programRow, idx < pausedJourneys.length - 1 && styles.programRowBorder]}>
+                    <View style={[styles.programAccent, { backgroundColor: areaColor, opacity: 0.5 }]} />
+                    <View style={[styles.programIcon, { backgroundColor: areaColor + '14' }]}>
+                      <Feather name="pause-circle" size={16} color={areaColor} />
+                    </View>
+                    <View style={styles.programInfo}>
+                      <Text style={styles.programTitle} numberOfLines={1}>{program.t}</Text>
+                      <Text style={styles.programMeta}>
+                        Paused at Week {jp.current_week} of {program.w} {'\u00B7'} Day {jp.current_day || 1}
+                      </Text>
+                      <View style={styles.progressTrack}>
+                        <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: areaColor, opacity: 0.5 }]} />
+                      </View>
+                    </View>
+                    <Pressable style={styles.resumeBtn} onPress={() => handleResume(jp.journey_id)} hitSlop={8}>
+                      <Feather name="play" size={14} color={T.brand} />
+                      <Text style={styles.resumeBtnText}>Resume</Text>
+                    </Pressable>
                   </View>
                 );
               })}
@@ -132,14 +200,51 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
           </View>
         )}
 
-        {activeJourneys.length === 0 && (
+        {completedJourneys.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Active Programs</Text>
-            <View style={[styles.emptyCard, shadow.xs]}>
-              <Feather name="compass" size={20} color={T.t3} />
-              <Text style={styles.emptyText}>No active programs yet</Text>
-              <Text style={styles.emptySubtext}>Explore the Discover tab to find a journey</Text>
+            <Text style={styles.sectionTitle}>Completed Programs</Text>
+            <View style={[styles.sectionCard, shadow.xs]}>
+              {completedJourneys.map((jp, idx) => {
+                const program = PRG.find(p => p.id === jp.journey_id);
+                if (!program) return null;
+                const areaColor = getAreaColor(program.a);
+
+                return (
+                  <View key={jp.id} style={[styles.programRow, idx < completedJourneys.length - 1 && styles.programRowBorder]}>
+                    <View style={[styles.programAccent, { backgroundColor: T.green }]} />
+                    <View style={[styles.programIcon, { backgroundColor: T.green + '14' }]}>
+                      <Feather name="award" size={16} color={T.green} />
+                    </View>
+                    <View style={styles.programInfo}>
+                      <View style={styles.completedTitleRow}>
+                        <Text style={styles.programTitle} numberOfLines={1}>{program.t}</Text>
+                        <View style={styles.completedBadge}>
+                          <Feather name="check-circle" size={10} color={T.green} />
+                          <Text style={styles.completedBadgeText}>Done</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.programMeta}>
+                        {program.w} weeks completed
+                      </Text>
+                    </View>
+                    <Pressable style={styles.restartBtn} onPress={() => handleRestart(jp.journey_id)} hitSlop={8}>
+                      <Feather name="refresh-cw" size={13} color={T.t2} />
+                    </Pressable>
+                  </View>
+                );
+              })}
             </View>
+          </View>
+        )}
+
+        {activeJourneys.length === 0 && pausedJourneys.length === 0 && completedJourneys.length === 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Programs</Text>
+            <Pressable style={[styles.emptyCard, shadow.xs]} onPress={navigateToDiscover}>
+              <Feather name="compass" size={20} color={T.t3} />
+              <Text style={styles.emptyText}>No programs yet</Text>
+              <Text style={styles.emptySubtext}>Explore the Discover tab to find a journey</Text>
+            </Pressable>
           </View>
         )}
 
@@ -369,10 +474,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 14,
+    overflow: 'hidden',
   },
   programRowBorder: {
     borderBottomWidth: 0.5,
     borderBottomColor: T.sep,
+  },
+  programAccent: {
+    position: 'absolute' as const,
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 14,
   },
   programIcon: {
     width: 38,
@@ -405,6 +520,47 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: T.brand,
     borderRadius: 2,
+  },
+  completedTitleRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  completedBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 3,
+    backgroundColor: T.green + '14',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  completedBadgeText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: T.green,
+  },
+  resumeBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: T.brand + '0F',
+    borderRadius: 8,
+  },
+  resumeBtnText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: T.brand,
+  },
+  restartBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: T.fill,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
 
   emptyCard: {
