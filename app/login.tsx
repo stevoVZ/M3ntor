@@ -11,17 +11,29 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useStore } from '../lib/store';
-import { T, S, F, R, shadow } from '../constants/theme';
 
 type Mode = 'signin' | 'signup';
 type Feedback = { type: 'success' | 'error'; message: string } | null;
 
+const ACCENT = '#007AFF';
+const DARK = '#1C1C1E';
+const LABEL = '#3A3A3C';
+const SUBTLE = '#8E8E93';
+const SEPARATOR = 'rgba(60,60,67,0.08)';
+const CARD_BG = 'rgba(255,255,255,0.68)';
+const CARD_BORDER = 'rgba(255,255,255,0.72)';
+const INPUT_BG = 'rgba(245,245,247,0.7)';
+
 function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
   if (Platform.OS === 'web') {
-    return <View style={[styles.glassCardWeb, style]}>{children}</View>;
+    return (
+      <View style={[styles.glassCardWeb, style]}>
+        {children}
+      </View>
+    );
   }
   return (
-    <BlurView intensity={60} tint="light" style={[styles.glassCard, style]}>
+    <BlurView intensity={48} tint="systemChromeMaterialLight" style={[styles.glassCard, style]}>
       {children}
     </BlurView>
   );
@@ -112,13 +124,13 @@ export default function LoginScreen() {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#F8F7FF', '#EDE9FE', '#F0EAFF', '#F5F3FF']}
-        locations={[0, 0.3, 0.6, 1]}
+        colors={['#F2F2F7', '#E8E8ED', '#F5F5FA', '#FFFFFF']}
+        locations={[0, 0.35, 0.7, 1]}
         style={StyleSheet.absoluteFill}
       />
 
-      <View style={[styles.orbTopRight, { top: topPad - 40 }]} />
-      <View style={styles.orbBottomLeft} />
+      <View style={styles.meshCircle1} />
+      <View style={styles.meshCircle2} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -140,23 +152,13 @@ export default function LoginScreen() {
           </View>
 
           <GlassCard style={styles.mainCard}>
-            <View style={styles.modeToggle}>
+            <View style={styles.segmentedControl}>
               {(['signin', 'signup'] as Mode[]).map(m => (
                 <Pressable key={m} onPress={() => switchMode(m)}
-                  style={[styles.modeBtn, mode === m && styles.modeBtnActive]}>
-                  {mode === m ? (
-                    <LinearGradient
-                      colors={['#FFFFFF', '#FAFAFF']}
-                      style={styles.modeBtnGrad}>
-                      <Text style={[styles.modeBtnText, styles.modeBtnTextActive]}>
-                        {m === 'signin' ? 'Sign In' : 'Create Account'}
-                      </Text>
-                    </LinearGradient>
-                  ) : (
-                    <Text style={styles.modeBtnText}>
-                      {m === 'signin' ? 'Sign In' : 'Create Account'}
-                    </Text>
-                  )}
+                  style={[styles.segment, mode === m && styles.segmentActive]}>
+                  <Text style={[styles.segmentText, mode === m && styles.segmentTextActive]}>
+                    {m === 'signin' ? 'Sign In' : 'Create Account'}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -165,8 +167,8 @@ export default function LoginScreen() {
               <View style={[styles.feedbackBanner, feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess]}>
                 <Feather
                   name={feedback.type === 'error' ? 'alert-circle' : 'check-circle'}
-                  size={16}
-                  color={feedback.type === 'error' ? '#DC2626' : '#16A34A'}
+                  size={15}
+                  color={feedback.type === 'error' ? '#FF3B30' : '#34C759'}
                 />
                 <Text style={[styles.feedbackText, feedback.type === 'error' ? styles.feedbackTextError : styles.feedbackTextSuccess]}>
                   {feedback.message}
@@ -176,8 +178,8 @@ export default function LoginScreen() {
 
             <View style={styles.formFields}>
               {mode === 'signup' && (
-                <View style={styles.inputWrap}>
-                  <Feather name="user" size={18} color="#AEAEB2" style={styles.inputIcon} />
+                <View style={styles.inputRow}>
+                  <Feather name="user" size={17} color={SUBTLE} style={styles.inputIcon} />
                   <TextInput
                     value={name}
                     onChangeText={setName}
@@ -190,8 +192,8 @@ export default function LoginScreen() {
                 </View>
               )}
 
-              <View style={[styles.inputWrap, mode === 'signup' && styles.inputWrapBorder]}>
-                <Feather name="mail" size={18} color="#AEAEB2" style={styles.inputIcon} />
+              <View style={[styles.inputRow, mode === 'signup' && styles.inputRowBorder]}>
+                <Feather name="mail" size={17} color={SUBTLE} style={styles.inputIcon} />
                 <TextInput
                   value={email}
                   onChangeText={setEmail}
@@ -205,8 +207,8 @@ export default function LoginScreen() {
                 />
               </View>
 
-              <View style={[styles.inputWrap, styles.inputWrapBorder]}>
-                <Feather name="lock" size={18} color="#AEAEB2" style={styles.inputIcon} />
+              <View style={[styles.inputRow, styles.inputRowBorder]}>
+                <Feather name="lock" size={17} color={SUBTLE} style={styles.inputIcon} />
                 <TextInput
                   value={password}
                   onChangeText={setPass}
@@ -229,19 +231,13 @@ export default function LoginScreen() {
             <Pressable
               onPress={handleEmailAuth}
               disabled={loading || !canSubmit}
-              style={{ marginTop: mode === 'signin' ? 0 : 20, opacity: (!canSubmit && !loading) ? 0.5 : 1 }}>
-              <LinearGradient
-                colors={T.gradColors as unknown as string[]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.primaryBtn}>
-                {loading
-                  ? <ActivityIndicator color="white" />
-                  : <Text style={styles.primaryBtnText}>
-                      {mode === 'signin' ? 'Sign In' : 'Create Account'}
-                    </Text>
-                }
-              </LinearGradient>
+              style={[styles.primaryBtn, { marginTop: mode === 'signin' ? 0 : 20, opacity: (!canSubmit && !loading) ? 0.4 : 1 }]}>
+              {loading
+                ? <ActivityIndicator color="white" />
+                : <Text style={styles.primaryBtnText}>
+                    {mode === 'signin' ? 'Sign In' : 'Create Account'}
+                  </Text>
+              }
             </Pressable>
           </GlassCard>
 
@@ -251,9 +247,9 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <Pressable style={styles.socialBtn}>
-            <Feather name="smartphone" size={20} color="white" />
-            <Text style={styles.socialBtnText}>Continue with Apple</Text>
+          <Pressable style={styles.appleBtn}>
+            <Feather name="smartphone" size={19} color="white" />
+            <Text style={styles.appleBtnText}>Continue with Apple</Text>
           </Pressable>
 
           <Pressable
@@ -264,8 +260,8 @@ export default function LoginScreen() {
               await store.loadAll('guest');
               router.replace('/(tabs)/today');
             }}>
-            <Feather name="arrow-right" size={18} color={T.brand} />
             <Text style={styles.guestBtnText}>Continue as Guest</Text>
+            <Feather name="arrow-right" size={16} color={LABEL} />
           </Pressable>
 
           <Text style={styles.legal}>
@@ -282,22 +278,23 @@ const styles = StyleSheet.create({
   kav:  { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 28 },
 
-  orbTopRight: {
+  meshCircle1: {
     position: 'absolute',
-    right: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: T.brand + '14',
-  },
-  orbBottomLeft: {
-    position: 'absolute',
-    left: -80,
-    bottom: -40,
+    right: -90,
+    top: -30,
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: 'rgba(123,121,232,0.06)',
+    backgroundColor: 'rgba(174,174,178,0.06)',
+  },
+  meshCircle2: {
+    position: 'absolute',
+    left: -70,
+    bottom: -50,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(199,199,204,0.08)',
   },
 
   hero: {
@@ -308,87 +305,84 @@ const styles = StyleSheet.create({
   heroLogo: { width: 320, height: 210 },
 
   glassCard: {
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     padding: 20,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: CARD_BORDER,
   },
   glassCardWeb: {
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     padding: 20,
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: CARD_BG,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.8)',
+    borderColor: CARD_BORDER,
     ...(Platform.OS === 'web' ? {
-      backdropFilter: 'blur(24px)',
-      WebkitBackdropFilter: 'blur(24px)',
+      backdropFilter: 'blur(40px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(40px) saturate(180%)',
     } as any : {}),
   },
   mainCard: {
     marginBottom: 20,
   },
 
-  modeToggle: {
+  segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.04)',
-    borderRadius: 12,
-    padding: 3,
+    backgroundColor: 'rgba(118,118,128,0.08)',
+    borderRadius: 10,
+    padding: 2,
     marginBottom: 20,
   },
-  modeBtn: {
+  segment: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
-  modeBtnActive: {
+  segmentActive: {
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 2,
   },
-  modeBtnGrad: {
-    width: '100%',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: SUBTLE,
+    letterSpacing: -0.1,
   },
-  modeBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8E8E93',
-  },
-  modeBtnTextActive: {
-    color: T.brand,
-    fontWeight: '700',
+  segmentTextActive: {
+    color: DARK,
+    fontWeight: '600' as const,
   },
 
   formFields: {
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    borderRadius: 14,
+    backgroundColor: INPUT_BG,
+    borderRadius: 12,
     overflow: 'hidden',
   },
-  inputWrap: {
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
   },
-  inputWrapBorder: {
+  inputRowBorder: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(0,0,0,0.06)',
+    borderTopColor: SEPARATOR,
   },
   inputIcon: {
     marginRight: 10,
   },
   input: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: 14,
     fontSize: 16,
-    color: T.text,
+    color: DARK,
+    letterSpacing: -0.2,
   },
 
   feedbackBanner: {
@@ -396,27 +390,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 16,
+    paddingVertical: 11,
+    borderRadius: 10,
+    marginBottom: 14,
   },
   feedbackError: {
-    backgroundColor: 'rgba(220,38,38,0.08)',
+    backgroundColor: 'rgba(255,59,48,0.08)',
   },
   feedbackSuccess: {
-    backgroundColor: 'rgba(22,163,74,0.08)',
+    backgroundColor: 'rgba(52,199,89,0.08)',
   },
   feedbackText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500' as const,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   feedbackTextError: {
-    color: '#DC2626',
+    color: '#FF3B30',
   },
   feedbackTextSuccess: {
-    color: '#16A34A',
+    color: '#34C759',
   },
 
   forgotBtn: {
@@ -425,23 +419,20 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: T.brand,
+    fontWeight: '500' as const,
+    color: ACCENT,
+    letterSpacing: -0.1,
   },
 
   primaryBtn: {
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: 'center',
-    shadowColor: T.brand,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    backgroundColor: DARK,
   },
   primaryBtnText: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600' as const,
     color: '#FFFFFF',
     letterSpacing: -0.3,
   },
@@ -450,37 +441,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   dividerLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: SEPARATOR,
   },
   dividerText: {
     fontSize: 13,
-    fontWeight: '500',
-    color: '#AEAEB2',
+    fontWeight: '500' as const,
+    color: '#C7C7CC',
   },
 
-  socialBtn: {
+  appleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#1C1C1E',
-    borderRadius: 14,
-    paddingVertical: 16,
-    marginBottom: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    paddingVertical: 15,
+    marginBottom: 10,
   },
-  socialBtnText: {
-    fontSize: 17,
-    fontWeight: '600',
+  appleBtnText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
@@ -489,25 +475,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
+    gap: 6,
+    paddingVertical: 15,
     marginBottom: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: T.brand + '33',
-    backgroundColor: T.brand + '0A',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(60,60,67,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
   guestBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: T.brand,
+    fontSize: 15,
+    fontWeight: '500' as const,
+    color: LABEL,
     letterSpacing: -0.2,
   },
 
   legal: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#AEAEB2',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 16,
+    letterSpacing: -0.1,
   },
 });

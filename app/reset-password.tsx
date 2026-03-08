@@ -10,16 +10,23 @@ import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { T } from '../constants/theme';
 
 type Feedback = { type: 'success' | 'error'; message: string } | null;
+
+const ACCENT = '#007AFF';
+const DARK = '#1C1C1E';
+const SUBTLE = '#8E8E93';
+const SEPARATOR = 'rgba(60,60,67,0.08)';
+const CARD_BG = 'rgba(255,255,255,0.68)';
+const CARD_BORDER = 'rgba(255,255,255,0.72)';
+const INPUT_BG = 'rgba(245,245,247,0.7)';
 
 function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
   if (Platform.OS === 'web') {
     return <View style={[styles.glassCardWeb, style]}>{children}</View>;
   }
   return (
-    <BlurView intensity={60} tint="light" style={[styles.glassCard, style]}>
+    <BlurView intensity={48} tint="systemChromeMaterialLight" style={[styles.glassCard, style]}>
       {children}
     </BlurView>
   );
@@ -70,33 +77,29 @@ export default function ResetPasswordScreen() {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#F8F7FF', '#EDE9FE', '#F0EAFF', '#F5F3FF']}
-        locations={[0, 0.3, 0.6, 1]}
+        colors={['#F2F2F7', '#E8E8ED', '#F5F5FA', '#FFFFFF']}
+        locations={[0, 0.35, 0.7, 1]}
         style={StyleSheet.absoluteFill}
       />
 
-      <View style={styles.orbTopRight} />
-      <View style={styles.orbBottomLeft} />
+      <View style={styles.meshCircle1} />
+      <View style={styles.meshCircle2} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.kav}>
         <ScrollView
           contentContainerStyle={[styles.scroll, {
-            paddingTop: topPad + 40,
+            paddingTop: topPad + 48,
             paddingBottom: bottomPad + 24,
           }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
 
           <View style={styles.iconWrap}>
-            <LinearGradient
-              colors={T.gradColors as unknown as string[]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.iconCircle}>
-              <Feather name="lock" size={32} color="#FFFFFF" />
-            </LinearGradient>
+            <View style={styles.iconCircle}>
+              <Feather name="lock" size={28} color="#FFFFFF" />
+            </View>
           </View>
 
           <Text style={styles.title}>Set New Password</Text>
@@ -107,8 +110,8 @@ export default function ResetPasswordScreen() {
               <View style={[styles.feedbackBanner, feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess]}>
                 <Feather
                   name={feedback.type === 'error' ? 'alert-circle' : 'check-circle'}
-                  size={16}
-                  color={feedback.type === 'error' ? '#DC2626' : '#16A34A'}
+                  size={15}
+                  color={feedback.type === 'error' ? '#FF3B30' : '#34C759'}
                 />
                 <Text style={[styles.feedbackText, feedback.type === 'error' ? styles.feedbackTextError : styles.feedbackTextSuccess]}>
                   {feedback.message}
@@ -117,8 +120,8 @@ export default function ResetPasswordScreen() {
             )}
 
             <View style={styles.formFields}>
-              <View style={styles.inputWrap}>
-                <Feather name="lock" size={18} color="#AEAEB2" style={styles.inputIcon} />
+              <View style={styles.inputRow}>
+                <Feather name="lock" size={17} color={SUBTLE} style={styles.inputIcon} />
                 <TextInput
                   value={password}
                   onChangeText={setPassword}
@@ -130,8 +133,8 @@ export default function ResetPasswordScreen() {
                 />
               </View>
 
-              <View style={[styles.inputWrap, styles.inputWrapBorder]}>
-                <Feather name="check-circle" size={18} color="#AEAEB2" style={styles.inputIcon} />
+              <View style={[styles.inputRow, styles.inputRowBorder]}>
+                <Feather name="check-circle" size={17} color={SUBTLE} style={styles.inputIcon} />
                 <TextInput
                   value={confirm}
                   onChangeText={setConfirm}
@@ -148,24 +151,18 @@ export default function ResetPasswordScreen() {
             <Pressable
               onPress={handleReset}
               disabled={loading || !canSubmit}
-              style={{ marginTop: 20, opacity: (!canSubmit && !loading) ? 0.5 : 1 }}>
-              <LinearGradient
-                colors={T.gradColors as unknown as string[]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.primaryBtn}>
-                {loading
-                  ? <ActivityIndicator color="white" />
-                  : <Text style={styles.primaryBtnText}>Update Password</Text>
-                }
-              </LinearGradient>
+              style={[styles.primaryBtn, { marginTop: 20, opacity: (!canSubmit && !loading) ? 0.4 : 1 }]}>
+              {loading
+                ? <ActivityIndicator color="white" />
+                : <Text style={styles.primaryBtnText}>Update Password</Text>
+              }
             </Pressable>
           </GlassCard>
 
           <Pressable
             style={styles.backBtn}
             onPress={() => router.replace('/login')}>
-            <Feather name="arrow-left" size={18} color={T.brand} />
+            <Feather name="arrow-left" size={16} color={ACCENT} />
             <Text style={styles.backBtnText}>Back to Sign In</Text>
           </Pressable>
 
@@ -180,23 +177,23 @@ const styles = StyleSheet.create({
   kav: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 28 },
 
-  orbTopRight: {
+  meshCircle1: {
     position: 'absolute',
-    right: -60,
-    top: 20,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: T.brand + '14',
-  },
-  orbBottomLeft: {
-    position: 'absolute',
-    left: -80,
-    bottom: -40,
+    right: -90,
+    top: -30,
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: 'rgba(123,121,232,0.06)',
+    backgroundColor: 'rgba(174,174,178,0.06)',
+  },
+  meshCircle2: {
+    position: 'absolute',
+    left: -70,
+    bottom: -50,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(199,199,204,0.08)',
   },
 
   iconWrap: {
@@ -204,45 +201,47 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: DARK,
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700' as const,
-    color: T.text,
+    color: DARK,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 15,
-    color: '#8E8E93',
+    color: SUBTLE,
     textAlign: 'center',
     marginBottom: 28,
+    letterSpacing: -0.2,
   },
 
   glassCard: {
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     padding: 20,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: CARD_BORDER,
   },
   glassCardWeb: {
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     padding: 20,
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: CARD_BG,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.8)',
+    borderColor: CARD_BORDER,
     ...(Platform.OS === 'web' ? {
-      backdropFilter: 'blur(24px)',
-      WebkitBackdropFilter: 'blur(24px)',
+      backdropFilter: 'blur(40px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(40px) saturate(180%)',
     } as any : {}),
   },
   mainCard: {
@@ -250,27 +249,28 @@ const styles = StyleSheet.create({
   },
 
   formFields: {
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    borderRadius: 14,
+    backgroundColor: INPUT_BG,
+    borderRadius: 12,
     overflow: 'hidden',
   },
-  inputWrap: {
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
   },
-  inputWrapBorder: {
+  inputRowBorder: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(0,0,0,0.06)',
+    borderTopColor: SEPARATOR,
   },
   inputIcon: {
     marginRight: 10,
   },
   input: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: 14,
     fontSize: 16,
-    color: T.text,
+    color: DARK,
+    letterSpacing: -0.2,
   },
 
   feedbackBanner: {
@@ -278,42 +278,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 16,
+    paddingVertical: 11,
+    borderRadius: 10,
+    marginBottom: 14,
   },
   feedbackError: {
-    backgroundColor: 'rgba(220,38,38,0.08)',
+    backgroundColor: 'rgba(255,59,48,0.08)',
   },
   feedbackSuccess: {
-    backgroundColor: 'rgba(22,163,74,0.08)',
+    backgroundColor: 'rgba(52,199,89,0.08)',
   },
   feedbackText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500' as const,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   feedbackTextError: {
-    color: '#DC2626',
+    color: '#FF3B30',
   },
   feedbackTextSuccess: {
-    color: '#16A34A',
+    color: '#34C759',
   },
 
   primaryBtn: {
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: 'center',
-    shadowColor: T.brand,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    backgroundColor: DARK,
   },
   primaryBtnText: {
-    fontSize: 17,
-    fontWeight: '700' as const,
+    fontSize: 16,
+    fontWeight: '600' as const,
     color: '#FFFFFF',
     letterSpacing: -0.3,
   },
@@ -322,17 +318,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: T.brand + '33',
-    backgroundColor: T.brand + '0A',
+    gap: 6,
+    paddingVertical: 14,
   },
   backBtnText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: T.brand,
+    fontSize: 15,
+    fontWeight: '500' as const,
+    color: ACCENT,
     letterSpacing: -0.2,
   },
 });
