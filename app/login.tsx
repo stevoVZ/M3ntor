@@ -41,6 +41,28 @@ export default function LoginScreen() {
     setFeedback(null);
   }
 
+  async function handleForgotPassword() {
+    setFeedback(null);
+    if (!isSupabaseConfigured || !supabase) {
+      setFeedback({ type: 'error', message: 'Supabase is not configured.' });
+      return;
+    }
+    if (!email.trim()) {
+      setFeedback({ type: 'error', message: 'Please enter your email address first.' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (error) throw error;
+      setFeedback({ type: 'success', message: 'Password reset email sent. Check your inbox.' });
+    } catch (e: any) {
+      setFeedback({ type: 'error', message: e.message ?? 'Something went wrong.' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleEmailAuth() {
     setFeedback(null);
     if (!isSupabaseConfigured || !supabase) {
@@ -196,7 +218,7 @@ export default function LoginScreen() {
             </View>
 
             {mode === 'signin' && (
-              <Pressable style={styles.forgotBtn}>
+              <Pressable style={styles.forgotBtn} onPress={handleForgotPassword} disabled={loading}>
                 <Text style={styles.forgotText}>Forgot Password?</Text>
               </Pressable>
             )}
