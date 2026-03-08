@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, Image,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
   ScrollView, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { T, S, F, R, shadow } from '../constants/theme';
 
 type Mode = 'signin' | 'signup';
+type Feedback = { type: 'success' | 'error'; message: string } | null;
 
 function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
   if (Platform.OS === 'web') {
@@ -33,14 +34,21 @@ export default function LoginScreen() {
   const [password, setPass]   = useState('');
   const [name, setName]       = useState('');
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>(null);
+
+  function switchMode(m: Mode) {
+    setMode(m);
+    setFeedback(null);
+  }
 
   async function handleEmailAuth() {
+    setFeedback(null);
     if (!isSupabaseConfigured || !supabase) {
-      Alert.alert('Not configured', 'Supabase is not configured. Please add your Supabase credentials.');
+      setFeedback({ type: 'error', message: 'Supabase is not configured. Please add your Supabase credentials.' });
       return;
     }
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing fields', 'Please enter your email and password.');
+      setFeedback({ type: 'error', message: 'Please enter your email and password.' });
       return;
     }
     setLoading(true);
@@ -52,8 +60,10 @@ export default function LoginScreen() {
           options:  { data: { name: name.trim() || undefined } },
         });
         if (error) throw error;
-        if (!data.session) {
-          Alert.alert('Check your email', 'We sent you a confirmation link.');
+        if (data.session) {
+          router.replace('/(tabs)/today');
+        } else {
+          setFeedback({ type: 'success', message: 'Check your email for a confirmation link.' });
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -61,9 +71,10 @@ export default function LoginScreen() {
           password: password.trim(),
         });
         if (error) throw error;
+        router.replace('/(tabs)/today');
       }
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Something went wrong.');
+      setFeedback({ type: 'error', message: e.message ?? 'Something went wrong.' });
     } finally {
       setLoading(false);
     }
@@ -106,7 +117,7 @@ export default function LoginScreen() {
           <GlassCard style={styles.mainCard}>
             <View style={styles.modeToggle}>
               {(['signin', 'signup'] as Mode[]).map(m => (
-                <Pressable key={m} onPress={() => setMode(m)}
+                <Pressable key={m} onPress={() => switchMode(m)}
                   style={[styles.modeBtn, mode === m && styles.modeBtnActive]}>
                   {mode === m ? (
                     <LinearGradient
@@ -124,6 +135,19 @@ export default function LoginScreen() {
                 </Pressable>
               ))}
             </View>
+
+            {feedback && (
+              <View style={[styles.feedbackBanner, feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess]}>
+                <Feather
+                  name={feedback.type === 'error' ? 'alert-circle' : 'check-circle'}
+                  size={16}
+                  color={feedback.type === 'error' ? '#DC2626' : '#16A34A'}
+                />
+                <Text style={[styles.feedbackText, feedback.type === 'error' ? styles.feedbackTextError : styles.feedbackTextSuccess]}>
+                  {feedback.message}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.formFields}>
               {mode === 'signup' && (
@@ -335,6 +359,34 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     fontSize: 16,
     color: T.text,
+  },
+
+  feedbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  feedbackError: {
+    backgroundColor: 'rgba(220,38,38,0.08)',
+  },
+  feedbackSuccess: {
+    backgroundColor: 'rgba(22,163,74,0.08)',
+  },
+  feedbackText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500' as const,
+    lineHeight: 20,
+  },
+  feedbackTextError: {
+    color: '#DC2626',
+  },
+  feedbackTextSuccess: {
+    color: '#16A34A',
   },
 
   forgotBtn: {
