@@ -10,7 +10,7 @@ import { itemKind, projectProgress, formatRecurrence, formatDuration } from '../
 import { greetingForTime, formatDeadline, isOverdue } from '../../utils/dates';
 import { getTodayActions, groupByTimeOfDay, sortedTimeSlots, timeSlotLabel, timeSlotIcon } from '../../utils/today';
 import SessionView from '../../components/today/SessionView';
-import type { Item, TodayAction, TimeOfDay, JourneyProgress, MoodValue } from '../../types';
+import type { Item, TodayAction, TimeOfDay, JourneyProgress } from '../../types';
 
 function TimeSlotIcon({ slot, size }: { slot: TimeOfDay; size: number }) {
   const iconName = timeSlotIcon(slot);
@@ -62,13 +62,11 @@ function JourneyCard({
   actions,
   statuses,
   onToggle,
-  onStartSession,
 }: {
   jp: JourneyProgress;
   actions: TodayAction[];
   statuses: Record<string, string>;
   onToggle: (id: string) => void;
-  onStartSession: (journeyId: string) => void;
 }) {
   const prog = PRG.find(p => p.id === jp.journey_id);
   const unenrollJourney = useStore(s => s.unenrollJourney);
@@ -116,19 +114,11 @@ function JourneyCard({
         <Pressable onPress={handleLeave} hitSlop={8} style={{ padding: 4 }}>
           <Feather name="more-vertical" size={16} color={T.t3} />
         </Pressable>
-        {allDone ? (
+        {allDone && (
           <View style={[styles.journeyDoneBadge, { backgroundColor: T.green + '12', borderColor: T.green + '20' }]}>
             <Feather name="check" size={11} color={T.green} />
             <Text style={{ fontSize: 12, fontWeight: '700' as const, color: T.green }}>Done</Text>
           </View>
-        ) : (
-          <Pressable
-            style={[styles.startSessionBtn, { backgroundColor: ac }]}
-            onPress={() => onStartSession(jp.journey_id)}
-          >
-            <Text style={styles.startSessionText}>{doneCount > 0 ? 'Resume' : 'Begin'}</Text>
-            <Feather name="play" size={11} color="white" />
-          </Pressable>
         )}
       </View>
 
@@ -303,12 +293,10 @@ export default function TodayScreen() {
   const journeys = useStore(s => s.journeys);
   const streak = useStore(s => s.streak);
   const recordCompletion = useStore(s => s.recordCompletion);
-  const recordMood = useStore(s => s.recordMood);
   const toggleStep = useStore(s => s.toggleStep);
 
   const [statuses, setStatuses] = useState<Record<string, string>>({});
   const [todayView, setTodayView] = useState<'dashboard' | 'session'>('dashboard');
-  const [sessionJourneyId, setSessionJourneyId] = useState<string | null>(null);
 
   const todayActions = useMemo(
     () => getTodayActions(items, journeys, PRG),
@@ -333,11 +321,8 @@ export default function TodayScreen() {
   const displayStreak = streakValue + (doneCount > 0 ? 1 : 0);
 
   const isEmpty = totalToday === 0;
-
-  const sessionJourney = useMemo(
-    () => sessionJourneyId ? journeys.find(j => j.journey_id === sessionJourneyId) : null,
-    [journeys, sessionJourneyId]
-  );
+  const handledCount = todayActions.filter(a => statuses[a.id] === 'done' || statuses[a.id] === 'skipped' || statuses[a.id] === 'deferred').length;
+  const allHandledToday = totalToday > 0 && handledCount === totalToday;
 
   function handleToggle(actionId: string) {
     const action = todayActions.find(a => a.id === actionId);
@@ -362,8 +347,7 @@ export default function TodayScreen() {
     }
   }
 
-  function handleStartSession(journeyId: string) {
-    setSessionJourneyId(journeyId);
+  function handleStartSession() {
     setTodayView('session');
   }
 
@@ -379,22 +363,15 @@ export default function TodayScreen() {
     recordCompletion(actionId, status);
   }
 
-  function handleSessionRecordMood(mood: MoodValue) {
-    recordMood(mood);
-  }
-
-  if (todayView === 'session' && sessionJourneyId && sessionJourney) {
+  if (todayView === 'session' && totalToday > 0) {
     return (
       <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }]} edges={['top']}>
         <SessionView
-          journeyId={sessionJourneyId}
-          journeyProgress={sessionJourney}
           actions={todayActions}
           statuses={statuses}
           streak={streakValue}
           onUpdateStatuses={handleSessionUpdateStatuses}
           onRecordCompletion={handleSessionRecordCompletion}
-          onRecordMood={handleSessionRecordMood}
           onExit={handleExitSession}
         />
       </SafeAreaView>
@@ -454,6 +431,19 @@ export default function TodayScreen() {
           )}
         </View>
 
+        {!isEmpty && !allHandledToday && (
+          <Pressable style={styles.mentorBtn} onPress={handleStartSession}>
+            <View style={styles.mentorBtnIcon}>
+              <Feather name="play" size={18} color="white" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.mentorBtnTitle}>Start daily M3NTOR</Text>
+              <Text style={styles.mentorBtnSub}>Review your {totalToday - handledCount} action{totalToday - handledCount !== 1 ? 's' : ''} for today</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={T.brand} />
+          </Pressable>
+        )}
+
         {activeJourneys.length > 0 && journeyActions.length > 0 && (
           <View style={styles.journeySection}>
             {activeJourneys.map(jp => (
@@ -463,7 +453,6 @@ export default function TodayScreen() {
                 actions={journeyActions}
                 statuses={statuses}
                 onToggle={handleToggle}
-                onStartSession={handleStartSession}
               />
             ))}
           </View>
@@ -535,6 +524,30 @@ const styles = StyleSheet.create({
   progressSegments: { flexDirection: 'row', gap: 2.5 },
   progressSegment: { flex: 1, height: 5, borderRadius: 3 },
 
+  mentorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: S.md,
+    marginBottom: S.md,
+    padding: 16,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: T.brand + '20',
+    ...shadow.md,
+  },
+  mentorBtnIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: T.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mentorBtnTitle: { fontSize: 16, fontWeight: '750' as const, color: T.text, letterSpacing: -0.3 },
+  mentorBtnSub: { fontSize: 13, color: T.t3, marginTop: 2 },
+
   journeySection: { paddingHorizontal: S.md, marginBottom: S.md },
   journeyCard: {
     backgroundColor: 'white',
@@ -553,9 +566,6 @@ const styles = StyleSheet.create({
   journeyDayTitle: { fontSize: 11, color: T.t3 },
 
   journeyDoneBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1 },
-
-  startSessionBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
-  startSessionText: { fontSize: 13, fontWeight: '700' as const, color: 'white' },
 
   journeyActionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginBottom: 6 },
   journeyActionText: { fontSize: 13, color: T.t2, fontWeight: '500' as const, lineHeight: 18, flex: 1 },

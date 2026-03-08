@@ -1,23 +1,15 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { useState, useRef, useMemo } from 'react';
+import { View, Text, Pressable, StyleSheet, Platform, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import { T, S, R, shadow } from '../../constants/theme';
-import { ITEM_AREAS, PRG, MOODS } from '../../constants/config';
+import { ITEM_AREAS, KIND_CONFIG } from '../../constants/config';
 import { formatDuration } from '../../utils/items';
 import { pickSessionActions } from '../../utils/today';
-import { getApiUrl } from '../../lib/query-client';
-import type { TodayAction, MoodValue, JourneyProgress } from '../../types';
+import type { TodayAction } from '../../types';
 import CompletionScreen from './CompletionScreen';
 
-interface MoodOption {
-  value: MoodValue;
-  label: string;
-  icon: string;
-  color: string;
-}
-
-type SessionStep = 'briefing' | 'mood' | 'actions' | 'complete' | 'summary';
+type SessionStep = 'actions' | 'complete';
 
 interface UndoEntry {
   actionId: string;
@@ -25,96 +17,12 @@ interface UndoEntry {
 }
 
 interface SessionViewProps {
-  journeyId: string;
-  journeyProgress: JourneyProgress;
   actions: TodayAction[];
   statuses: Record<string, string>;
   streak: number;
   onUpdateStatuses: (statuses: Record<string, string>) => void;
   onRecordCompletion: (actionId: string, status: 'done' | 'skipped') => void;
-  onRecordMood: (mood: MoodValue) => void;
   onExit: () => void;
-}
-
-function BriefingCard({
-  briefingText,
-  loading,
-  journeyTitle,
-  weekNum,
-  dayNum,
-  onContinue,
-  onSkip,
-}: {
-  briefingText: string;
-  loading: boolean;
-  journeyTitle: string;
-  weekNum: number;
-  dayNum: number;
-  onContinue: () => void;
-  onSkip: () => void;
-}) {
-  return (
-    <Animated.View entering={FadeIn.duration(300)} style={briefStyles.container}>
-      <View style={briefStyles.card}>
-        <View style={briefStyles.decorCircle1} />
-        <View style={briefStyles.decorCircle2} />
-
-        <View style={briefStyles.inner}>
-          <View style={briefStyles.headerRow}>
-            <View style={briefStyles.headerIcon}>
-              <Feather name="zap" size={14} color="white" />
-            </View>
-            <Text style={briefStyles.headerLabel}>Morning Briefing</Text>
-            <Text style={briefStyles.headerDay}>Day {dayNum} of 7</Text>
-          </View>
-
-          <Text style={briefStyles.greeting}>Ready for today</Text>
-
-          {loading ? (
-            <View style={briefStyles.loadingRow}>
-              <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
-              <Text style={briefStyles.loadingText}>Preparing your daily insight...</Text>
-            </View>
-          ) : (
-            <Text style={briefStyles.briefingText}>{briefingText}</Text>
-          )}
-
-          {!loading && (
-            <Pressable style={briefStyles.continueBtn} onPress={onContinue}>
-              <Text style={briefStyles.continueBtnText}>Start Today's Actions</Text>
-            </Pressable>
-          )}
-
-          <Pressable style={briefStyles.skipBtn} onPress={onSkip}>
-            <Text style={briefStyles.skipBtnText}>
-              {loading ? 'Skip to actions' : 'Skip briefing'}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
-function MoodCheck({ onSelect }: { onSelect: (mood: MoodOption) => void }) {
-  return (
-    <Animated.View entering={FadeIn.duration(300)} style={moodStyles.container}>
-      <View style={moodStyles.card}>
-        <Text style={moodStyles.label}>QUICK CHECK-IN</Text>
-        <Text style={moodStyles.title}>How are you feeling?</Text>
-        <View style={moodStyles.row}>
-          {MOODS.map(m => (
-            <Pressable key={m.value} style={moodStyles.option} onPress={() => onSelect(m)}>
-              <View style={[moodStyles.iconWrap, { backgroundColor: m.color + '14' }]}>
-                <Feather name={m.icon as any} size={26} color={m.color} />
-              </View>
-              <Text style={moodStyles.optionLabel}>{m.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-    </Animated.View>
-  );
 }
 
 function ActionCard({
@@ -132,6 +40,8 @@ function ActionCard({
 }) {
   const area = ITEM_AREAS[action.area];
   const ac = area?.c || T.brand;
+  const typeConfig = KIND_CONFIG[action.type] || KIND_CONFIG.action;
+  const typeIcon = action.type === 'habit' ? 'repeat' : action.type === 'project' ? 'folder' : action.type === 'journey' ? 'compass' : 'check-circle';
 
   return (
     <Animated.View
@@ -144,7 +54,7 @@ function ActionCard({
     >
       <View style={actionCardStyles.inner}>
         <View style={[actionCardStyles.iconWrap, { backgroundColor: ac + '14' }]}>
-          <Feather name="activity" size={24} color={ac} />
+          <Feather name={typeIcon as any} size={24} color={ac} />
         </View>
 
         <Text style={actionCardStyles.title}>{action.title}</Text>
@@ -160,9 +70,14 @@ function ActionCard({
           </View>
         ) : null}
 
-        <View style={actionCardStyles.area}>
+        <View style={actionCardStyles.meta}>
           <View style={[actionCardStyles.areaDot, { backgroundColor: ac }]} />
           <Text style={actionCardStyles.areaText}>{area?.n || action.area}</Text>
+          <View style={[actionCardStyles.typeBadge, { backgroundColor: (typeConfig.color || T.brand) + '10' }]}>
+            <Text style={[actionCardStyles.typeText, { color: typeConfig.color || T.brand }]}>
+              {action.type === 'habit' ? 'Habit' : action.type === 'project' ? 'Project' : action.type === 'journey' ? 'Journey' : 'Action'}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -223,33 +138,20 @@ function UndoToast({ label, onUndo }: { label: string; onUndo: () => void }) {
 }
 
 export default function SessionView({
-  journeyId,
-  journeyProgress,
   actions,
   statuses,
   streak,
   onUpdateStatuses,
   onRecordCompletion,
-  onRecordMood,
   onExit,
 }: SessionViewProps) {
-  const [step, setStep] = useState<SessionStep>('briefing');
-  const [briefingText, setBriefingText] = useState('');
-  const [briefingLoading, setBriefingLoading] = useState(true);
-  const [mood, setMood] = useState<MoodOption | null>(null);
+  const [step, setStep] = useState<SessionStep>('actions');
   const [localStatuses, setLocalStatuses] = useState<Record<string, string>>({});
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [showUndo, setShowUndo] = useState(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const prog = PRG.find(p => p.id === journeyId);
-  const weekNum = journeyProgress.current_week;
-  const dayNum = journeyProgress.current_day || 1;
-
-  const sessionActions = useMemo(
-    () => actions.filter(a => a.type === 'journey' && a.journeyId === journeyId),
-    [actions, journeyId]
-  );
+  const sessionActions = actions;
 
   const mergedStatuses = useMemo(
     () => ({ ...statuses, ...localStatuses }),
@@ -264,38 +166,7 @@ export default function SessionView({
   const completed = sessionActions.filter(a => mergedStatuses[a.id] === 'done').length;
   const skipped = sessionActions.filter(a => mergedStatuses[a.id] === 'skipped').length;
   const deferred = sessionActions.filter(a => mergedStatuses[a.id] === 'deferred').length;
-  const sessionHandled = Object.keys(mergedStatuses).filter(k => sessionActions.some(a => a.id === k)).length;
-
-  useEffect(() => {
-    loadBriefing();
-  }, []);
-
-  async function loadBriefing() {
-    setBriefingLoading(true);
-    const fallbackText = `${sessionActions.length} actions for your ${prog?.t || 'journey'} session today. Each one builds on the last. Let's make Day ${dayNum} count.`;
-    try {
-      const briefingUrl = new URL('/api/ai/briefing', getApiUrl());
-      const res = await fetch(briefingUrl.toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          journeyTitle: prog?.t || '',
-          weekNum,
-          dayNum,
-          dayTitle: sessionActions[0]?.dayTitle || '',
-          actionCount: sessionActions.length,
-          streak,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
-      setBriefingText(data.briefing || fallbackText);
-    } catch {
-      setBriefingText(fallbackText);
-    } finally {
-      setBriefingLoading(false);
-    }
-  }
+  const handled = sessionActions.filter(a => mergedStatuses[a.id]).length;
 
   function flashUndo() {
     setShowUndo(true);
@@ -319,7 +190,8 @@ export default function SessionView({
     onUpdateStatuses(newMerged);
     flashUndo();
 
-    if (pickSessionActions(sessionActions, newMerged, new Set()).length === 0) {
+    const remaining = sessionActions.filter(a => !newMerged[a.id]);
+    if (remaining.length === 0) {
       setTimeout(() => setStep('complete'), 300);
     }
   }
@@ -328,60 +200,35 @@ export default function SessionView({
     if (!undoStack.length) return;
     const last = undoStack[undoStack.length - 1];
     setUndoStack(p => p.slice(0, -1));
+
+    let computedLocal: Record<string, string> = {};
     setLocalStatuses(prev => {
       const n = { ...prev };
       if (last.prevStatus === undefined) delete n[last.actionId];
       else n[last.actionId] = last.prevStatus;
+      computedLocal = n;
       return n;
     });
-    const newLocal = { ...localStatuses };
-    if (last.prevStatus === undefined) delete newLocal[last.actionId];
-    else newLocal[last.actionId] = last.prevStatus;
-    onUpdateStatuses({ ...statuses, ...newLocal });
+    onUpdateStatuses({ ...statuses, ...computedLocal });
 
     if (step === 'complete') setStep('actions');
     setShowUndo(false);
   }
 
-  function handleMoodSelect(m: MoodOption) {
-    setMood(m);
-    onRecordMood(m.value);
-    setStep('actions');
-  }
-
-  function handleDoneForToday() {
-    onExit();
-  }
-
-  const sessionTitle = step === 'briefing' ? "Today's Briefing"
-    : step === 'mood' ? 'Check-in'
-    : step === 'actions' ? `Action ${sessionHandled + 1} of ${sessionActions.length}`
-    : step === 'complete' ? 'Session Complete'
-    : step === 'summary' ? "Today's Summary" : 'Session';
-
-  const canBack = ['mood', 'actions', 'complete', 'summary'].includes(step);
-
-  function handleBack() {
-    if (step === 'mood') setStep('briefing');
-    else if (step === 'actions') onExit();
-    else if (step === 'complete') { if (undoStack.length) handleUndo(); }
-    else if (step === 'summary') setStep('complete');
-  }
+  const sessionTitle = step === 'actions'
+    ? `${handled + 1} of ${sessionActions.length}`
+    : 'Session Complete';
 
   return (
     <View style={sessionStyles.container}>
       <View style={[sessionStyles.header, Platform.OS === 'web' && { paddingTop: 12 }]}>
-        {canBack && (
-          <Pressable style={sessionStyles.backBtn} onPress={handleBack}>
-            <Feather name="chevron-left" size={18} color={T.brand} />
-            <Text style={sessionStyles.backText}>
-              {step === 'mood' ? 'Briefing' : step === 'actions' ? 'Dashboard' : step === 'summary' ? 'Complete' : ''}
-            </Text>
-          </Pressable>
-        )}
+        <Pressable style={sessionStyles.backBtn} onPress={onExit}>
+          <Feather name="chevron-left" size={18} color={T.brand} />
+          <Text style={sessionStyles.backText}>Dashboard</Text>
+        </Pressable>
         <View style={sessionStyles.headerCenter}>
           <Text style={sessionStyles.headerTitle}>{sessionTitle}</Text>
-          {prog && <Text style={sessionStyles.headerSub}>{prog.t}</Text>}
+          <Text style={sessionStyles.headerSub}>Daily M3NTOR</Text>
         </View>
         <Pressable style={sessionStyles.exitBtn} onPress={onExit}>
           <Feather name="list" size={14} color={T.t2} />
@@ -390,22 +237,6 @@ export default function SessionView({
       </View>
 
       <View style={sessionStyles.content}>
-        {step === 'briefing' && (
-          <BriefingCard
-            briefingText={briefingText}
-            loading={briefingLoading}
-            journeyTitle={prog?.t || ''}
-            weekNum={weekNum}
-            dayNum={dayNum}
-            onContinue={() => setStep('mood')}
-            onSkip={() => setStep('mood')}
-          />
-        )}
-
-        {step === 'mood' && (
-          <MoodCheck onSelect={handleMoodSelect} />
-        )}
-
         {step === 'actions' && (
           <View style={sessionStyles.actionsWrap}>
             <View style={sessionStyles.cardArea}>
@@ -448,143 +279,16 @@ export default function SessionView({
             skipped={skipped}
             deferred={deferred}
             total={sessionActions.length}
-            mood={mood}
             streak={streak}
-            canUndo={undoStack.length > 0}
-            onUndo={handleUndo}
-            onSummary={() => setStep('summary')}
-          />
-        )}
-
-        {step === 'summary' && (
-          <DailySummaryView
             actions={sessionActions}
             statuses={mergedStatuses}
-            mood={mood}
-            streak={streak}
-            onDone={handleDoneForToday}
+            canUndo={undoStack.length > 0}
+            onUndo={handleUndo}
+            onDone={onExit}
           />
         )}
       </View>
     </View>
-  );
-}
-
-function DailySummaryView({
-  actions,
-  statuses,
-  mood,
-  streak,
-  onDone,
-}: {
-  actions: TodayAction[];
-  statuses: Record<string, string>;
-  mood: MoodOption | null;
-  streak: number;
-  onDone: () => void;
-}) {
-  const completed = actions.filter(a => statuses[a.id] === 'done').length;
-  const skippedCount = actions.filter(a => statuses[a.id] === 'skipped').length;
-  const deferredCount = actions.filter(a => statuses[a.id] === 'deferred').length;
-  const displayStreak = streak + (completed > 0 ? 1 : 0);
-
-  const summaryText = completed === actions.length
-    ? `You completed every action today. That kind of consistency is what actually rewires your habits.`
-    : deferredCount > 0
-    ? `${completed} actions done so far, with ${deferredCount} waiting for later. Come back when you are ready.`
-    : `${completed} of ${actions.length} actions completed today. Even partial days build the pathways that make these habits stick.`;
-
-  const stats = [
-    { label: 'Done', value: completed, color: T.green, icon: 'check' as const },
-    { label: 'Skipped', value: skippedCount, color: T.t3, icon: 'fast-forward' as const },
-    { label: 'Later', value: deferredCount, color: T.orange, icon: 'clock' as const },
-    { label: 'Streak', value: `${displayStreak}d`, color: T.orange, icon: 'trending-up' as const },
-  ];
-
-  return (
-    <Animated.View entering={FadeIn.duration(300)} style={summaryStyles.container}>
-      <View style={summaryStyles.statsRow}>
-        {stats.map(s => (
-          <View key={s.label} style={[summaryStyles.statCard, { borderColor: s.color + '20' }]}>
-            <Feather name={s.icon} size={14} color={s.color} />
-            <Text style={summaryStyles.statValue}>{s.value}</Text>
-            <Text style={summaryStyles.statLabel}>{s.label}</Text>
-          </View>
-        ))}
-      </View>
-
-      {mood && (
-        <View style={[summaryStyles.moodRow, { backgroundColor: mood.color + '10' }]}>
-          <Feather name={mood.icon as any} size={20} color={mood.color} />
-          <View>
-            <Text style={summaryStyles.moodLabel}>Feeling {mood.label.toLowerCase()}</Text>
-            <Text style={summaryStyles.moodSub}>Logged this morning</Text>
-          </View>
-        </View>
-      )}
-
-      <View style={summaryStyles.actionsList}>
-        <Text style={summaryStyles.actionsHeader}>ACTIONS</Text>
-        {actions.map(a => {
-          const s = statuses[a.id] || 'pending';
-          const isDone = s === 'done';
-          const isSkipped = s === 'skipped';
-          const isDeferred = s === 'deferred';
-          return (
-            <View key={a.id} style={[summaryStyles.actionRow, isSkipped && { opacity: 0.5 }]}>
-              <View style={[
-                summaryStyles.statusDot,
-                {
-                  backgroundColor: isDone ? T.green : isDeferred ? T.orange + '20' : 'transparent',
-                  borderColor: isDone ? T.green : isDeferred ? T.orange : isSkipped ? T.t3 : T.sep,
-                },
-              ]}>
-                {isDone && <Feather name="check" size={10} color="white" />}
-                {isSkipped && <Feather name="fast-forward" size={8} color={T.t3} />}
-                {isDeferred && <Feather name="clock" size={8} color={T.orange} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[summaryStyles.actionTitle, isSkipped && { textDecorationLine: 'line-through' as const }]}>
-                  {a.title}
-                </Text>
-                {a.duration ? <Text style={summaryStyles.actionDur}>{formatDuration(a.duration)}</Text> : null}
-              </View>
-              <View style={[
-                summaryStyles.statusBadge,
-                {
-                  backgroundColor: isDone ? T.green + '10' : isDeferred ? T.orange + '10' : isSkipped ? T.sep : T.brand + '08',
-                },
-              ]}>
-                <Text style={[
-                  summaryStyles.statusText,
-                  {
-                    color: isDone ? T.green : isDeferred ? T.orange : isSkipped ? T.t3 : T.brand,
-                  },
-                ]}>
-                  {isDone ? 'Done' : isDeferred ? 'Later' : isSkipped ? 'Skipped' : 'Pending'}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      <View style={summaryStyles.coachCard}>
-        <View style={summaryStyles.coachHeader}>
-          <View style={summaryStyles.coachIcon}>
-            <Text style={summaryStyles.coachIconText}>M3</Text>
-          </View>
-          <Text style={summaryStyles.coachLabel}>Coach's Take</Text>
-        </View>
-        <Text style={summaryStyles.coachText}>{summaryText}</Text>
-      </View>
-
-      <Pressable style={summaryStyles.doneBtn} onPress={onDone}>
-        <Text style={summaryStyles.doneBtnText}>Done for Today</Text>
-      </Pressable>
-
-      <View style={{ height: 60 }} />
-    </Animated.View>
   );
 }
 
@@ -619,81 +323,6 @@ const sessionStyles = StyleSheet.create({
   emptyDeckText: { fontSize: 16, fontWeight: '600' as const, color: T.t2, marginTop: 12 },
 });
 
-const briefStyles = StyleSheet.create({
-  container: { paddingHorizontal: 20 },
-  card: {
-    borderRadius: 24,
-    padding: 24,
-    backgroundColor: T.brand,
-    overflow: 'hidden',
-    ...shadow.lg,
-  },
-  decorCircle1: {
-    position: 'absolute',
-    top: -30,
-    right: -30,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  decorCircle2: {
-    position: 'absolute',
-    bottom: -20,
-    left: -20,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  inner: {},
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  headerIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerLabel: { fontSize: 13, fontWeight: '600' as const, color: 'rgba(255,255,255,0.8)' },
-  headerDay: { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginLeft: 'auto' as any },
-  greeting: { fontSize: 24, fontWeight: '700' as const, color: 'white', letterSpacing: -0.3, lineHeight: 31, marginBottom: 12 },
-  briefingText: { fontSize: 16, lineHeight: 26, color: 'rgba(255,255,255,0.9)', marginBottom: 20 },
-  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
-  loadingText: { fontSize: 14, color: 'rgba(255,255,255,0.7)' },
-  continueBtn: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 14,
-    padding: 13,
-    alignItems: 'center',
-  },
-  continueBtnText: { fontSize: 16, fontWeight: '650' as const, color: 'white' },
-  skipBtn: { padding: 8, alignItems: 'center', marginTop: 6 },
-  skipBtnText: { fontSize: 14, fontWeight: '500' as const, color: 'rgba(255,255,255,0.6)' },
-});
-
-const moodStyles = StyleSheet.create({
-  container: { paddingHorizontal: 20 },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 24,
-    borderWidth: 0.5,
-    borderColor: T.sep,
-    padding: 28,
-    alignItems: 'center',
-    ...shadow.sm,
-  },
-  label: { fontSize: 13, fontWeight: '600' as const, color: T.t3, letterSpacing: 0.5, marginBottom: 8 },
-  title: { fontSize: 22, fontWeight: '700' as const, color: T.text, marginBottom: 24 },
-  row: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
-  option: { alignItems: 'center', gap: 6 },
-  iconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  optionLabel: { fontSize: 13, fontWeight: '500' as const, color: T.t3 },
-});
-
 const actionCardStyles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
@@ -708,9 +337,11 @@ const actionCardStyles = StyleSheet.create({
   desc: { fontSize: 14, color: T.t3, textAlign: 'center', marginBottom: 8 },
   durationBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
   durationText: { fontSize: 13, color: T.t3 },
-  area: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   areaDot: { width: 8, height: 8, borderRadius: 4 },
   areaText: { fontSize: 12, color: T.t3 },
+  typeBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  typeText: { fontSize: 11, fontWeight: '600' as const },
   btnRow: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.sep },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 16 },
   actionBtnText: { fontSize: 14, fontWeight: '650' as const },
@@ -739,81 +370,4 @@ const undoStyles = StyleSheet.create({
     ...shadow.sm,
   },
   text: { fontSize: 13, fontWeight: '600' as const, color: T.brand },
-});
-
-const summaryStyles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 4 },
-  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    borderWidth: 0.5,
-    padding: 12,
-    alignItems: 'center',
-    ...shadow.xs,
-  },
-  statValue: { fontSize: 20, fontWeight: '800' as const, color: T.text, marginTop: 2 },
-  statLabel: { fontSize: 10, fontWeight: '500' as const, color: T.t3 },
-  moodRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, marginBottom: 14 },
-  moodLabel: { fontSize: 14, fontWeight: '600' as const, color: T.text },
-  moodSub: { fontSize: 12, color: T.t3 },
-  actionsList: {
-    backgroundColor: 'white',
-    borderRadius: 18,
-    borderWidth: 0.5,
-    borderColor: T.sep,
-    overflow: 'hidden',
-    marginBottom: 14,
-  },
-  actionsHeader: { padding: 12, paddingBottom: 8, fontSize: 12, fontWeight: '600' as const, color: T.t3, letterSpacing: 0.5 },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 0.5,
-    borderTopColor: T.sep,
-  },
-  statusDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionTitle: { fontSize: 14, fontWeight: '600' as const, color: T.text },
-  actionDur: { fontSize: 12, color: T.t3 },
-  statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  statusText: { fontSize: 11, fontWeight: '600' as const },
-  coachCard: {
-    backgroundColor: 'white',
-    borderRadius: 18,
-    borderWidth: 0.5,
-    borderColor: T.sep,
-    padding: 18,
-    marginBottom: 14,
-  },
-  coachHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  coachIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: T.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  coachIconText: { fontSize: 10, fontWeight: '800' as const, color: 'white' },
-  coachLabel: { fontSize: 13, fontWeight: '650' as const, color: T.text },
-  coachText: { fontSize: 14, lineHeight: 22, color: T.t2 },
-  doneBtn: {
-    backgroundColor: T.brand,
-    borderRadius: 14,
-    padding: 15,
-    alignItems: 'center',
-    ...shadow.lg,
-  },
-  doneBtnText: { fontSize: 16, fontWeight: '650' as const, color: 'white' },
 });
