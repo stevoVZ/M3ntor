@@ -8,6 +8,8 @@ import { ITEM_AREAS, PRG, DIFF, JOURNEY_ICONS, WA } from '../../constants/config
 import type { Journey, JourneyProgress } from '../../types';
 import AICoach from '../../components/discover/AICoach';
 
+type Tab = 'explore' | 'mine';
+
 function MyJourneyRow({ jp, program }: { jp: JourneyProgress; program: Journey }) {
   const area = ITEM_AREAS[program.a] ?? ITEM_AREAS.learning;
   const unenrollJourney = useStore(s => s.unenrollJourney);
@@ -30,51 +32,82 @@ function MyJourneyRow({ jp, program }: { jp: JourneyProgress; program: Journey }
     );
   };
 
+  const handleStartOver = () => {
+    Alert.alert(
+      'Start over?',
+      'This will reset your progress to Week 1, Day 1.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Start over', style: 'destructive', onPress: () => reEnrollJourney(program.id, true) },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.myRow, { borderLeftColor: area.c }]}>
       <View style={styles.myRowTop}>
         <View style={[styles.myRowIcon, { backgroundColor: area.c + '14' }]}>
-          <Text style={{ fontSize: 14 }}>{JOURNEY_ICONS[program.id] || area.e}</Text>
+          <Text style={{ fontSize: 16 }}>{JOURNEY_ICONS[program.id] || area.e}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.myRowTitle} numberOfLines={1}>{program.t}</Text>
-          {isActive && (
-            <Text style={styles.myRowMeta}>
-              Week {jp.current_week} of {program.w} {'\u00B7'} Day {jp.current_day || 1}
-            </Text>
-          )}
-          {isPaused && (
-            <Text style={[styles.myRowMeta, { color: T.orange }]}>
-              Paused at Week {jp.current_week}, Day {jp.current_day || 1}
-            </Text>
-          )}
-          {isDone && (
-            <Text style={[styles.myRowMeta, { color: T.green }]}>Completed</Text>
-          )}
+          <Text style={styles.myRowExpert}>{program.e}</Text>
         </View>
         {isActive && (
           <Pressable onPress={handleLeave} hitSlop={8} style={styles.myRowLeave}>
             <Feather name="pause" size={12} color={T.t3} />
           </Pressable>
         )}
-        {isPaused && (
-          <Pressable onPress={() => reEnrollJourney(program.id, false)} style={[styles.myRowAction, { backgroundColor: area.c }]}>
-            <Feather name="play" size={11} color="white" />
-            <Text style={styles.myRowActionText}>Resume</Text>
-          </Pressable>
-        )}
-        {isDone && (
-          <View style={[styles.myRowBadge, { backgroundColor: T.green + '14' }]}>
-            <Feather name="award" size={11} color={T.green} />
-          </View>
-        )}
       </View>
+
       {isActive && (
-        <View style={styles.myRowProgress}>
-          <View style={styles.myRowProgressBg}>
-            <View style={[styles.myRowProgressFill, { width: `${Math.round(progress * 100)}%` as any, backgroundColor: area.c }]} />
+        <>
+          <View style={styles.myRowProgress}>
+            <View style={styles.myRowProgressBg}>
+              <View style={[styles.myRowProgressFill, { width: `${Math.round(progress * 100)}%` as any, backgroundColor: area.c }]} />
+            </View>
+            <Text style={[styles.myRowProgressPct, { color: area.c }]}>{Math.round(progress * 100)}%</Text>
           </View>
-          <Text style={[styles.myRowProgressPct, { color: area.c }]}>{Math.round(progress * 100)}%</Text>
+          <Text style={styles.myRowProgressMeta}>
+            Week {jp.current_week} of {program.w} {'\u00B7'} Day {jp.current_day || 1} {'\u00B7'} {program.m} min/day
+          </Text>
+        </>
+      )}
+
+      {isPaused && (
+        <>
+          <View style={styles.myRowPausedRow}>
+            <Feather name="pause-circle" size={12} color={T.orange} />
+            <Text style={styles.myRowPausedText}>
+              Paused at Week {jp.current_week}, Day {jp.current_day || 1}
+            </Text>
+          </View>
+          <View style={styles.myRowActions}>
+            <Pressable style={[styles.myRowActionBtn, { backgroundColor: area.c }]}
+              onPress={() => reEnrollJourney(program.id, false)}>
+              <Feather name="play" size={12} color="white" />
+              <Text style={styles.myRowActionBtnText}>Resume</Text>
+            </Pressable>
+            <Pressable style={[styles.myRowActionBtn, { backgroundColor: T.fill }]}
+              onPress={handleStartOver}>
+              <Feather name="refresh-cw" size={11} color={T.t2} />
+              <Text style={[styles.myRowActionBtnText, { color: T.t2 }]}>Start over</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
+
+      {isDone && (
+        <View style={styles.myRowDoneRow}>
+          <View style={styles.myRowDoneBadge}>
+            <Feather name="award" size={12} color={T.green} />
+            <Text style={styles.myRowDoneText}>Completed</Text>
+          </View>
+          <Pressable style={[styles.myRowActionBtn, { backgroundColor: T.fill }]}
+            onPress={handleStartOver}>
+            <Feather name="refresh-cw" size={11} color={T.t2} />
+            <Text style={[styles.myRowActionBtnText, { color: T.t2 }]}>Restart</Text>
+          </Pressable>
         </View>
       )}
     </View>
@@ -246,6 +279,7 @@ function JourneyCard({ journey }: { journey: Journey }) {
 }
 
 export default function DiscoverScreen() {
+  const [tab, setTab] = useState<Tab>('explore');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<string | null>(null);
   const [showCoach, setShowCoach] = useState(false);
@@ -261,7 +295,6 @@ export default function DiscoverScreen() {
   const activeJourneys = myJourneys.filter(j => j.jp.status === 'active');
   const pausedJourneys = myJourneys.filter(j => j.jp.status === 'paused');
   const doneJourneys = myJourneys.filter(j => j.jp.status === 'done');
-  const hasMyJourneys = myJourneys.length > 0;
 
   const filtered = PRG.filter(j => {
     const matchSearch = !search.trim() || j.t.toLowerCase().includes(search.toLowerCase()) || j.e.toLowerCase().includes(search.toLowerCase());
@@ -282,114 +315,180 @@ export default function DiscoverScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }]} edges={['top']}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}>
-
+      <View style={styles.headerArea}>
         <View style={styles.hero}>
-          <Text style={styles.heroEyebrow}>Expert programs</Text>
           <Text style={styles.heroTitle}>Discover</Text>
-          <Text style={styles.heroSub}>Science-backed journeys curated for real results</Text>
         </View>
 
-        {hasMyJourneys && (
-          <View style={styles.mySection}>
-            <View style={styles.mySectionHeader}>
-              <Feather name="layers" size={14} color={T.brand} />
-              <Text style={styles.mySectionTitle}>My Journeys</Text>
-              <Text style={styles.mySectionCount}>{myJourneys.length}</Text>
-            </View>
-            <View style={[styles.mySectionCard, shadow.xs]}>
-              {activeJourneys.map(({ jp, program }) => (
-                <MyJourneyRow key={jp.id} jp={jp} program={program} />
-              ))}
-              {pausedJourneys.map(({ jp, program }) => (
-                <MyJourneyRow key={jp.id} jp={jp} program={program} />
-              ))}
-              {doneJourneys.map(({ jp, program }) => (
-                <MyJourneyRow key={jp.id} jp={jp} program={program} />
-              ))}
-            </View>
-          </View>
-        )}
-
-        <Pressable style={[styles.coachCard, shadow.sm]} onPress={() => setShowCoach(true)}>
-          <View style={styles.coachLeft}>
-            <View style={styles.coachAvatar}>
-              <Feather name="zap" size={18} color="white" />
-            </View>
-            <View style={styles.coachInfo}>
-              <Text style={styles.coachTitle}>Ask M3NTOR</Text>
-              <Text style={styles.coachSub}>Tell me your goals and I'll recommend the best programs</Text>
-            </View>
-          </View>
-          <Feather name="chevron-right" size={18} color={T.t3} />
-        </Pressable>
-
-        <View style={styles.searchWrap}>
-          <Feather name="search" size={16} color={T.t3} style={styles.searchIcon} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search journeys..."
-            placeholderTextColor={T.t3}
-            style={styles.search}
-          />
-          {search.trim().length > 0 && (
-            <Pressable onPress={() => setSearch('')} style={styles.searchClear} hitSlop={8}>
-              <Feather name="x" size={14} color={T.t3} />
-            </Pressable>
-          )}
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={styles.filters} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
-          <Pressable style={[styles.filterChip, !filter && styles.filterChipActive]}
-            onPress={() => setFilter(null)}>
-            <Text style={[styles.filterChipText, !filter && styles.filterChipTextActive]}>All</Text>
+        <View style={styles.tabBar}>
+          <Pressable
+            style={[styles.tabItem, tab === 'explore' && styles.tabItemActive]}
+            onPress={() => setTab('explore')}
+          >
+            <Feather name="compass" size={14} color={tab === 'explore' ? T.brand : T.t3} />
+            <Text style={[styles.tabText, tab === 'explore' && styles.tabTextActive]}>Explore</Text>
           </Pressable>
-          {areas.map(a => {
-            const area = ITEM_AREAS[a];
-            if (!area) return null;
-            const on = filter === a;
-            return (
-              <Pressable key={a} style={[styles.filterChip, on && { backgroundColor: area.c + '12', borderColor: area.c + '40' }]}
-                onPress={() => setFilter(prev => prev === a ? null : a)}>
-                <Text style={{ fontSize: 13 }}>{area.e}</Text>
-                <Text style={[styles.filterChipText, on && { color: area.c, fontWeight: '700' as const }]}>
-                  {area.n.split(' ')[0]}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+          <Pressable
+            style={[styles.tabItem, tab === 'mine' && styles.tabItemActive]}
+            onPress={() => setTab('mine')}
+          >
+            <Feather name="layers" size={14} color={tab === 'mine' ? T.brand : T.t3} />
+            <Text style={[styles.tabText, tab === 'mine' && styles.tabTextActive]}>My Journeys</Text>
+            {myJourneys.length > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>{myJourneys.length}</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
+      </View>
 
-        {featured.length > 0 && (
-          <View style={styles.section}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Feather name="award" size={14} color="#B8860B" />
-              <Text style={styles.sectionTitle}>Featured</Text>
+      {tab === 'explore' ? (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false} key="explore">
+
+          <Pressable style={[styles.coachCard, shadow.sm]} onPress={() => setShowCoach(true)}>
+            <View style={styles.coachLeft}>
+              <View style={styles.coachAvatar}>
+                <Feather name="zap" size={18} color="white" />
+              </View>
+              <View style={styles.coachInfo}>
+                <Text style={styles.coachTitle}>Ask M3NTOR</Text>
+                <Text style={styles.coachSub}>Tell me your goals and I'll recommend the best programs</Text>
+              </View>
             </View>
-            {featured.map(j => <JourneyCard key={j.id} journey={j} />)}
-          </View>
-        )}
+            <Feather name="chevron-right" size={18} color={T.t3} />
+          </Pressable>
 
-        {rest.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>All journeys</Text>
-            {rest.map(j => <JourneyCard key={j.id} journey={j} />)}
+          <View style={styles.searchWrap}>
+            <Feather name="search" size={16} color={T.t3} style={styles.searchIcon} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search journeys..."
+              placeholderTextColor={T.t3}
+              style={styles.search}
+            />
+            {search.trim().length > 0 && (
+              <Pressable onPress={() => setSearch('')} style={styles.searchClear} hitSlop={8}>
+                <Feather name="x" size={14} color={T.t3} />
+              </Pressable>
+            )}
           </View>
-        )}
 
-        {filtered.length === 0 && (
-          <View style={styles.empty}>
-            <Feather name="search" size={40} color={T.t3} />
-            <Text style={styles.emptyTitle}>No matches</Text>
-            <Text style={styles.emptySub}>Try a different search or filter</Text>
-          </View>
-        )}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={styles.filters} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+            <Pressable style={[styles.filterChip, !filter && styles.filterChipActive]}
+              onPress={() => setFilter(null)}>
+              <Text style={[styles.filterChipText, !filter && styles.filterChipTextActive]}>All</Text>
+            </Pressable>
+            {areas.map(a => {
+              const area = ITEM_AREAS[a];
+              if (!area) return null;
+              const on = filter === a;
+              return (
+                <Pressable key={a} style={[styles.filterChip, on && { backgroundColor: area.c + '12', borderColor: area.c + '40' }]}
+                  onPress={() => setFilter(prev => prev === a ? null : a)}>
+                  <Text style={{ fontSize: 13 }}>{area.e}</Text>
+                  <Text style={[styles.filterChipText, on && { color: area.c, fontWeight: '700' as const }]}>
+                    {area.n.split(' ')[0]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
 
-        <View style={{ height: 100 }} />
-      </ScrollView>
+          {featured.length > 0 && (
+            <View style={styles.section}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="award" size={14} color="#B8860B" />
+                <Text style={styles.sectionTitle}>Featured</Text>
+              </View>
+              {featured.map(j => <JourneyCard key={j.id} journey={j} />)}
+            </View>
+          )}
+
+          {rest.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>All journeys</Text>
+              {rest.map(j => <JourneyCard key={j.id} journey={j} />)}
+            </View>
+          )}
+
+          {filtered.length === 0 && (
+            <View style={styles.empty}>
+              <Feather name="search" size={40} color={T.t3} />
+              <Text style={styles.emptyTitle}>No matches</Text>
+              <Text style={styles.emptySub}>Try a different search or filter</Text>
+            </View>
+          )}
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      ) : (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false} key="mine">
+
+          {activeJourneys.length > 0 && (
+            <View style={styles.mySection}>
+              <View style={styles.mySectionHeader}>
+                <View style={[styles.mySectionDot, { backgroundColor: T.green }]} />
+                <Text style={styles.mySectionLabel}>Active</Text>
+                <Text style={styles.mySectionCount}>{activeJourneys.length}</Text>
+              </View>
+              <View style={[styles.mySectionCard, shadow.xs]}>
+                {activeJourneys.map(({ jp, program }) => (
+                  <MyJourneyRow key={jp.id} jp={jp} program={program} />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {pausedJourneys.length > 0 && (
+            <View style={styles.mySection}>
+              <View style={styles.mySectionHeader}>
+                <View style={[styles.mySectionDot, { backgroundColor: T.orange }]} />
+                <Text style={styles.mySectionLabel}>Paused</Text>
+                <Text style={styles.mySectionCount}>{pausedJourneys.length}</Text>
+              </View>
+              <View style={[styles.mySectionCard, shadow.xs]}>
+                {pausedJourneys.map(({ jp, program }) => (
+                  <MyJourneyRow key={jp.id} jp={jp} program={program} />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {doneJourneys.length > 0 && (
+            <View style={styles.mySection}>
+              <View style={styles.mySectionHeader}>
+                <View style={[styles.mySectionDot, { backgroundColor: T.green }]} />
+                <Text style={styles.mySectionLabel}>Completed</Text>
+                <Text style={styles.mySectionCount}>{doneJourneys.length}</Text>
+              </View>
+              <View style={[styles.mySectionCard, shadow.xs]}>
+                {doneJourneys.map(({ jp, program }) => (
+                  <MyJourneyRow key={jp.id} jp={jp} program={program} />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {myJourneys.length === 0 && (
+            <View style={styles.emptyMine}>
+              <Feather name="compass" size={36} color={T.t3} />
+              <Text style={styles.emptyMineTitle}>No journeys yet</Text>
+              <Text style={styles.emptyMineSub}>Explore expert-curated programs and enrol in one to get started</Text>
+              <Pressable style={styles.emptyMineBtn} onPress={() => setTab('explore')}>
+                <Feather name="search" size={14} color="white" />
+                <Text style={styles.emptyMineBtnText}>Explore journeys</Text>
+              </Pressable>
+            </View>
+          )}
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -399,30 +498,44 @@ const styles = StyleSheet.create({
   scroll:  { flex: 1 },
   content: { paddingHorizontal: S.md },
 
-  hero:        { paddingTop: S.lg, paddingBottom: S.md },
-  heroEyebrow: { fontSize: F.xs, color: T.t3, fontWeight: '600' as const, marginBottom: 2 },
+  headerArea: { paddingHorizontal: S.md },
+  hero:        { paddingTop: S.lg, paddingBottom: 8 },
   heroTitle:   { fontSize: F.h1, fontWeight: '800' as const, color: T.text, letterSpacing: -1 },
-  heroSub:     { fontSize: F.sm, color: T.t2, marginTop: 6 },
+
+  tabBar: { flexDirection: 'row', backgroundColor: T.fill, borderRadius: 12, padding: 3, marginBottom: S.md },
+  tabItem: { flex: 1, flexDirection: 'row', alignItems: 'center' as const, justifyContent: 'center' as const, gap: 6, paddingVertical: 9, borderRadius: 10 },
+  tabItemActive: { backgroundColor: 'white', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 3 }, android: { elevation: 2 }, default: {} }) },
+  tabText: { fontSize: 13, fontWeight: '600' as const, color: T.t3 },
+  tabTextActive: { color: T.brand, fontWeight: '700' as const },
+  tabBadge: { backgroundColor: T.brand, borderRadius: 8, minWidth: 18, height: 18, alignItems: 'center' as const, justifyContent: 'center' as const, paddingHorizontal: 5 },
+  tabBadgeText: { fontSize: 10, fontWeight: '800' as const, color: 'white' },
 
   mySection: { marginBottom: S.md },
   mySectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  mySectionTitle: { fontSize: F.sm, fontWeight: '700' as const, color: T.brand, flex: 1 },
+  mySectionDot: { width: 8, height: 8, borderRadius: 4 },
+  mySectionLabel: { fontSize: F.sm, fontWeight: '700' as const, color: T.t2, flex: 1 },
   mySectionCount: { fontSize: 11, fontWeight: '700' as const, color: T.t3, backgroundColor: T.fill, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' as const },
   mySectionCard: { backgroundColor: 'white', borderRadius: R.lg, overflow: 'hidden' as const },
 
-  myRow: { padding: 12, borderLeftWidth: 3, borderLeftColor: T.brand },
+  myRow: { padding: 14, borderLeftWidth: 3, borderLeftColor: T.brand },
   myRowTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  myRowIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center' as const, justifyContent: 'center' as const },
-  myRowTitle: { fontSize: 13, fontWeight: '700' as const, color: T.text },
-  myRowMeta: { fontSize: 11, color: T.t3, marginTop: 1 },
-  myRowLeave: { width: 28, height: 28, borderRadius: 14, backgroundColor: T.fill, alignItems: 'center' as const, justifyContent: 'center' as const },
-  myRowAction: { flexDirection: 'row', alignItems: 'center' as const, gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  myRowActionText: { fontSize: 11, fontWeight: '700' as const, color: 'white' },
-  myRowBadge: { width: 28, height: 28, borderRadius: 14, alignItems: 'center' as const, justifyContent: 'center' as const },
-  myRowProgress: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, paddingLeft: 42 },
-  myRowProgressBg: { flex: 1, height: 4, backgroundColor: T.fill, borderRadius: 2, overflow: 'hidden' as const },
-  myRowProgressFill: { height: 4, borderRadius: 2 },
-  myRowProgressPct: { fontSize: 10, fontWeight: '700' as const, minWidth: 28 },
+  myRowIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center' as const, justifyContent: 'center' as const },
+  myRowTitle: { fontSize: 14, fontWeight: '700' as const, color: T.text },
+  myRowExpert: { fontSize: 11, color: T.t3, marginTop: 1 },
+  myRowLeave: { width: 30, height: 30, borderRadius: 15, backgroundColor: T.fill, alignItems: 'center' as const, justifyContent: 'center' as const },
+  myRowProgress: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  myRowProgressBg: { flex: 1, height: 5, backgroundColor: T.fill, borderRadius: 3, overflow: 'hidden' as const },
+  myRowProgressFill: { height: 5, borderRadius: 3 },
+  myRowProgressPct: { fontSize: 11, fontWeight: '700' as const, minWidth: 30 },
+  myRowProgressMeta: { fontSize: 11, color: T.t3, marginTop: 4 },
+  myRowPausedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  myRowPausedText: { fontSize: 12, color: T.orange, fontWeight: '500' as const },
+  myRowActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  myRowActionBtn: { flexDirection: 'row', alignItems: 'center' as const, justifyContent: 'center' as const, gap: 5, flex: 1, paddingVertical: 8, borderRadius: 10 },
+  myRowActionBtnText: { fontSize: 12, fontWeight: '700' as const, color: 'white' },
+  myRowDoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  myRowDoneBadge: { flexDirection: 'row', alignItems: 'center' as const, gap: 5, flex: 1 },
+  myRowDoneText: { fontSize: 12, fontWeight: '700' as const, color: T.green },
 
   searchWrap: { marginBottom: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: R.lg, borderWidth: 1, borderColor: T.sep },
   searchIcon: { marginLeft: S.md },
@@ -493,4 +606,10 @@ const styles = StyleSheet.create({
   empty:      { alignItems: 'center' as const, paddingVertical: 48 },
   emptyTitle: { fontSize: F.lg, fontWeight: '700' as const, color: T.text, marginBottom: S.sm, marginTop: S.md },
   emptySub:   { fontSize: F.md, color: T.t2 },
+
+  emptyMine: { alignItems: 'center' as const, paddingVertical: 60, paddingHorizontal: S.lg },
+  emptyMineTitle: { fontSize: F.lg, fontWeight: '700' as const, color: T.text, marginTop: S.md, marginBottom: 6 },
+  emptyMineSub: { fontSize: F.sm, color: T.t2, textAlign: 'center' as const, lineHeight: 20, marginBottom: S.lg },
+  emptyMineBtn: { flexDirection: 'row', alignItems: 'center' as const, gap: 6, backgroundColor: T.brand, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12 },
+  emptyMineBtnText: { fontSize: 14, fontWeight: '700' as const, color: 'white' },
 });
