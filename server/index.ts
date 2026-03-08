@@ -167,7 +167,14 @@ function configureExpoAndLanding(app: express.Application) {
     "templates",
     "landing-page.html",
   );
+  const resetTemplatePath = path.resolve(
+    process.cwd(),
+    "server",
+    "templates",
+    "reset-password.html",
+  );
   const landingPageTemplate = fs.readFileSync(templatePath, "utf-8");
+  const resetPasswordTemplate = fs.readFileSync(resetTemplatePath, "utf-8");
   const appName = getAppName();
 
   log("Serving static Expo files with dynamic manifest routing");
@@ -175,6 +182,17 @@ function configureExpoAndLanding(app: express.Application) {
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api")) {
       return next();
+    }
+
+    if (req.path === "/reset-password") {
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+      const html = resetPasswordTemplate
+        .replace(/SUPABASE_URL_PLACEHOLDER/g, supabaseUrl)
+        .replace(/SUPABASE_KEY_PLACEHOLDER/g, supabaseKey)
+        .replace(/APP_NAME_PLACEHOLDER/g, appName);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(200).send(html);
     }
 
     if (req.path !== "/" && req.path !== "/manifest") {

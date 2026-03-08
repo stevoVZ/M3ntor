@@ -393,6 +393,14 @@
       </div>
     </div>
 
+    <script>
+      (function() {
+        var h = window.location.hash;
+        if (h && (h.indexOf('access_token=') !== -1 || (h.indexOf('error=') !== -1 && h.indexOf('error_code=') !== -1))) {
+          window.location.replace('/reset-password' + h);
+        }
+      })();
+    </script>
     <script src="https://unpkg.com/qr-code-styling@1.6.0/lib/qr-code-styling.js"></script>
     <script>
       (function () {

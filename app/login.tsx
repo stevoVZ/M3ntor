@@ -53,9 +53,8 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const redirectTo = Platform.OS === 'web' && typeof window !== 'undefined'
-        ? window.location.origin + '/reset-password'
-        : undefined;
+      const domain = process.env.EXPO_PUBLIC_DOMAIN;
+      const redirectTo = domain ? `https://${domain.replace(/:5000$/, '')}/reset-password` : undefined;
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
       if (error) throw error;
       setFeedback({ type: 'success', message: 'Password reset email sent. Check your inbox.' });
