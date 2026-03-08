@@ -338,7 +338,7 @@ export default function WheelAreaDetail({ area, appScore }: Props) {
 
       {actions.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>To-Do</Text>
+          <Text style={styles.sectionTitle}>Actions</Text>
           {actions.map(item => (
             <Pressable key={item.id} style={styles.habitCard} onPress={() => router.push(`/item/${item.id}`)}>
               <View style={[styles.habitIcon, { backgroundColor: area.c + '08' }]}>

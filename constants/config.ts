@@ -88,7 +88,7 @@ export const KIND_CONFIG = {
   habit:   { label: 'Habit',   color: T.orange,  icon: 'repeat',  order: 0 },
   journey: { label: 'Journey', color: T.brand,   icon: 'compass', order: 1 },
   project: { label: 'Project', color: T.green,   icon: 'folder',  order: 2 },
-  action:  { label: 'To-Do',   color: T.t3,      icon: 'check',   order: 3 },
+  action:  { label: 'Action',  color: T.t3,      icon: 'check',   order: 3 },
   goal:    { label: 'Goal',    color: '#AF52DE',  icon: 'target',  order: 4 },
 } as const;
 
