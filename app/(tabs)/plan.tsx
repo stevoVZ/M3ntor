@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useStore } from '../../lib/store';
 import { router } from 'expo-router';
 import { T, S, F, R, shadow } from '../../constants/theme';
-import { ITEM_AREAS, KIND_CONFIG, PRG } from '../../constants/config';
+import { ITEM_AREAS, KIND_CONFIG, STEP_STATUS, EFFORT, PRG } from '../../constants/config';
 import { itemKind, projectProgress, formatRecurrence, formatDuration } from '../../utils/items';
 import { goalProgress, linkedItemProgress, getUnlinkedItems } from '../../utils/scores';
 import { formatDeadline, isOverdue } from '../../utils/dates';
@@ -13,7 +13,7 @@ import { ProgressBar } from '../../components/items/ProgressBar';
 import { ItemEditSheet } from '../../components/plan/ItemEditSheet';
 import GoalDetailPage from '../../components/plan/GoalDetailPage';
 import { ProjectEditPage } from '../../components/plan/ProjectEditPage';
-import type { Item } from '../../types';
+import type { Item, Step } from '../../types';
 
 type FilterId = 'all' | 'goals' | 'active' | 'paused';
 type ViewMode = 'hierarchy' | 'list';
@@ -346,6 +346,80 @@ function GoalCard({ goal, items, journeyProgresses, onMenu, onOpenGoal, reordera
   );
 }
 
+function InlineStepRow({ step, itemId, accentColor }: { step: Step; itemId: string; accentColor: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const toggleStep = useStore(s => s.toggleStep);
+  const toggleSubtask = useStore(s => s.toggleSubtask);
+  const sConf = STEP_STATUS[step.status || 'todo'];
+  const subtasks = step.subtasks || [];
+  const subDone = subtasks.filter(s => s.done).length;
+  const efConf = step.effort ? (EFFORT as any)[step.effort] : null;
+
+  return (
+    <View>
+      <Pressable
+        style={styles.inlineStepRow}
+        onPress={() => subtasks.length > 0 ? setExpanded(e => !e) : undefined}
+      >
+        <Pressable
+          style={styles.inlineStepCheck}
+          onPress={() => toggleStep(itemId, step.id, !step.done)}
+          hitSlop={4}
+        >
+          <View style={[
+            styles.inlineStepDot,
+            { borderColor: sConf.dot + '60' },
+            step.done && { backgroundColor: T.green, borderColor: T.green },
+            step.status === 'doing' && { borderColor: T.brand, backgroundColor: T.brand + '18' },
+            step.status === 'blocked' && { borderColor: '#E53E3E', backgroundColor: '#E53E3E18' },
+          ]}>
+            {step.done && <Feather name="check" size={9} color="white" />}
+            {step.status === 'doing' && !step.done && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: T.brand }} />}
+          </View>
+        </Pressable>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[styles.inlineStepTitle, step.done && styles.inlineStepTitleDone]} numberOfLines={1}>{step.title}</Text>
+          <View style={styles.inlineStepMeta}>
+            {efConf && (
+              <Text style={[styles.inlineStepEffort, { color: efConf.color || T.t3 }]}>{efConf.label}</Text>
+            )}
+            {subtasks.length > 0 && (
+              <Text style={styles.inlineStepSubCount}>{subDone}/{subtasks.length} subtasks</Text>
+            )}
+          </View>
+        </View>
+        {subtasks.length > 0 && (
+          <Feather
+            name="chevron-down"
+            size={12}
+            color={T.t3}
+            style={{ transform: [{ rotate: expanded ? '0deg' : '-90deg' }], opacity: 0.5 }}
+          />
+        )}
+      </Pressable>
+      {expanded && subtasks.length > 0 && (
+        <View style={[styles.inlineSubtaskList, { borderLeftColor: accentColor + '30' }]}>
+          {subtasks.map(sub => (
+            <Pressable
+              key={sub.id}
+              style={styles.inlineSubtaskRow}
+              onPress={() => toggleSubtask(itemId, step.id, sub.id)}
+            >
+              <View style={[
+                styles.inlineSubCheck,
+                sub.done && { backgroundColor: T.green, borderColor: T.green },
+              ]}>
+                {sub.done && <Feather name="check" size={8} color="white" />}
+              </View>
+              <Text style={[styles.inlineSubTitle, sub.done && styles.inlineSubTitleDone]} numberOfLines={1}>{sub.title}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, index }: {
   item: Item;
   indented?: boolean;
@@ -358,6 +432,7 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
   index?: number;
 }) {
   const updateItem = useStore(s => s.updateItem);
+  const [expanded, setExpanded] = useState(false);
   const kind = itemKind(item);
   const kc = KIND_CONFIG[kind];
   const area = ITEM_AREAS[item.area];
@@ -367,6 +442,9 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
   const isActive = !isPaused && !isDone;
   const hasDeadline = !!item.deadline;
   const overdue = hasDeadline && isOverdue(item.deadline!);
+  const isProject = kind === 'project';
+  const steps = item.steps || [];
+  const sortedSteps = [...steps].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   const accentColor = isDone ? T.green : isPaused ? T.t3 : (area?.c || T.brand);
 
@@ -378,117 +456,165 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
     }
   }
 
+  function handleRowPress() {
+    if (isProject && steps.length > 0) {
+      setExpanded(e => !e);
+    } else {
+      router.push(`/item/${item.id}`);
+    }
+  }
+
   return (
-    <Pressable
-      style={[
-        styles.itemRow, shadow.xs,
-        indented && { marginLeft: 16 },
-        isDone && styles.itemRowDone,
-        isPaused && styles.itemRowPaused,
-      ]}
-      onPress={() => router.push(`/item/${item.id}`)}
-      onLongPress={() => onMenu(item)}
-    >
-      <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
+    <View style={[indented && { marginLeft: 16 }, { marginBottom: 6 }]}>
+      <Pressable
+        testID={isProject && steps.length > 0 ? 'expandable-project' : 'nav-item'}
+        accessibilityLabel={isProject && steps.length > 0 ? `Expand project ${item.title}` : `Open ${item.title}`}
+        style={[
+          styles.itemRow,
+          shadow.xs,
+          isDone && styles.itemRowDone,
+          isPaused && styles.itemRowPaused,
+          expanded && styles.itemRowExpanded,
+        ]}
+        onPress={handleRowPress}
+        onLongPress={() => onMenu(item)}
+      >
+        <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
 
-      {index != null && (
-        <Text style={[styles.orderNumber, isPaused && { opacity: 0.3 }]}>{index}</Text>
-      )}
-      {reorderable && (
-        <Pressable
-          style={styles.reorderCol}
-          onPress={(e) => e.stopPropagation()}
-        >
+        {index != null && (
+          <Text style={[styles.orderNumber, isPaused && { opacity: 0.3 }]}>{index}</Text>
+        )}
+        {reorderable && (
           <Pressable
-            onPress={(e) => { e.stopPropagation(); onMoveUp?.(); }}
-            hitSlop={6}
-            style={[styles.reorderBtn, isFirst && { opacity: 0.2 }]}
-            disabled={isFirst}
+            style={styles.reorderCol}
+            onPress={(e) => e.stopPropagation()}
           >
-            <Feather name="chevron-up" size={14} color={T.brand} />
+            <Pressable
+              onPress={(e) => { e.stopPropagation(); onMoveUp?.(); }}
+              hitSlop={6}
+              style={[styles.reorderBtn, isFirst && { opacity: 0.2 }]}
+              disabled={isFirst}
+            >
+              <Feather name="chevron-up" size={14} color={T.brand} />
+            </Pressable>
+            <Pressable
+              onPress={(e) => { e.stopPropagation(); onMoveDown?.(); }}
+              hitSlop={6}
+              style={[styles.reorderBtn, isLast && { opacity: 0.2 }]}
+              disabled={isLast}
+            >
+              <Feather name="chevron-down" size={14} color={T.brand} />
+            </Pressable>
           </Pressable>
+        )}
+
+        {isProject && steps.length > 0 && (
+          <View style={styles.itemExpandChevron}>
+            <Feather
+              name="chevron-down"
+              size={13}
+              color={accentColor}
+              style={{ transform: [{ rotate: expanded ? '0deg' : '-90deg' }] }}
+            />
+          </View>
+        )}
+
+        {kind !== 'goal' && !(isProject && steps.length > 0) && (
           <Pressable
-            onPress={(e) => { e.stopPropagation(); onMoveDown?.(); }}
-            hitSlop={6}
-            style={[styles.reorderBtn, isLast && { opacity: 0.2 }]}
-            disabled={isLast}
+            testID="quick-check"
+            accessibilityRole="checkbox"
+            style={styles.quickCheck}
+            onPress={(e) => { e.stopPropagation(); handleQuickToggle(); }}
+            hitSlop={4}
           >
-            <Feather name="chevron-down" size={14} color={T.brand} />
+            <View style={[
+              styles.quickCheckBox,
+              isActive && { borderColor: accentColor + '60' },
+              isDone && styles.quickCheckBoxDone,
+            ]}>
+              {isDone && <Feather name="check" size={11} color="white" />}
+            </View>
           </Pressable>
-        </Pressable>
-      )}
+        )}
 
-      {kind !== 'goal' && (
-        <Pressable
-          testID="quick-check"
-          accessibilityRole="checkbox"
-          style={styles.quickCheck}
-          onPress={(e) => { e.stopPropagation(); handleQuickToggle(); }}
-          hitSlop={4}
-        >
-          <View style={[
-            styles.quickCheckBox,
-            isActive && { borderColor: accentColor + '60' },
-            isDone && styles.quickCheckBoxDone,
-          ]}>
-            {isDone && <Feather name="check" size={11} color="white" />}
-          </View>
-        </Pressable>
-      )}
-
-      <Text style={[styles.itemEmoji, (isDone || isPaused) && { opacity: 0.45 }]}>{item.emoji}</Text>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[
-          styles.itemTitle,
-          isDone && styles.itemTitleDone,
-          isPaused && styles.itemTitlePaused,
-        ]} numberOfLines={1}>{item.title}</Text>
-        <View style={styles.itemMetaRow}>
-          <View style={[styles.kindBadge, { backgroundColor: (isPaused ? T.t3 : kc.color) + '12' }]}>
-            <Text style={[styles.kindBadgeText, { color: isPaused ? T.t3 : kc.color }]}>{kc.label}</Text>
-          </View>
-          {area && <Text style={styles.itemAreaText}>{area.e} {area.n.split(' ')[0]}</Text>}
-          {kind === 'project' && item.steps && (
-            <Text style={[styles.itemStepCount, item.steps.filter(s => s.done).length === item.steps.length && item.steps.length > 0 && { color: T.green }]}>
-              {item.steps.filter(s => s.done).length}/{item.steps.length}
-            </Text>
-          )}
-          {kind === 'habit' && item.recurrence && (
-            <Text style={styles.itemRecurrence}>{formatRecurrence(item)}</Text>
-          )}
-          {hasDeadline && (
-            <Text style={[styles.itemDeadline, overdue && { color: T.red }]}>
-              {formatDeadline(item.deadline)}
-            </Text>
-          )}
-          {isPaused && (
-            <View style={styles.pausedBadgeWrap}>
-              <Feather name="pause-circle" size={9} color={T.orange} />
-              <Text style={styles.pausedBadge}>Paused</Text>
+        <Text style={[styles.itemEmoji, (isDone || isPaused) && { opacity: 0.45 }]}>{item.emoji}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[
+            styles.itemTitle,
+            isDone && styles.itemTitleDone,
+            isPaused && styles.itemTitlePaused,
+          ]} numberOfLines={1}>{item.title}</Text>
+          <View style={styles.itemMetaRow}>
+            <View style={[styles.kindBadge, { backgroundColor: (isPaused ? T.t3 : kc.color) + '12' }]}>
+              <Text style={[styles.kindBadgeText, { color: isPaused ? T.t3 : kc.color }]}>{kc.label}</Text>
             </View>
-          )}
-          {isDone && (
-            <View style={styles.doneBadgeWrap}>
-              <Feather name="check-circle" size={9} color={T.green} />
-              <Text style={styles.doneBadgeText}>Done</Text>
-            </View>
-          )}
+            {area && <Text style={styles.itemAreaText}>{area.e} {area.n.split(' ')[0]}</Text>}
+            {isProject && steps.length > 0 && (
+              <Text style={[styles.itemStepCount, steps.filter(s => s.done).length === steps.length && { color: T.green }]}>
+                {steps.filter(s => s.done).length}/{steps.length}
+              </Text>
+            )}
+            {kind === 'habit' && item.recurrence && (
+              <Text style={styles.itemRecurrence}>{formatRecurrence(item)}</Text>
+            )}
+            {hasDeadline && (
+              <Text style={[styles.itemDeadline, overdue && { color: T.red }]}>
+                {formatDeadline(item.deadline)}
+              </Text>
+            )}
+            {isPaused && (
+              <View style={styles.pausedBadgeWrap}>
+                <Feather name="pause-circle" size={9} color={T.orange} />
+                <Text style={styles.pausedBadge}>Paused</Text>
+              </View>
+            )}
+            {isDone && (
+              <View style={styles.doneBadgeWrap}>
+                <Feather name="check-circle" size={9} color={T.green} />
+                <Text style={styles.doneBadgeText}>Done</Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
 
-      {kind === 'project' && item.steps && item.steps.length > 0 ? (
-        <View style={styles.miniProgressBg}>
-          <View style={[styles.miniProgressFill, {
-            width: `${pct}%` as any,
-            backgroundColor: pct === 100 ? T.green : (area?.c || T.brand),
-          }]} />
-        </View>
-      ) : null}
+        {isProject && steps.length > 0 ? (
+          <View style={styles.miniProgressBg}>
+            <View style={[styles.miniProgressFill, {
+              width: `${pct}%` as any,
+              backgroundColor: pct === 100 ? T.green : (area?.c || T.brand),
+            }]} />
+          </View>
+        ) : null}
 
-      <Pressable onPress={() => onMenu(item)} hitSlop={8}>
-        <Feather name="more-vertical" size={14} color={T.t3} style={{ opacity: 0.5 }} />
+        <Pressable onPress={() => onMenu(item)} hitSlop={8}>
+          <Feather name="more-vertical" size={14} color={T.t3} style={{ opacity: 0.5 }} />
+        </Pressable>
       </Pressable>
-    </Pressable>
+
+      {expanded && isProject && (
+        <View style={[styles.inlineTasksContainer, { borderColor: accentColor + '18', backgroundColor: accentColor + '04' }]}>
+          {sortedSteps.length > 0 ? (
+            <>
+              {sortedSteps.map(step => (
+                <InlineStepRow key={step.id} step={step} itemId={item.id} accentColor={accentColor} />
+              ))}
+              <Pressable
+                style={styles.inlineOpenBtn}
+                onPress={() => router.push(`/item/${item.id}`)}
+              >
+                <Feather name="external-link" size={11} color={T.brand} />
+                <Text style={styles.inlineOpenBtnText}>View details</Text>
+              </Pressable>
+            </>
+          ) : (
+            <View style={styles.inlineEmptyTasks}>
+              <Feather name="clipboard" size={16} color={T.t3} />
+              <Text style={styles.inlineEmptyText}>No tasks yet</Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -1135,7 +1261,10 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     padding: 11, paddingHorizontal: 14, paddingLeft: 0, borderRadius: 14,
-    backgroundColor: 'white', marginBottom: 6, overflow: 'hidden' as const,
+    backgroundColor: 'white', overflow: 'hidden' as const,
+  },
+  itemRowExpanded: {
+    borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
   },
   itemRowDone: {
     backgroundColor: T.green + '06', opacity: 0.7,
@@ -1239,4 +1368,57 @@ const styles = StyleSheet.create({
   trashRestoreText: { fontSize: 11, fontWeight: '600' as const, color: T.brand },
   trashDeleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   trashDeleteText: { fontSize: 11, fontWeight: '600' as const, color: T.red },
+
+  itemExpandChevron: {
+    width: 22, alignItems: 'center' as const, justifyContent: 'center' as const,
+    marginLeft: 4, marginRight: -4,
+  },
+
+  inlineTasksContainer: {
+    borderWidth: 0.5, borderTopWidth: 0,
+    borderBottomLeftRadius: 14, borderBottomRightRadius: 14,
+    paddingHorizontal: 12, paddingTop: 6, paddingBottom: 10,
+  },
+  inlineStepRow: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
+    paddingVertical: 7, paddingHorizontal: 4,
+  },
+  inlineStepCheck: { marginRight: 0 },
+  inlineStepDot: {
+    width: 18, height: 18, borderRadius: 6, borderWidth: 1.5,
+    alignItems: 'center' as const, justifyContent: 'center' as const,
+  },
+  inlineStepTitle: { fontSize: 12, fontWeight: '600' as const, color: T.text },
+  inlineStepTitleDone: { textDecorationLine: 'line-through' as const, color: T.t3, fontWeight: '400' as const },
+  inlineStepMeta: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, marginTop: 1 },
+  inlineStepEffort: { fontSize: 10, fontWeight: '600' as const },
+  inlineStepSubCount: { fontSize: 10, color: T.t3 },
+
+  inlineSubtaskList: {
+    marginLeft: 26, borderLeftWidth: 2, paddingLeft: 10, marginBottom: 4,
+  },
+  inlineSubtaskRow: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 7,
+    paddingVertical: 4,
+  },
+  inlineSubCheck: {
+    width: 14, height: 14, borderRadius: 4, borderWidth: 1.5,
+    borderColor: T.t3 + '40',
+    alignItems: 'center' as const, justifyContent: 'center' as const,
+  },
+  inlineSubTitle: { flex: 1, fontSize: 11, color: T.text },
+  inlineSubTitleDone: { textDecorationLine: 'line-through' as const, color: T.t3 },
+
+  inlineOpenBtn: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5,
+    alignSelf: 'flex-end' as const, paddingVertical: 5, paddingHorizontal: 8,
+    marginTop: 4,
+  },
+  inlineOpenBtnText: { fontSize: 11, fontWeight: '600' as const, color: T.brand },
+
+  inlineEmptyTasks: {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6,
+    paddingVertical: 10, paddingHorizontal: 4, justifyContent: 'center' as const,
+  },
+  inlineEmptyText: { fontSize: 12, color: T.t3 },
 });
