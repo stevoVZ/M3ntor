@@ -104,5 +104,7 @@ The Supabase schema defines tables for `profiles`, `items`, `steps`, `subtasks`,
 
 ### Data Persistence
 
-- **Guest mode**: Uses sample data and `AsyncStorage` for completion/mood logs.
+- **Guest mode**: Full local persistence via `AsyncStorage` — items, deleted items, journeys, name, completion/mood logs, self-scores, and score history all survive app restarts. A debounced Zustand subscriber auto-saves items/journeys on any mutation.
 - **Authenticated mode**: Synchronizes items and journeys with Supabase, with completion/mood logs persisted locally and to Supabase.
+- **Trash/Soft Delete**: Items are soft-deleted to `deletedItems` array. Profile screen shows a collapsible Trash section with restore and permanent delete options.
+- **Profile Name**: Editable inline via tap-to-edit in Profile screen. Persisted to AsyncStorage (guest) or Supabase profiles table (authenticated).

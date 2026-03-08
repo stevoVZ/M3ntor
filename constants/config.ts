@@ -4,8 +4,6 @@ import type { Journey } from '../types';
 export { WA } from './weekly-actions';
 export type { WeeklyAction } from './weekly-actions';
 
-export { SAMPLE_ITEMS, SAMPLE_COMMITTED, PEOPLE } from './sample-data';
-
 // ─────────────────────────────────────────────────────────
 // ITEM_AREAS — life areas with display config
 // ─────────────────────────────────────────────────────────

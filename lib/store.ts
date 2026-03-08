@@ -11,6 +11,10 @@ const MOOD_LOG_KEY = 'm3ntor_mood_log';
 const COUNTRY_KEY = 'm3ntor_country';
 const SELF_SCORES_KEY = 'm3ntor_self_scores';
 const SCORE_HISTORY_KEY = 'm3ntor_score_history';
+const GUEST_ITEMS_KEY = 'm3ntor_guest_items';
+const GUEST_DELETED_ITEMS_KEY = 'm3ntor_guest_deleted_items';
+const GUEST_JOURNEYS_KEY = 'm3ntor_guest_journeys';
+const GUEST_NAME_KEY = 'm3ntor_guest_name';
 
 async function saveCompletionLogToStorage(log: CompletionLog) {
   try {
@@ -80,6 +84,65 @@ async function loadScoreHistoryFromStorage(): Promise<ScoreSnapshot[]> {
   }
 }
 
+async function saveGuestItemsToStorage(items: Item[], deleted: Item[]) {
+  try {
+    await Promise.all([
+      AsyncStorage.setItem(GUEST_ITEMS_KEY, JSON.stringify(items)),
+      AsyncStorage.setItem(GUEST_DELETED_ITEMS_KEY, JSON.stringify(deleted)),
+    ]);
+  } catch (e) {
+    console.error('Failed to save guest items:', e);
+  }
+}
+
+async function loadGuestItemsFromStorage(): Promise<{ items: Item[]; deleted: Item[] }> {
+  try {
+    const [rawItems, rawDeleted] = await Promise.all([
+      AsyncStorage.getItem(GUEST_ITEMS_KEY),
+      AsyncStorage.getItem(GUEST_DELETED_ITEMS_KEY),
+    ]);
+    return {
+      items: rawItems ? JSON.parse(rawItems) : [],
+      deleted: rawDeleted ? JSON.parse(rawDeleted) : [],
+    };
+  } catch {
+    return { items: [], deleted: [] };
+  }
+}
+
+async function saveGuestJourneysToStorage(journeys: JourneyProgress[]) {
+  try {
+    await AsyncStorage.setItem(GUEST_JOURNEYS_KEY, JSON.stringify(journeys));
+  } catch (e) {
+    console.error('Failed to save guest journeys:', e);
+  }
+}
+
+async function loadGuestJourneysFromStorage(): Promise<JourneyProgress[]> {
+  try {
+    const raw = await AsyncStorage.getItem(GUEST_JOURNEYS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveGuestNameToStorage(name: string) {
+  try {
+    await AsyncStorage.setItem(GUEST_NAME_KEY, name);
+  } catch (e) {
+    console.error('Failed to save guest name:', e);
+  }
+}
+
+async function loadGuestNameFromStorage(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(GUEST_NAME_KEY);
+  } catch {
+    return null;
+  }
+}
+
 interface AppState {
   items:         Item[];
   deletedItems:  Item[];
@@ -129,6 +192,7 @@ interface AppState {
   setSelfScore:    (areaId: string, score: number) => void;
   saveScoreSnapshot: () => void;
 
+  setName:         (name: string) => void;
   signOut:         () => Promise<void>;
 
   streak:          () => number;
@@ -173,6 +237,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const effectiveUserId = userId ?? 'guest';
       const isGuest = effectiveUserId === 'guest';
+      set({ userId: effectiveUserId });
 
       const [localCompletionLog, localMoodLog, savedCountry, localSelfScores, localScoreHistory] = await Promise.all([
         loadCompletionLogFromStorage(),
@@ -183,10 +248,16 @@ export const useStore = create<AppState>((set, get) => ({
       ]);
 
       if (isGuest) {
+        const [guestData, guestJourneys, guestName] = await Promise.all([
+          loadGuestItemsFromStorage(),
+          loadGuestJourneysFromStorage(),
+          loadGuestNameFromStorage(),
+        ]);
         set({
-          items: [],
-          journeys: [],
-          profile: { id: 'guest', created_at: new Date().toISOString(), country: savedCountry || undefined },
+          items: guestData.items,
+          deletedItems: guestData.deleted,
+          journeys: guestJourneys,
+          profile: { id: 'guest', created_at: new Date().toISOString(), country: savedCountry || undefined, name: guestName || undefined },
           completionLog: localCompletionLog,
           moodLog: localMoodLog,
           selfScores: localSelfScores,
@@ -881,6 +952,20 @@ export const useStore = create<AppState>((set, get) => ({
     saveScoreHistoryToStorage(newHistory);
   },
 
+  setName: (name) => {
+    set(s => ({
+      profile: s.profile ? { ...s.profile, name } : null,
+    }));
+    const uid = get().userId;
+    if (!uid || uid === 'guest') {
+      saveGuestNameToStorage(name);
+    } else if (isSupabaseConfigured && supabase) {
+      supabase.from('profiles').update({ name }).eq('id', uid).then(({ error }) => {
+        if (error) console.error('Failed to save name:', error);
+      });
+    }
+  },
+
   signOut: async () => {
     if (isSupabaseConfigured && supabase) {
       await supabase.auth.signOut().catch(console.error);
@@ -918,3 +1003,20 @@ export const useStore = create<AppState>((set, get) => ({
 
   getItem: (id) => get().items.find(i => i.id === id),
 }));
+
+let _guestSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let _guestDirty = { items: false, journeys: false };
+
+useStore.subscribe((state, prevState) => {
+  if (state.userId !== 'guest') return;
+  if (state.items !== prevState.items || state.deletedItems !== prevState.deletedItems) _guestDirty.items = true;
+  if (state.journeys !== prevState.journeys) _guestDirty.journeys = true;
+  if (!_guestDirty.items && !_guestDirty.journeys) return;
+  if (_guestSaveTimer) clearTimeout(_guestSaveTimer);
+  _guestSaveTimer = setTimeout(() => {
+    const s = useStore.getState();
+    if (_guestDirty.items) saveGuestItemsToStorage(s.items, s.deletedItems);
+    if (_guestDirty.journeys) saveGuestJourneysToStorage(s.journeys);
+    _guestDirty = { items: false, journeys: false };
+  }, 150);
+});

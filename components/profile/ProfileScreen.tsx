@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Platform, TextInput, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,11 +35,19 @@ interface ProfileScreenProps {
 export default function ProfileScreen({ onClose }: ProfileScreenProps) {
   const profile = useStore(s => s.profile);
   const journeys = useStore(s => s.journeys);
+  const deletedItems = useStore(s => s.deletedItems);
+  const restoreItem = useStore(s => s.restoreItem);
+  const permanentlyDeleteItem = useStore(s => s.permanentlyDeleteItem);
   const setCountry = useStore(s => s.setCountry);
+  const setName = useStore(s => s.setName);
   const signOut = useStore(s => s.signOut);
   const userId = useStore(s => s.userId);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [showTrash, setShowTrash] = useState(false);
+  const nameInputRef = useRef<TextInput>(null);
   const isGuest = !userId || userId === 'guest';
 
   function handleSignOut() {
@@ -104,6 +112,35 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
     );
   }
 
+  function handleNameTap() {
+    setNameInput(profile?.name || '');
+    setEditingName(true);
+    setTimeout(() => nameInputRef.current?.focus(), 100);
+  }
+
+  function handleNameSubmit() {
+    const trimmed = nameInput.trim();
+    if (trimmed && trimmed !== (profile?.name || '')) {
+      setName(trimmed);
+    }
+    setEditingName(false);
+  }
+
+  function handleRestore(id: string) {
+    restoreItem(id);
+  }
+
+  function handlePermanentDelete(id: string) {
+    Alert.alert(
+      'Delete permanently?',
+      'This item will be gone forever and cannot be recovered.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => permanentlyDeleteItem(id) },
+      ],
+    );
+  }
+
   function navigateToJourney(journeyId: string) {
     onClose();
     router.push(`/item/${journeyId}`);
@@ -139,7 +176,24 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
             <Text style={styles.avatarText}>{userInitial}</Text>
           </LinearGradient>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{userName}</Text>
+            {editingName ? (
+              <TextInput
+                ref={nameInputRef}
+                value={nameInput}
+                onChangeText={setNameInput}
+                onBlur={handleNameSubmit}
+                onSubmitEditing={handleNameSubmit}
+                style={styles.nameInput}
+                returnKeyType="done"
+                selectTextOnFocus
+                testID="name-input"
+              />
+            ) : (
+              <Pressable onPress={handleNameTap} style={styles.nameRow} hitSlop={8}>
+                <Text style={styles.userName}>{userName}</Text>
+                <Feather name="edit-2" size={13} color={T.t3} />
+              </Pressable>
+            )}
             <Text style={styles.userSince}>Member since {memberSince}</Text>
           </View>
         </View>
@@ -268,6 +322,39 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
               <Text style={styles.emptyText}>No programs yet</Text>
               <Text style={styles.emptySubtext}>Explore the Discover tab to find a journey</Text>
             </Pressable>
+          </View>
+        )}
+
+        {deletedItems.length > 0 && (
+          <View style={styles.section}>
+            <Pressable style={styles.trashHeader} onPress={() => setShowTrash(!showTrash)}>
+              <View style={styles.trashHeaderLeft}>
+                <Text style={styles.sectionTitle}>Trash</Text>
+                <View style={styles.trashBadge}>
+                  <Text style={styles.trashBadgeText}>{deletedItems.length}</Text>
+                </View>
+              </View>
+              <Feather name={showTrash ? 'chevron-up' : 'chevron-down'} size={16} color={T.t3} />
+            </Pressable>
+            {showTrash && (
+              <View style={[styles.sectionCard, shadow.xs]}>
+                {deletedItems.map((item, idx) => {
+                  const areaColor = getAreaColor(item.area || 'learning');
+                  return (
+                    <View key={item.id} style={[styles.trashRow, idx < deletedItems.length - 1 && styles.programRowBorder]}>
+                      <View style={[styles.trashDot, { backgroundColor: areaColor }]} />
+                      <Text style={styles.trashTitle} numberOfLines={1}>{item.title}</Text>
+                      <Pressable style={styles.trashActionBtn} onPress={() => handleRestore(item.id)} hitSlop={8} testID={`restore-${item.id}`}>
+                        <Feather name="rotate-ccw" size={14} color={T.brand} />
+                      </Pressable>
+                      <Pressable style={styles.trashActionBtn} onPress={() => handlePermanentDelete(item.id)} hitSlop={8} testID={`delete-${item.id}`}>
+                        <Feather name="trash-2" size={14} color={T.red} />
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
 
@@ -462,6 +549,21 @@ const styles = StyleSheet.create({
   userInfo: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  nameInput: {
+    fontSize: 17,
+    fontWeight: '700' as const,
+    color: T.text,
+    borderBottomWidth: 1.5,
+    borderBottomColor: T.brand,
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+    marginRight: 8,
+  },
   userName: {
     fontSize: 17,
     fontWeight: '700' as const,
@@ -589,6 +691,54 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+
+  trashHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: 8,
+  },
+  trashHeaderLeft: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  trashBadge: {
+    backgroundColor: T.red + '18',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  trashBadgeText: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: T.red,
+  },
+  trashRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  trashDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  trashTitle: {
+    flex: 1,
+    fontSize: 14,
+    color: T.t2,
+  },
+  trashActionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: T.fill,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
