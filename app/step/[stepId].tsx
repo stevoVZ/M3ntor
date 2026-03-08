@@ -44,6 +44,8 @@ export default function StepDetailScreen() {
   const [editingDue, setEditingDue] = useState(false);
   const [dueDraft, setDueDraft] = useState('');
   const [editingEstMin, setEditingEstMin] = useState(false);
+  const [editingPhase, setEditingPhase] = useState(false);
+  const [phaseDraft, setPhaseDraft] = useState('');
   const subInputRef = useRef<TextInput>(null);
 
   if (!item || !step || !itemId) {
@@ -69,6 +71,11 @@ export default function StepDetailScreen() {
   const efConf = EFFORT[step.effort] ?? EFFORT.medium;
   const subtasks = step.subtasks ?? [];
   const subDone = subtasks.filter(s => s.done).length;
+
+  const existingPhases: string[] = [];
+  (item.steps ?? []).forEach(s => {
+    if (s.phase && !existingPhases.includes(s.phase)) existingPhases.push(s.phase);
+  });
 
   function handleStatusSet(status: Step['status']) {
     if (!itemId) return;
@@ -305,6 +312,70 @@ export default function StepDetailScreen() {
                 <Feather name="clock" size={11} color={T.t3} />
                 <Text style={[styles.metaValueText, { color: step.estimated_minutes ? T.t2 : T.t3 }]}>
                   {step.estimated_minutes ? `${step.estimated_minutes} min` : 'Set estimate...'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Phase</Text>
+            {editingPhase ? (
+              <View style={{ gap: 6, alignItems: 'flex-end' as const }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'flex-end' as const }}>
+                  {existingPhases.map(p => (
+                    <Pressable
+                      key={p}
+                      style={[styles.phasePill, step.phase === p && styles.phasePillActive]}
+                      onPress={() => { updateStep(itemId!, step.id, { phase: p }); setEditingPhase(false); }}
+                    >
+                      <Text style={[styles.phasePillText, step.phase === p && styles.phasePillTextActive]}>{p}</Text>
+                    </Pressable>
+                  ))}
+                  {step.phase && (
+                    <Pressable
+                      style={[styles.phasePill, { borderColor: T.red + '40' }]}
+                      onPress={() => { updateStep(itemId!, step.id, { phase: undefined }); setEditingPhase(false); }}
+                    >
+                      <Feather name="x" size={10} color={T.red} />
+                      <Text style={[styles.phasePillText, { color: T.red }]}>None</Text>
+                    </Pressable>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, width: '100%' }}>
+                  <TextInput
+                    value={phaseDraft}
+                    onChangeText={setPhaseDraft}
+                    onSubmitEditing={() => {
+                      if (phaseDraft.trim()) {
+                        updateStep(itemId!, step.id, { phase: phaseDraft.trim() });
+                        setEditingPhase(false);
+                        setPhaseDraft('');
+                      }
+                    }}
+                    placeholder="New phase name..."
+                    placeholderTextColor={T.t3}
+                    style={styles.phaseInput}
+                    returnKeyType="done"
+                  />
+                  <Pressable onPress={() => {
+                    if (phaseDraft.trim()) {
+                      updateStep(itemId!, step.id, { phase: phaseDraft.trim() });
+                    }
+                    setEditingPhase(false);
+                    setPhaseDraft('');
+                  }} hitSlop={8}>
+                    <Feather name="check" size={14} color={T.brand} />
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable
+                style={[styles.metaValue, step.phase ? { backgroundColor: T.brand + '10' } : { backgroundColor: T.fill }]}
+                onPress={() => { setEditingPhase(true); setPhaseDraft(''); }}
+              >
+                <Feather name="folder" size={11} color={step.phase ? T.brand : T.t3} />
+                <Text style={[styles.metaValueText, { color: step.phase ? T.brand : T.t3 }]}>
+                  {step.phase || 'Set phase...'}
                 </Text>
               </Pressable>
             )}
@@ -580,6 +651,19 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   addSubTriggerText: { fontSize: 13, fontWeight: '600' as const, color: T.brand },
+
+  phasePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+    borderWidth: 1, borderColor: T.sep, backgroundColor: T.fill,
+  },
+  phasePillActive: { backgroundColor: T.brand + '12', borderColor: T.brand + '40' },
+  phasePillText: { fontSize: 12, fontWeight: '600' as const, color: T.t2 },
+  phasePillTextActive: { color: T.brand },
+  phaseInput: {
+    flex: 1, fontSize: 13, color: T.text, padding: 8,
+    backgroundColor: T.fill, borderRadius: 8, borderWidth: 1, borderColor: T.brand + '30',
+  },
 
   emptyState: {
     flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12,

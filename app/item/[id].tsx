@@ -225,7 +225,13 @@ export default function ItemDetailPage() {
   const [aiSubLoadingId, setAiSubLoadingId] = useState<string | null>(null);
   const [showPhasePicker, setShowPhasePicker] = useState(false);
   const [expandingPhase, setExpandingPhase] = useState<string | null>(null);
+  const [collapsedPhases, setCollapsedPhases] = useState<Record<string, boolean>>({});
+  const [addingToPhase, setAddingToPhase] = useState<string | null>(null);
+  const [phaseStepText, setPhaseStepText] = useState('');
+  const [creatingPhase, setCreatingPhase] = useState(false);
+  const [newPhaseName, setNewPhaseName] = useState('');
   const stepInputRef = useRef<TextInput>(null);
+  const phaseInputRef = useRef<TextInput>(null);
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -356,6 +362,54 @@ export default function ItemDetailPage() {
     setNewStepText('');
   }
 
+  function handleAddPhaseStep(phaseName: string) {
+    if (!phaseStepText.trim()) return;
+    const step = createStep(item.id, {
+      title: phaseStepText.trim(),
+      sort_order: steps.length,
+      phase: phaseName,
+    });
+    addStepAction(item.id, step);
+    setPhaseStepText('');
+    setAddingToPhase(null);
+  }
+
+  function handleCreatePhase() {
+    if (!newPhaseName.trim()) return;
+    setCreatingPhase(false);
+    setAddingToPhase(newPhaseName.trim());
+    setNewPhaseName('');
+  }
+
+  function togglePhaseCollapse(phaseName: string) {
+    setCollapsedPhases(prev => ({ ...prev, [phaseName]: !prev[phaseName] }));
+  }
+
+  const existingPhases = useMemo(() => {
+    const phaseSet = new Set<string>();
+    steps.forEach(s => { if (s.phase) phaseSet.add(s.phase); });
+    return Array.from(phaseSet);
+  }, [steps]);
+
+  const groupedSteps = useMemo(() => {
+    const sorted = [...steps].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const ungrouped: Step[] = [];
+    const phaseMap = new Map<string, Step[]>();
+    const phaseOrder: string[] = [];
+    sorted.forEach(s => {
+      if (s.phase) {
+        if (!phaseMap.has(s.phase)) {
+          phaseMap.set(s.phase, []);
+          phaseOrder.push(s.phase);
+        }
+        phaseMap.get(s.phase)!.push(s);
+      } else {
+        ungrouped.push(s);
+      }
+    });
+    return { ungrouped, phaseMap, phaseOrder };
+  }, [steps]);
+
   function handleMoreTasksPress() {
     if (steps.length > 0) {
       setShowPhasePicker(prev => !prev);
@@ -379,6 +433,7 @@ export default function ItemDetailPage() {
         title: t.title,
         sort_order: steps.length + i,
         effort: t.effort || undefined,
+        phase: t.phase || undefined,
       }));
       newSteps.forEach(s => addStepAction(item.id, s));
       setAiBanner(`Added ${result.tasks.length} tasks`);
@@ -407,6 +462,7 @@ export default function ItemDetailPage() {
             title: t.title,
             sort_order: steps.length + i,
             effort: t.effort || undefined,
+            phase: t.phase || step.title,
           });
           addStepAction(item.id, newStep);
           newStepIds.push(newStep.id);
@@ -962,7 +1018,7 @@ export default function ItemDetailPage() {
                 </View>
               ) : (
                 <>
-                  {steps.map((step) => (
+                  {groupedSteps.ungrouped.map((step) => (
                     <StepRow
                       key={step.id}
                       step={step}
@@ -970,6 +1026,101 @@ export default function ItemDetailPage() {
                       onToggle={(done) => toggleStep(item.id, step.id, done)}
                     />
                   ))}
+
+                  {groupedSteps.phaseOrder.map(phaseName => {
+                    const phaseSteps = groupedSteps.phaseMap.get(phaseName) || [];
+                    const phaseDone = phaseSteps.filter(s => s.done).length;
+                    const isCollapsed = collapsedPhases[phaseName] ?? false;
+                    const phaseColor = area?.c || T.brand;
+
+                    return (
+                      <View key={phaseName} style={styles.phaseGroup}>
+                        <Pressable style={styles.phaseHeader} onPress={() => togglePhaseCollapse(phaseName)}>
+                          <Feather name={isCollapsed ? 'chevron-right' : 'chevron-down'} size={14} color={phaseColor} />
+                          <View style={[styles.phaseIcon, { backgroundColor: phaseColor + '12' }]}>
+                            <Feather name="folder" size={12} color={phaseColor} />
+                          </View>
+                          <Text style={[styles.phaseName, { color: phaseColor }]} numberOfLines={1}>{phaseName}</Text>
+                          <View style={[styles.phaseProgress, { backgroundColor: phaseDone === phaseSteps.length && phaseSteps.length > 0 ? T.green + '14' : T.fill }]}>
+                            <Text style={[styles.phaseProgressText, { color: phaseDone === phaseSteps.length && phaseSteps.length > 0 ? T.green : T.t3 }]}>
+                              {phaseDone}/{phaseSteps.length}
+                            </Text>
+                          </View>
+                          <Pressable
+                            hitSlop={8}
+                            onPress={(e) => { e.stopPropagation(); setAddingToPhase(phaseName); setPhaseStepText(''); }}
+                            style={styles.phaseAddBtn}
+                          >
+                            <Feather name="plus" size={12} color={T.t3} />
+                          </Pressable>
+                        </Pressable>
+
+                        {!isCollapsed && phaseSteps.map(step => (
+                          <StepRow
+                            key={step.id}
+                            step={step}
+                            itemId={item.id}
+                            onToggle={(done) => toggleStep(item.id, step.id, done)}
+                          />
+                        ))}
+
+                        {!isCollapsed && addingToPhase === phaseName && (
+                          <View style={styles.phaseAddRow}>
+                            <TextInput
+                              autoFocus
+                              value={phaseStepText}
+                              onChangeText={setPhaseStepText}
+                              onSubmitEditing={() => handleAddPhaseStep(phaseName)}
+                              placeholder={`Add task to ${phaseName}...`}
+                              placeholderTextColor={T.t3}
+                              style={styles.phaseAddInput}
+                              returnKeyType="done"
+                            />
+                            <Pressable
+                              style={[styles.phaseAddSubmit, phaseStepText.trim() ? { backgroundColor: T.brand } : {}]}
+                              onPress={() => handleAddPhaseStep(phaseName)}
+                            >
+                              <Feather name="plus" size={16} color={phaseStepText.trim() ? 'white' : T.t3} />
+                            </Pressable>
+                            <Pressable onPress={() => { setAddingToPhase(null); setPhaseStepText(''); }} hitSlop={8}>
+                              <Feather name="x" size={14} color={T.t3} />
+                            </Pressable>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+
+                  {creatingPhase ? (
+                    <View style={styles.newPhaseRow}>
+                      <Feather name="folder-plus" size={14} color={T.brand} />
+                      <TextInput
+                        ref={phaseInputRef}
+                        autoFocus
+                        value={newPhaseName}
+                        onChangeText={setNewPhaseName}
+                        onSubmitEditing={handleCreatePhase}
+                        placeholder="Phase name..."
+                        placeholderTextColor={T.t3}
+                        style={styles.newPhaseInput}
+                        returnKeyType="done"
+                      />
+                      <Pressable
+                        style={[styles.newPhaseBtn, newPhaseName.trim() ? { backgroundColor: T.brand } : {}]}
+                        onPress={handleCreatePhase}
+                      >
+                        <Text style={[styles.newPhaseBtnText, newPhaseName.trim() ? { color: 'white' } : {}]}>Create</Text>
+                      </Pressable>
+                      <Pressable onPress={() => { setCreatingPhase(false); setNewPhaseName(''); }} hitSlop={8}>
+                        <Feather name="x" size={14} color={T.t3} />
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Pressable style={styles.newPhaseTrigger} onPress={() => setCreatingPhase(true)}>
+                      <Feather name="folder-plus" size={13} color={T.brand} />
+                      <Text style={styles.newPhaseTriggerText}>New phase</Text>
+                    </Pressable>
+                  )}
 
                   {steps.length > 0 && doneSteps === steps.length && item.status !== 'done' && (
                     <Pressable
@@ -1376,6 +1527,23 @@ const styles = StyleSheet.create({
   addTaskInput: { flex: 1, backgroundColor: 'white', borderRadius: R.md, borderWidth: 1, borderColor: T.sep, paddingHorizontal: S.md, paddingVertical: 11, fontSize: 14, color: T.text },
   addTaskBtn: { width: 44, height: 44, borderRadius: R.md, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' },
   addTaskBtnActive: { backgroundColor: T.brand },
+
+  phaseGroup: { marginTop: 10 },
+  phaseHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 4 },
+  phaseIcon: { width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  phaseName: { flex: 1, fontSize: 13, fontWeight: '700' as const },
+  phaseProgress: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  phaseProgressText: { fontSize: 11, fontWeight: '700' as const },
+  phaseAddBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: T.fill, alignItems: 'center', justifyContent: 'center' },
+  phaseAddRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingLeft: 34 },
+  phaseAddInput: { flex: 1, fontSize: 13, color: T.text, padding: 8, backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: T.sep },
+  phaseAddSubmit: { width: 32, height: 32, borderRadius: 8, backgroundColor: T.fill, alignItems: 'center', justifyContent: 'center' },
+  newPhaseRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 4 },
+  newPhaseInput: { flex: 1, fontSize: 13, color: T.text, padding: 8, backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: T.brand + '30' },
+  newPhaseBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: T.fill },
+  newPhaseBtnText: { fontSize: 12, fontWeight: '700' as const, color: T.t3 },
+  newPhaseTrigger: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 4 },
+  newPhaseTriggerText: { fontSize: 13, fontWeight: '600' as const, color: T.brand },
 
   bodyScroll: { flex: 1 },
   section: { backgroundColor: 'white', borderRadius: R.lg, padding: S.md, marginBottom: S.md, ...shadow.xs },

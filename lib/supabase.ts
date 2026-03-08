@@ -115,7 +115,7 @@ export async function deleteItem(id: string) {
 }
 
 const STEP_COLUMNS = [
-  'id', 'item_id', 'title', 'description', 'done', 'status',
+  'id', 'item_id', 'title', 'description', 'phase', 'done', 'status',
   'priority', 'effort', 'today', 'blocked_by', 'assignees',
   'sort_order', 'created_at',
 ];

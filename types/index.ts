@@ -20,6 +20,7 @@ export interface Step {
   item_id: string;
   title: string;
   description?: string;
+  phase?: string;
   done: boolean;
   status: StepStatus;
   priority: Priority;

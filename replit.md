@@ -53,6 +53,7 @@ The application uses a modular component structure:
 ### Data Models
 
 - **Core Entities**: `Item`, `Step`, `Subtask` are central to the application.
+- **Step Phases**: Steps have an optional `phase?: string` field. Steps sharing the same phase string are grouped under collapsible headers in the project detail view (`app/item/[id].tsx`). Phases show per-phase progress counts, can be collapsed/expanded, and support adding steps directly into a phase. Phase assignment is editable from the step detail screen (`app/step/[stepId].tsx`). AI task generation (`lib/ai.ts`) produces phased steps automatically.
 - **User & Progress**: `Profile`, `JourneyProgress`, `CompletionLog`, `MoodEntry` track user-specific data.
 - **Static Data**: `Journey` defines expert-curated programs.
 - **Dynamic Type Detection**: Item type is derived at runtime via `itemKind()`.

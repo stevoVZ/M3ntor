@@ -151,7 +151,7 @@ export default function CreateScreen() {
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [goalSuggestion, setGoalSuggestion] = useState<{ why?: string; journeyHints?: string[]; firstSteps?: string[] } | null>(null);
   const [goalEnrichLoading, setGoalEnrichLoading] = useState(false);
-  const [breakdownSteps, setBreakdownSteps] = useState<{ id: string; text: string; effort?: string }[]>([]);
+  const [breakdownSteps, setBreakdownSteps] = useState<{ id: string; text: string; effort?: string; phase?: string }[]>([]);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [pinnedAiType, setPinnedAiType] = useState<string | null>(null);
@@ -286,6 +286,7 @@ export default function CreateScreen() {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
                 text: t.title,
                 effort: t.effort,
+                phase: t.phase,
               })));
             }
             setBreakdownLoading(false);
@@ -348,6 +349,7 @@ export default function CreateScreen() {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
         text: t.title,
         effort: t.effort,
+        phase: t.phase,
       })));
     }
     setBreakdownLoading(false);
@@ -392,6 +394,7 @@ export default function CreateScreen() {
           title: s.text.trim(),
           sort_order: idx,
           effort: (s.effort as 'quick' | 'medium' | 'deep') || undefined,
+          phase: s.phase || undefined,
         }))
       : undefined;
 
@@ -922,6 +925,7 @@ export default function CreateScreen() {
                     id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
                     text: t.title,
                     effort: t.effort,
+                    phase: t.phase,
                   })));
                 }
                 setBreakdownLoading(false);

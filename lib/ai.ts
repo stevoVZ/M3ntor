@@ -63,6 +63,7 @@ export async function assessProjectComplexity(title: string, country?: string): 
 export interface AiTaskItem {
   title: string;
   effort?: 'quick' | 'medium' | 'deep';
+  phase?: string;
 }
 
 export interface AiTasks {
@@ -76,9 +77,10 @@ export async function generateProjectTasks(title: string, existing: string[] = [
   const noApps = `\nNever recommend apps, websites, software, or third-party services. Only suggest actions the user can do themselves.`;
   const contextCtx = context ? `\nAdditional context from the user:\n${context}` : '';
   const effortNote = `\nFor each task, estimate effort: "quick" (< 15 min), "medium" (~1-2 hrs), or "deep" (half day+).`;
+  const phaseNote = `\nGroup tasks into logical phases. Each task must include a "phase" field — a short label for the group it belongs to (e.g. "Planning", "Execution", "Review"). Tasks in the same phase share the same phase string.`;
   const prompt = existing.length
-    ? `Project: "${title}"${countryCtx}${noApps}${contextCtx}${effortNote}\nExisting phases/steps: ${existing.join(', ')}\nGenerate 3-5 additional major phases or steps NOT yet covered. Focus on significant project phases that are missing, not minor sub-tasks of existing steps. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium"}],"emoji":"emoji"}`
-    : `Project: "${title}"${countryCtx}${noApps}${contextCtx}${effortNote}\nGenerate 5-7 concrete actionable tasks in logical order. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium"}],"emoji":"emoji","why":"one sentence"}`;
+    ? `Project: "${title}"${countryCtx}${noApps}${contextCtx}${effortNote}${phaseNote}\nExisting phases/steps: ${existing.join(', ')}\nGenerate 3-5 additional major phases or steps NOT yet covered. Focus on significant project phases that are missing, not minor sub-tasks of existing steps. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium","phase":"Phase Name"}],"emoji":"emoji"}`
+    : `Project: "${title}"${countryCtx}${noApps}${contextCtx}${effortNote}${phaseNote}\nGenerate 5-7 concrete actionable tasks in logical order, grouped into 2-4 phases. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium","phase":"Phase Name"}],"emoji":"emoji","why":"one sentence"}`;
   try {
     const raw    = await aiAssist(prompt);
     const clean  = raw.replace(/```json|```/g, '').trim();
@@ -153,7 +155,7 @@ export async function expandProjectPhase(
   const existingCtx = existingSubtasks.length
     ? `\nAlready has these sub-steps: ${existingSubtasks.join(', ')}. Do NOT repeat them.`
     : '';
-  const prompt = `Project: "${projectTitle}"${countryCtx}${noApps}${effortNote}\nPhase to expand: "${phaseTitle}"${siblingsCtx}${existingCtx}\nBreak down this specific phase into 3-5 detailed, actionable sub-steps. These should be concrete tasks that someone would do during the "${phaseTitle}" phase only. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium"}]}`;
+  const prompt = `Project: "${projectTitle}"${countryCtx}${noApps}${effortNote}\nPhase to expand: "${phaseTitle}"${siblingsCtx}${existingCtx}\nBreak down this specific phase into 3-5 detailed, actionable sub-steps. These should be concrete tasks that someone would do during the "${phaseTitle}" phase only. All tasks belong to the "${phaseTitle}" phase. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium","phase":"${phaseTitle}"}]}`;
   try {
     const raw = await aiAssist(prompt);
     const clean = raw.replace(/```json|```/g, '').trim();
