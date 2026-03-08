@@ -1,85 +1,16 @@
 import { create } from 'zustand';
-import type { Item, Step, Subtask, JourneyProgress, Profile, CompletionLog, MoodEntry, MoodValue } from '../types';
+import type { Item, Step, Subtask, JourneyProgress, Profile, CompletionLog, MoodEntry, MoodValue, ScoreSnapshot } from '../types';
 import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured, fetchItems, fetchDeletedItems, fetchJourneyProgress, upsertItem, deleteItem, softDeleteItem, restoreDeletedItem, upsertStep, upsertSubtask, upsertCompletionLog, fetchCompletionLogs, upsertMoodEntry, fetchMoodEntries, upsertJourneyProgress } from './supabase';
-import { SAMPLE_ITEMS, SAMPLE_COMMITTED } from '../constants/sample-data';
 import { PRG } from '../constants/config';
 import { WA } from '../constants/weekly-actions';
-import type { SampleItem, SampleStep, SampleSubtask, CommittedEntry } from '../constants/sample-data';
-
-function convertSubtask(st: SampleSubtask, stepId: string, idx: number): Subtask {
-  return {
-    id: st.id,
-    step_id: stepId,
-    title: st.title,
-    done: st.done,
-    assignees: st.assignees,
-    sort_order: idx,
-  };
-}
-
-function convertStep(s: SampleStep, itemId: string, idx: number): Step {
-  const now = new Date().toISOString();
-  return {
-    id: s.id,
-    item_id: itemId,
-    title: s.title,
-    description: s.description,
-    done: s.done,
-    status: (s.status as Step['status']) ?? 'todo',
-    priority: (s.priority as Step['priority']) ?? 'normal',
-    effort: (s.effort as Step['effort']) ?? 'medium',
-    today: s.today ?? false,
-    blocked_by: s.blockedBy ?? [],
-    assignees: s.assignees,
-    sort_order: idx,
-    subtasks: s.subtasks?.map((st, si) => convertSubtask(st, s.id, si)),
-    created_at: now,
-    completed_at: s.done ? now : undefined,
-  };
-}
-
-function convertSampleItem(si: SampleItem): Item {
-  const now = new Date().toISOString();
-  return {
-    id: si.id,
-    user_id: 'guest',
-    title: si.title,
-    emoji: si.emoji,
-    description: si.description,
-    area: si.area,
-    secondary_areas: si.secondaryAreas,
-    status: si.status as Item['status'],
-    source: si.source as Item['source'],
-    priority: 'normal',
-    effort: 'medium',
-    deadline: si.deadline,
-    started_at: si.status === 'active' ? now : undefined,
-    steps: si.steps?.map((s, idx) => convertStep(s, si.id, idx)),
-    linked_items: si.linkedItems,
-    linked_journeys: si.linkedJourneys,
-    created_at: now,
-    updated_at: now,
-  };
-}
-
-function convertCommittedToJourney(c: CommittedEntry): JourneyProgress {
-  return {
-    id: Crypto.randomUUID(),
-    user_id: 'guest',
-    journey_id: c.id,
-    status: c.status === 'completed' ? 'done' : c.status === 'active' ? 'active' : 'paused',
-    current_week: c.week,
-    current_day: c.day,
-    streak: c.status === 'active' ? c.day : 0,
-    enrolled_at: new Date().toISOString(),
-  };
-}
 
 const COMPLETION_LOG_KEY = 'm3ntor_completion_log';
 const MOOD_LOG_KEY = 'm3ntor_mood_log';
 const COUNTRY_KEY = 'm3ntor_country';
+const SELF_SCORES_KEY = 'm3ntor_self_scores';
+const SCORE_HISTORY_KEY = 'm3ntor_score_history';
 
 async function saveCompletionLogToStorage(log: CompletionLog) {
   try {
@@ -115,6 +46,40 @@ async function loadMoodLogFromStorage(): Promise<MoodEntry[]> {
   }
 }
 
+async function saveSelfScoresToStorage(scores: Record<string, number>) {
+  try {
+    await AsyncStorage.setItem(SELF_SCORES_KEY, JSON.stringify(scores));
+  } catch (e) {
+    console.error('Failed to save selfScores:', e);
+  }
+}
+
+async function loadSelfScoresFromStorage(): Promise<Record<string, number>> {
+  try {
+    const raw = await AsyncStorage.getItem(SELF_SCORES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function saveScoreHistoryToStorage(history: ScoreSnapshot[]) {
+  try {
+    await AsyncStorage.setItem(SCORE_HISTORY_KEY, JSON.stringify(history));
+  } catch (e) {
+    console.error('Failed to save scoreHistory:', e);
+  }
+}
+
+async function loadScoreHistoryFromStorage(): Promise<ScoreSnapshot[]> {
+  try {
+    const raw = await AsyncStorage.getItem(SCORE_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
 interface AppState {
   items:         Item[];
   deletedItems:  Item[];
@@ -125,6 +90,8 @@ interface AppState {
   error:         string | null;
   completionLog: CompletionLog;
   moodLog:       MoodEntry[];
+  selfScores:    Record<string, number>;
+  scoreHistory:  ScoreSnapshot[];
 
   setUserId:       (id: string | null) => void;
   setCountry:      (country: string | null) => void;
@@ -159,6 +126,8 @@ interface AppState {
   advanceJourneyDay: (journeyId: string) => void;
   recordCompletion:(actionId: string, status: 'done' | 'skipped') => void;
   recordMood:      (mood: MoodValue) => void;
+  setSelfScore:    (areaId: string, score: number) => void;
+  saveScoreSnapshot: () => void;
 
   signOut:         () => Promise<void>;
 
@@ -182,6 +151,8 @@ export const useStore = create<AppState>((set, get) => ({
   error:         null,
   completionLog: {},
   moodLog:       [],
+  selfScores:    {},
+  scoreHistory:  [],
 
   setUserId:  (id) => set({ userId: id }),
   setCountry: (country) => {
@@ -203,10 +174,12 @@ export const useStore = create<AppState>((set, get) => ({
       const effectiveUserId = userId ?? 'guest';
       const isGuest = effectiveUserId === 'guest';
 
-      const [localCompletionLog, localMoodLog, savedCountry] = await Promise.all([
+      const [localCompletionLog, localMoodLog, savedCountry, localSelfScores, localScoreHistory] = await Promise.all([
         loadCompletionLogFromStorage(),
         loadMoodLogFromStorage(),
         AsyncStorage.getItem(COUNTRY_KEY).catch(() => null),
+        loadSelfScoresFromStorage(),
+        loadScoreHistoryFromStorage(),
       ]);
 
       if (isGuest) {
@@ -216,6 +189,8 @@ export const useStore = create<AppState>((set, get) => ({
           profile: { id: 'guest', created_at: new Date().toISOString(), country: savedCountry || undefined },
           completionLog: localCompletionLog,
           moodLog: localMoodLog,
+          selfScores: localSelfScores,
+          scoreHistory: localScoreHistory,
           loading: false,
         });
         return;
@@ -291,6 +266,8 @@ export const useStore = create<AppState>((set, get) => ({
         journeys: loadedJourneys,
         completionLog,
         moodLog,
+        selfScores: localSelfScores,
+        scoreHistory: localScoreHistory,
         loading: false,
       });
 
@@ -875,6 +852,35 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
+  setSelfScore: (areaId, score) => {
+    const clamped = Math.min(10, Math.max(1, Math.round(score)));
+    set(s => {
+      const updated = { ...s.selfScores, [areaId]: clamped };
+      saveSelfScoresToStorage(updated);
+      const history = s.scoreHistory;
+      const now = new Date();
+      const isFirstSnapshot = history.length === 0;
+      const lastSnap = history.length > 0 ? history[history.length - 1] : null;
+      const hoursSinceLast = lastSnap ? (now.getTime() - new Date(lastSnap.date).getTime()) / (1000 * 60 * 60) : Infinity;
+      if (isFirstSnapshot || hoursSinceLast >= 24) {
+        const snapshot: ScoreSnapshot = { date: now.toISOString(), scores: { ...updated } };
+        const newHistory = [...history, snapshot];
+        saveScoreHistoryToStorage(newHistory);
+        return { selfScores: updated, scoreHistory: newHistory };
+      }
+      return { selfScores: updated };
+    });
+  },
+
+  saveScoreSnapshot: () => {
+    const { selfScores, scoreHistory } = get();
+    if (Object.keys(selfScores).length === 0) return;
+    const snapshot: ScoreSnapshot = { date: new Date().toISOString(), scores: { ...selfScores } };
+    const newHistory = [...scoreHistory, snapshot];
+    set({ scoreHistory: newHistory });
+    saveScoreHistoryToStorage(newHistory);
+  },
+
   signOut: async () => {
     if (isSupabaseConfigured && supabase) {
       await supabase.auth.signOut().catch(console.error);
@@ -889,6 +895,8 @@ export const useStore = create<AppState>((set, get) => ({
       error: null,
       completionLog: {},
       moodLog: [],
+      selfScores: {},
+      scoreHistory: [],
     });
   },
 

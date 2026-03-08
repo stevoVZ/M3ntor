@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -18,7 +18,12 @@ interface Props {
 export default function WheelAreaDetail({ area, appScore }: Props) {
   const items = useStore(s => s.items);
   const journeys = useStore(s => s.journeys);
+  const setSelfScore = useStore(s => s.setSelfScore);
+  const selfScores = useStore(s => s.selfScores);
+  const scoreHistory = useStore(s => s.scoreHistory);
+  const [showPicker, setShowPicker] = useState(false);
   const tier = scoreTier(area.score);
+  const hasManualScore = selfScores[area.id] !== undefined;
 
   const areaItems = items.filter(
     i => (i.status === 'active' || i.status === 'paused' || i.status === 'someday') &&
@@ -49,7 +54,8 @@ export default function WheelAreaDetail({ area, appScore }: Props) {
     ? Math.min(10, area.score + Math.min(2, Math.round(totalContributing * 0.5)))
     : null;
 
-  const change = area.score - area.start;
+  const firstScore = scoreHistory.length > 0 ? (scoreHistory[0].scores[area.id] ?? null) : null;
+  const change = firstScore != null ? area.score - firstScore : 0;
 
   return (
     <View style={[styles.container, { backgroundColor: area.c + '0A', borderColor: area.c + '18' }]}>
@@ -71,10 +77,10 @@ export default function WheelAreaDetail({ area, appScore }: Props) {
           </Text>
         </View>
         <View style={styles.dualScoreWrap}>
-          <View style={[styles.scoreBox, { backgroundColor: area.c }]}>
+          <Pressable onPress={() => setShowPicker(p => !p)} style={[styles.scoreBox, { backgroundColor: area.c }]}>
             <Text style={styles.scoreBoxValue}>{area.score}</Text>
-            <Text style={styles.scoreBoxLabel}>YOU</Text>
-          </View>
+            <Text style={styles.scoreBoxLabel}>{hasManualScore ? 'YOU' : 'TAP'}</Text>
+          </Pressable>
           {appScore != null && (
             <View style={[styles.scoreBoxOutline, { backgroundColor: area.c + '12', borderColor: area.c + '50' }]}>
               <Text style={[styles.scoreBoxValueOutline, { color: area.c }]}>{appScore}</Text>
@@ -104,27 +110,64 @@ export default function WheelAreaDetail({ area, appScore }: Props) {
         );
       })()}
 
+      {showPicker && (
+        <View style={[styles.pickerWrap, { borderColor: area.c + '30' }]}>
+          <Text style={styles.pickerLabel}>Rate your {area.n.toLowerCase()}</Text>
+          <View style={styles.pickerRow}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => {
+              const isSelected = area.score === n;
+              return (
+                <Pressable
+                  key={n}
+                  onPress={() => {
+                    setSelfScore(area.id, n);
+                    setShowPicker(false);
+                  }}
+                  style={[
+                    styles.pickerDot,
+                    { borderColor: area.c + '40' },
+                    isSelected && { backgroundColor: area.c, borderColor: area.c },
+                  ]}
+                >
+                  <Text style={[styles.pickerDotText, isSelected && { color: '#fff' }]}>{n}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.pickerHints}>
+            <Text style={styles.pickerHintText}>Needs focus</Text>
+            <Text style={styles.pickerHintText}>Thriving</Text>
+          </View>
+        </View>
+      )}
+
       <View style={[styles.descBox, { backgroundColor: area.c + '06' }]}>
         <Text style={styles.desc}>{area.desc}</Text>
       </View>
 
       <View style={styles.scoreBarSection}>
         <View style={styles.scoreBarHeader}>
-          <Text style={styles.scoreBarLeft}>Started at {area.start}/10</Text>
+          <Text style={styles.scoreBarLeft}>
+            {firstScore != null ? `First rated ${firstScore}/10` : hasManualScore ? `Current ${area.score}/10` : 'Not yet rated'}
+          </Text>
           <View style={styles.scoreBarRight}>
             {projectedScore != null && projectedScore > area.score && (
               <Text style={[styles.projectedText, { color: area.c }]}>
                 {'\u2192'} {projectedScore} projected
               </Text>
             )}
-            <Text style={[styles.changeText, { color: change > 0 ? T.green : change < 0 ? T.red : T.t3 }]}>
-              {change > 0 ? `+${change}` : change < 0 ? `${change}` : 'No change'}
-            </Text>
+            {firstScore != null && (
+              <Text style={[styles.changeText, { color: change > 0 ? T.green : change < 0 ? T.red : T.t3 }]}>
+                {change > 0 ? `+${change}` : change < 0 ? `${change}` : 'No change'}
+              </Text>
+            )}
           </View>
         </View>
         <View style={[styles.scoreBarTrack, { backgroundColor: area.c + '12' }]}>
           <View style={[styles.scoreBarFill, { width: `${area.score * 10}%`, backgroundColor: area.c }]} />
-          <View style={[styles.scoreBarMarker, { left: `${area.start * 10}%`, backgroundColor: area.c + '40' }]} />
+          {firstScore != null && (
+            <View style={[styles.scoreBarMarker, { left: `${firstScore * 10}%`, backgroundColor: area.c + '40' }]} />
+          )}
           {projectedScore != null && projectedScore > area.score && (
             <View style={[styles.scoreBarMarker, { left: `${projectedScore * 10}%`, backgroundColor: area.c, opacity: 0.3 }]} />
           )}
@@ -1024,5 +1067,46 @@ const styles = StyleSheet.create({
     color: T.t3,
     fontWeight: '600',
     marginTop: 2,
+  },
+  pickerWrap: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: T.bg + 'CC',
+  },
+  pickerLabel: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: T.t1,
+    marginBottom: 10,
+    textAlign: 'center' as const,
+  },
+  pickerRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    gap: 4,
+  },
+  pickerDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  pickerDotText: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: T.t2,
+  },
+  pickerHints: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    marginTop: 6,
+  },
+  pickerHintText: {
+    fontSize: 9,
+    color: T.t3,
   },
 });

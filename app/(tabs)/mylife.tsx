@@ -27,6 +27,8 @@ export default function MyLifeScreen() {
   const items = useStore(s => s.items);
   const journeys = useStore(s => s.journeys);
   const profile = useStore(s => s.profile);
+  const selfScores = useStore(s => s.selfScores);
+  const scoreHistory = useStore(s => s.scoreHistory);
   const [tappedIdx, setTappedIdx] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('wheel');
   const [listSort, setListSort] = useState<ListSort>('score-asc');
@@ -37,19 +39,10 @@ export default function MyLifeScreen() {
 
   const areas: LifeArea[] = useMemo(() => {
     return AREAS.map(area => {
-      const normalizedId = normalizeAreaId(area.id);
-      const areaItems = items.filter(
-        i => (i.status === 'active' || i.status === 'paused') &&
-             (i.area === area.id || i.area === normalizedId ||
-              (i.secondary_areas ?? []).includes(area.id) ||
-              (i.secondary_areas ?? []).includes(normalizedId))
-      );
-      const activeCount = areaItems.filter(i => i.status === 'active').length;
-      const boost = Math.min(activeCount, 3);
-      const score = Math.min(10, Math.max(1, area.start + boost));
+      const score = selfScores[area.id] ?? area.start;
       return { ...area, score };
     });
-  }, [items]);
+  }, [selfScores]);
 
   const appScores = useMemo(() => {
     const s: Record<string, number> = {};
@@ -60,20 +53,28 @@ export default function MyLifeScreen() {
   }, [items, journeys]);
 
   const compareScores = useMemo(() => {
-    if (timePeriod === 'now') return null;
+    if (timePeriod === 'now' || scoreHistory.length === 0) return null;
+    const now = Date.now();
+    const targetMs = timePeriod === 'week' ? 7 * 24 * 60 * 60 * 1000
+                   : timePeriod === 'month' ? 30 * 24 * 60 * 60 * 1000
+                   : Infinity;
     if (timePeriod === 'start') {
-      const scores: Record<string, number> = {};
-      areas.forEach(a => {
-        const base = AREAS.find(ar => ar.id === a.id);
-        scores[a.id] = base?.start ?? 5;
-      });
-      return scores;
+      return scoreHistory[0]?.scores ?? null;
     }
-    return null;
-  }, [timePeriod, areas]);
+    let closest: typeof scoreHistory[0] | null = null;
+    let closestDiff = Infinity;
+    for (const snap of scoreHistory) {
+      const diff = Math.abs((now - new Date(snap.date).getTime()) - targetMs);
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closest = snap;
+      }
+    }
+    return closest?.scores ?? null;
+  }, [timePeriod, scoreHistory]);
 
   const compareLabel = useMemo(() => {
-    const labels: Record<string, string> = { week: 'Last week', month: 'Last month', start: 'Start' };
+    const labels: Record<string, string> = { week: 'Last week', month: 'Last month', start: 'First rating' };
     return labels[timePeriod] || '';
   }, [timePeriod]);
 

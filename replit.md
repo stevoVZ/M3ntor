@@ -71,7 +71,7 @@ Uses `expo-router` for file-based routing:
 - **Today**: Displays time-of-day grouped actions, journey session mode, and streak tracking.
 - **Plan**: Offers dual hierarchy/list views, goal and project management with progress tracking, and AI generation of steps/subtasks.
 - **Discover**: Provides a journey catalog with segmented Explore/My Journeys tabs. Enrolled journeys are filtered out of Explore. My Journeys rows are tappable to navigate to journey detail. AI Coach branded as "Ask M3NTOR".
-- **My Life**: Features the Wheel of Life for self and app scores, insights, and profile management.
+- **My Life**: Features the Wheel of Life with manually editable self-scores (1-10 per area), app-computed scores, historical score tracking via snapshots, insights, and profile management. Scores persist via AsyncStorage.
 
 ## External Dependencies
 

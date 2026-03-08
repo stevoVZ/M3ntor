@@ -162,10 +162,3 @@ export const MOODS = [
   { value: 5, label: 'Great', icon: 'smile', color: '#30D158' },
 ] as const;
 
-export const HISTORY = {
-  week: { label: '1 week ago', scores: { health: 3, career: 4, finances: 5, relationships: 6, personal: 5, social: 5, love: 8, fun: 3, environment: 6, spirituality: 5 } },
-  month: { label: '1 month ago', scores: { health: 2, career: 3, finances: 4, relationships: 6, personal: 4, social: 4, love: 7, fun: 3, environment: 5, spirituality: 4 } },
-  year: { label: 'Start', scores: { health: 5, career: 3, finances: 4, relationships: 6, personal: 5, social: 5, love: 8, fun: 3, environment: 5, spirituality: 4 } },
-} as const;
-
-export const DEFAULT_USER = { name: 'Stevo', streak: 4, weekDay: 5, programWeek: 1 };

@@ -131,6 +131,11 @@ export interface Journey {
   regions?: string[];
 }
 
+export interface ScoreSnapshot {
+  date: string;
+  scores: Record<string, number>;
+}
+
 export interface TodayAction {
   id: string;
   type: 'journey' | 'habit' | 'project' | 'action';
