@@ -14,7 +14,7 @@ import { T, S, F, R, shadow } from '../../constants/theme';
 import { ITEM_AREAS, KIND_CONFIG, PRIORITY, EFFORT, STEP_STATUS, PRG, WA } from '../../constants/config';
 import { itemKind, projectProgress, createStep, formatRecurrence, formatDuration } from '../../utils/items';
 import { formatDeadline, isOverdue, formatDate, fromNow } from '../../utils/dates';
-import { generateProjectTasks, generateSubtasks } from '../../lib/ai';
+import { generateProjectTasks, generateSubtasks, expandProjectPhase } from '../../lib/ai';
 import { useStore } from '../../lib/store';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { Step, Subtask, JourneyProgress, Journey } from '../../types';
@@ -326,6 +326,8 @@ export default function ItemDetailPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiBanner, setAiBanner] = useState<string | null>(null);
   const [aiSubLoadingId, setAiSubLoadingId] = useState<string | null>(null);
+  const [showPhasePicker, setShowPhasePicker] = useState(false);
+  const [expandingPhase, setExpandingPhase] = useState<string | null>(null);
   const stepInputRef = useRef<TextInput>(null);
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -450,19 +452,29 @@ export default function ItemDetailPage() {
     setNewStepText('');
   }
 
+  function handleMoreTasksPress() {
+    if (steps.length > 0) {
+      setShowPhasePicker(prev => !prev);
+      return;
+    }
+    handleAiTasks();
+  }
+
   async function handleAiTasks() {
     if (aiLoading) return;
+    setShowPhasePicker(false);
     setAiLoading(true);
     setAiBanner(null);
     try {
       const result = await generateProjectTasks(item.title, steps.map(s => s.title));
       if (!result.tasks.length) {
-        setAiBanner('AI couldn\'t suggest tasks. Try being more specific in the title.');
+        setAiBanner('M3NTOR couldn\'t suggest tasks. Try being more specific in the title.');
         return;
       }
-      const newSteps = result.tasks.map((title, i) => createStep(item.id, {
-        title,
+      const newSteps = result.tasks.map((t, i) => createStep(item.id, {
+        title: t.title,
         sort_order: steps.length + i,
+        effort: t.effort || undefined,
       }));
       newSteps.forEach(s => addStepAction(item.id, s));
       setAiBanner(`Added ${result.tasks.length} tasks`);
@@ -472,6 +484,48 @@ export default function ItemDetailPage() {
     } finally {
       setAiLoading(false);
     }
+  }
+
+  async function handleExpandPhase(stepId: string) {
+    const step = steps.find(s => s.id === stepId);
+    if (!step || expandingPhase) return;
+    setShowPhasePicker(false);
+    setExpandingPhase(stepId);
+    setAiBanner(null);
+    try {
+      const siblingPhases = steps.filter(s => s.id !== stepId).map(s => s.title);
+      const existingSubs = (step.subtasks || []).map(s => s.title);
+      const result = await expandProjectPhase(item.title, step.title, existingSubs, siblingPhases);
+      if (result.tasks?.length) {
+        const newStepIds: string[] = [];
+        result.tasks.forEach((t, i) => {
+          const newStep = createStep(item.id, {
+            title: t.title,
+            sort_order: steps.length + i,
+            effort: t.effort || undefined,
+          });
+          addStepAction(item.id, newStep);
+          newStepIds.push(newStep.id);
+        });
+        const freshSteps = useStore.getState().items.find(it => it.id === item.id)?.steps || [];
+        const oldSteps = freshSteps.filter(s => !newStepIds.includes(s.id));
+        oldSteps.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+        const targetIdx = oldSteps.findIndex(s => s.id === stepId);
+        const before = oldSteps.slice(0, targetIdx + 1);
+        const newOnes = freshSteps.filter(s => newStepIds.includes(s.id));
+        const after = oldSteps.slice(targetIdx + 1);
+        const ordered = [...before, ...newOnes, ...after];
+        ordered.forEach((s, i) => updateStepAction(item.id, s.id, { sort_order: i }));
+        setAiBanner(`Added ${result.tasks.length} tasks under "${step.title}"`);
+        setTimeout(() => setAiBanner(null), 3000);
+      } else {
+        setAiBanner('No additional tasks found for this step.');
+        setTimeout(() => setAiBanner(null), 3000);
+      }
+    } catch {
+      setAiBanner('Something went wrong. Try again.');
+    }
+    setExpandingPhase(null);
   }
 
   function handleDeleteStep(stepId: string) {
@@ -817,13 +871,61 @@ export default function ItemDetailPage() {
                   Tasks
                   {steps.length > 0 && <Text style={styles.tasksCount}> · {doneSteps}/{steps.length}</Text>}
                 </Text>
-                <Pressable style={styles.aiBtn} onPress={handleAiTasks} disabled={aiLoading}>
-                  {aiLoading
+                <Pressable style={styles.aiBtn} onPress={handleMoreTasksPress} disabled={aiLoading || !!expandingPhase}>
+                  {(aiLoading || !!expandingPhase)
                     ? <ActivityIndicator size="small" color={T.brand} />
-                    : <Text style={styles.aiBtnText}>{steps.length > 0 ? 'More tasks' : 'Generate tasks'}</Text>
+                    : <Text style={styles.aiBtnText}>{(aiLoading || !!expandingPhase) ? 'Generating...' : steps.length > 0 ? 'More tasks' : 'Generate tasks'}</Text>
                   }
                 </Pressable>
               </View>
+
+              {showPhasePicker && steps.length > 0 && (
+                <View style={styles.phasePickerSection}>
+                  <View style={styles.phasePickerHeader}>
+                    <Feather name="zap" size={13} color={T.brand} />
+                    <Text style={styles.phasePickerTitle}>How would you like to add tasks?</Text>
+                    <Pressable onPress={() => setShowPhasePicker(false)} hitSlop={8}>
+                      <Feather name="x" size={16} color={T.t3} />
+                    </Pressable>
+                  </View>
+                  <Pressable
+                    style={styles.phaseOption}
+                    onPress={() => { setShowPhasePicker(false); handleAiTasks(); }}
+                  >
+                    <View style={[styles.phaseOptionIcon, { backgroundColor: T.brand + '12' }]}>
+                      <Feather name="layers" size={16} color={T.brand} />
+                    </View>
+                    <View style={styles.phaseOptionContent}>
+                      <Text style={styles.phaseOptionTitle}>Add new phases</Text>
+                      <Text style={styles.phaseOptionDesc}>Generate major steps not yet covered</Text>
+                    </View>
+                    <Feather name="chevron-right" size={16} color={T.t3} />
+                  </Pressable>
+                  <View style={styles.phasePickerDivider} />
+                  <Text style={styles.phaseExpandLabel}>Or expand an existing step</Text>
+                  {[...steps].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)).map(step => {
+                    const subCount = (step.subtasks || []).length;
+                    return (
+                      <Pressable
+                        key={step.id}
+                        style={styles.phaseStepRow}
+                        onPress={() => handleExpandPhase(step.id)}
+                      >
+                        <View style={[styles.phaseOptionIcon, { backgroundColor: (area?.c || T.brand) + '12' }]}>
+                          <Feather name="git-branch" size={14} color={area?.c || T.brand} />
+                        </View>
+                        <View style={styles.phaseOptionContent}>
+                          <Text style={styles.phaseStepTitle} numberOfLines={1}>{step.title}</Text>
+                          {subCount > 0 && (
+                            <Text style={styles.phaseStepSub}>{subCount} subtask{subCount !== 1 ? 's' : ''}</Text>
+                          )}
+                        </View>
+                        <Feather name="chevron-right" size={14} color={T.t3} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
 
               {steps.length === 0 ? (
                 <View style={styles.emptySteps}>
@@ -1179,6 +1281,20 @@ const styles = StyleSheet.create({
 
   aiBanner: { marginTop: S.sm, backgroundColor: T.brand + '0E', borderRadius: R.md, padding: 10, borderWidth: 1, borderColor: T.brand + '20' },
   aiBannerText: { fontSize: 13, fontWeight: '600', color: T.brand },
+
+  phasePickerSection: { backgroundColor: T.brand + '06', borderRadius: 14, padding: 14, marginTop: 8, marginBottom: 4, borderWidth: 1, borderColor: T.brand + '15' },
+  phasePickerHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  phasePickerTitle: { flex: 1, fontSize: 13, fontWeight: '700' as const, color: T.brand },
+  phaseOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.7)' },
+  phaseOptionIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  phaseOptionContent: { flex: 1 },
+  phaseOptionTitle: { fontSize: 13, fontWeight: '700' as const, color: T.text },
+  phaseOptionDesc: { fontSize: 11, color: T.t3, marginTop: 1 },
+  phasePickerDivider: { height: StyleSheet.hairlineWidth, backgroundColor: T.sep, marginVertical: 10 },
+  phaseExpandLabel: { fontSize: 11, fontWeight: '600' as const, color: T.t3, marginBottom: 8 },
+  phaseStepRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10 },
+  phaseStepTitle: { fontSize: 13, fontWeight: '600' as const, color: T.text },
+  phaseStepSub: { fontSize: 11, color: T.t3, marginTop: 1 },
 
   tasksHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: S.sm },
   tasksTitle: { flex: 1, fontSize: F.md, fontWeight: '800', color: T.text },

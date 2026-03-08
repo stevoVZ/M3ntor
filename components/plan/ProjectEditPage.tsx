@@ -12,7 +12,7 @@ import { projectProgress, itemKind, createStep } from '@/utils/items';
 import { ProgressBar } from '@/components/items/ProgressBar';
 import { ITEM_AREAS, STEP_STATUS, PRIORITY, EFFORT } from '@/constants/config';
 import { T, S, R, F, shadow } from '@/constants/theme';
-import { generateProjectTasks, generateSubtasks, assessProjectComplexity } from '@/lib/ai';
+import { generateProjectTasks, generateSubtasks, assessProjectComplexity, expandProjectPhase } from '@/lib/ai';
 import type { Step, Subtask } from '@/types';
 
 interface ProjectEditPageProps {
@@ -57,6 +57,8 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
   const [clarifyQuestions, setClarifyQuestions] = useState<string[]>([]);
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<number, string>>({});
   const [showClarify, setShowClarify] = useState(false);
+  const [showPhasePicker, setShowPhasePicker] = useState(false);
+  const [expandingPhase, setExpandingPhase] = useState<string | null>(null);
 
   const taskInputRef = useRef<TextInput>(null);
   const subInputRef = useRef<TextInput>(null);
@@ -130,8 +132,17 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
     setTimeout(() => subInputRef.current?.focus(), 50);
   };
 
+  const handleMoreTasksPress = () => {
+    if (steps.length > 0) {
+      setShowPhasePicker(prev => !prev);
+      return;
+    }
+    handleAiTasks();
+  };
+
   const handleAiTasks = async (context?: string, skipComplexityCheck?: boolean) => {
     if (aiTasksLoading) return;
+    setShowPhasePicker(false);
     setAiTasksLoading(true);
     setAiBanner(null);
     try {
@@ -163,6 +174,48 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
       setAiBanner('error');
     }
     setAiTasksLoading(false);
+    setTimeout(() => setAiBanner(null), 3000);
+  };
+
+  const handleExpandPhase = async (stepId: string) => {
+    const step = steps.find(s => s.id === stepId);
+    if (!step || expandingPhase) return;
+    setShowPhasePicker(false);
+    setExpandingPhase(stepId);
+    setAiBanner(null);
+    try {
+      const siblingPhases = steps.filter(s => s.id !== stepId).map(s => s.title);
+      const existingSubs = (step.subtasks || []).map(s => s.title);
+      const result = await expandProjectPhase(item.title, step.title, existingSubs, siblingPhases);
+      if (result.tasks?.length) {
+        const newStepIds: string[] = [];
+        result.tasks.forEach((t, i) => {
+          const newStep = createStep(item.id, {
+            title: t.title,
+            sort_order: steps.length + i,
+            effort: t.effort || undefined,
+          });
+          addStep(item.id, newStep);
+          newStepIds.push(newStep.id);
+        });
+        const freshSteps = useStore.getState().items.find(it => it.id === item.id)?.steps || [];
+        const oldSteps = freshSteps.filter(s => !newStepIds.includes(s.id));
+        oldSteps.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+        const targetIdx = oldSteps.findIndex(s => s.id === stepId);
+        const before = oldSteps.slice(0, targetIdx + 1);
+        const newOnes = freshSteps.filter(s => newStepIds.includes(s.id));
+        const after = oldSteps.slice(targetIdx + 1);
+        const ordered = [...before, ...newOnes, ...after];
+        ordered.forEach((s, i) => updateStep(item.id, s.id, { sort_order: i }));
+        setAiBanner('success');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setAiBanner('error');
+      }
+    } catch {
+      setAiBanner('error');
+    }
+    setExpandingPhase(null);
     setTimeout(() => setAiBanner(null), 3000);
   };
 
@@ -343,13 +396,19 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
             {totalCount > 0 && <Text style={styles.tasksCount}>{doneCount}/{totalCount}</Text>}
           </View>
           <View style={styles.tasksHeaderRight}>
-            <Pressable style={[styles.aiBtn, { borderColor: `${T.brand}25`, backgroundColor: `${T.brand}08` }]} onPress={handleAiTasks} disabled={aiTasksLoading}>
-              {aiTasksLoading ? (
+            <Pressable
+              style={[styles.aiBtn, { borderColor: `${T.brand}25`, backgroundColor: `${T.brand}08` }]}
+              onPress={handleMoreTasksPress}
+              disabled={aiTasksLoading || !!expandingPhase}
+            >
+              {(aiTasksLoading || !!expandingPhase) ? (
                 <ActivityIndicator size="small" color={T.brand} />
               ) : (
                 <Feather name="zap" size={12} color={T.brand} />
               )}
-              <Text style={styles.aiBtnText}>{aiTasksLoading ? 'Generating...' : steps.length > 0 ? 'More tasks' : 'Generate tasks'}</Text>
+              <Text style={styles.aiBtnText}>
+                {(aiTasksLoading || !!expandingPhase) ? 'Generating...' : steps.length > 0 ? 'More tasks' : 'Generate tasks'}
+              </Text>
             </Pressable>
             {kind === 'project' && item.status !== 'paused' && doneCount === totalCount && totalCount > 0 && (
               <Pressable style={styles.completeBtn} onPress={() => { completeItem(item.id); onBack(); }}>
@@ -359,6 +418,54 @@ export function ProjectEditPage({ itemId, onBack, backLabel = 'Back' }: ProjectE
             )}
           </View>
         </View>
+
+        {showPhasePicker && steps.length > 0 && (
+          <View style={styles.phasePickerSection}>
+            <View style={styles.phasePickerHeader}>
+              <Feather name="zap" size={13} color={T.brand} />
+              <Text style={styles.phasePickerTitle}>How would you like to add tasks?</Text>
+              <Pressable onPress={() => setShowPhasePicker(false)} hitSlop={8}>
+                <Feather name="x" size={16} color={T.t3} />
+              </Pressable>
+            </View>
+            <Pressable
+              style={styles.phaseOption}
+              onPress={() => { setShowPhasePicker(false); handleAiTasks(); }}
+            >
+              <View style={[styles.phaseOptionIcon, { backgroundColor: T.brand + '12' }]}>
+                <Feather name="layers" size={16} color={T.brand} />
+              </View>
+              <View style={styles.phaseOptionContent}>
+                <Text style={styles.phaseOptionTitle}>Add new phases</Text>
+                <Text style={styles.phaseOptionDesc}>Generate major steps not yet covered</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={T.t3} />
+            </Pressable>
+            <View style={styles.phasePickerDivider} />
+            <Text style={styles.phaseExpandLabel}>Or expand an existing step</Text>
+            {sortedSteps.map(step => {
+              const subCount = (step.subtasks || []).length;
+              return (
+                <Pressable
+                  key={step.id}
+                  style={styles.phaseStepRow}
+                  onPress={() => handleExpandPhase(step.id)}
+                >
+                  <View style={[styles.phaseOptionIcon, { backgroundColor: ac + '12' }]}>
+                    <Feather name="git-branch" size={14} color={ac} />
+                  </View>
+                  <View style={styles.phaseOptionContent}>
+                    <Text style={styles.phaseStepTitle} numberOfLines={1}>{step.title}</Text>
+                    {subCount > 0 && (
+                      <Text style={styles.phaseStepSub}>{subCount} subtask{subCount !== 1 ? 's' : ''}</Text>
+                    )}
+                  </View>
+                  <Feather name="chevron-right" size={14} color={T.t3} />
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         {showClarify && clarifyQuestions.length > 0 && (
           <View style={styles.clarifySection}>
@@ -851,6 +958,20 @@ const styles = StyleSheet.create<Record<string, any>>({
   addTaskInput: { flex: 1, fontSize: 14, color: T.text, fontWeight: '500' as const, minHeight: 36 },
   addTaskBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 12 },
   addTaskBtnText: { fontSize: 13, fontWeight: '700' as const, color: '#fff' },
+
+  phasePickerSection: { backgroundColor: T.brand + '06', borderRadius: 14, padding: 14, marginBottom: 12, marginHorizontal: S.md, borderWidth: 1, borderColor: T.brand + '15' },
+  phasePickerHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  phasePickerTitle: { flex: 1, fontSize: 13, fontWeight: '700' as const, color: T.brand },
+  phaseOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.7)' },
+  phaseOptionIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  phaseOptionContent: { flex: 1 },
+  phaseOptionTitle: { fontSize: 13, fontWeight: '700' as const, color: T.text },
+  phaseOptionDesc: { fontSize: 11, color: T.t3, marginTop: 1 },
+  phasePickerDivider: { height: StyleSheet.hairlineWidth, backgroundColor: T.sep, marginVertical: 10 },
+  phaseExpandLabel: { fontSize: 11, fontWeight: '600' as const, color: T.t3, marginBottom: 8 },
+  phaseStepRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10 },
+  phaseStepTitle: { fontSize: 13, fontWeight: '600' as const, color: T.text },
+  phaseStepSub: { fontSize: 11, color: T.t3, marginTop: 1 },
 
   clarifySection:   { backgroundColor: T.brand + '08', borderRadius: 14, padding: 14, marginBottom: 12, marginHorizontal: S.md, borderWidth: 1, borderColor: T.brand + '18' },
   clarifyHeader:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },

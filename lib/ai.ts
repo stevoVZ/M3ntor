@@ -77,7 +77,7 @@ export async function generateProjectTasks(title: string, existing: string[] = [
   const contextCtx = context ? `\nAdditional context from the user:\n${context}` : '';
   const effortNote = `\nFor each task, estimate effort: "quick" (< 15 min), "medium" (~1-2 hrs), or "deep" (half day+).`;
   const prompt = existing.length
-    ? `Project: "${title}"${countryCtx}${noApps}${contextCtx}${effortNote}\nExisting tasks: ${existing.join(', ')}\nGenerate 3-5 MORE missing tasks. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium"}],"emoji":"emoji"}`
+    ? `Project: "${title}"${countryCtx}${noApps}${contextCtx}${effortNote}\nExisting phases/steps: ${existing.join(', ')}\nGenerate 3-5 additional major phases or steps NOT yet covered. Focus on significant project phases that are missing, not minor sub-tasks of existing steps. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium"}],"emoji":"emoji"}`
     : `Project: "${title}"${countryCtx}${noApps}${contextCtx}${effortNote}\nGenerate 5-7 concrete actionable tasks in logical order. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium"}],"emoji":"emoji","why":"one sentence"}`;
   try {
     const raw    = await aiAssist(prompt);
@@ -134,6 +134,38 @@ export async function generateActionPlan(title: string, context?: string, countr
     return JSON.parse(clean) as AiActionPlan;
   } catch {
     return {};
+  }
+}
+
+export async function expandProjectPhase(
+  projectTitle: string,
+  phaseTitle: string,
+  existingSubtasks: string[] = [],
+  siblingPhases: string[] = [],
+  country?: string,
+): Promise<AiTasks> {
+  const countryCtx = country ? `\nThe user is based in ${country}. Use locally relevant examples.` : '';
+  const noApps = `\nNever recommend apps, websites, software, or third-party services. Only suggest actions the user can do themselves.`;
+  const effortNote = `\nFor each task, estimate effort: "quick" (< 15 min), "medium" (~1-2 hrs), or "deep" (half day+).`;
+  const siblingsCtx = siblingPhases.length
+    ? `\nOther phases in this project: ${siblingPhases.join(', ')}. Do NOT generate tasks that belong to those phases.`
+    : '';
+  const existingCtx = existingSubtasks.length
+    ? `\nAlready has these sub-steps: ${existingSubtasks.join(', ')}. Do NOT repeat them.`
+    : '';
+  const prompt = `Project: "${projectTitle}"${countryCtx}${noApps}${effortNote}\nPhase to expand: "${phaseTitle}"${siblingsCtx}${existingCtx}\nBreak down this specific phase into 3-5 detailed, actionable sub-steps. These should be concrete tasks that someone would do during the "${phaseTitle}" phase only. Reply JSON only: {"tasks":[{"title":"task 1","effort":"medium"}]}`;
+  try {
+    const raw = await aiAssist(prompt);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    if (Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
+      if (typeof parsed.tasks[0] === 'string') {
+        parsed.tasks = parsed.tasks.map((t: string) => ({ title: t, effort: 'medium' }));
+      }
+    }
+    return parsed as AiTasks;
+  } catch {
+    return { tasks: [] };
   }
 }
 
