@@ -32,24 +32,31 @@ export default function RootLayout() {
     }
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const uid = session?.user?.id ?? null;
-      setUserId(uid);
-      if (uid) {
-        loadAll(uid).finally(() => setBooting(false));
-      } else {
-        const chosen = await isGuestChosen();
-        if (chosen) {
-          setGuestMode(true);
-          loadAll('guest').finally(() => setBooting(false));
+      try {
+        const uid = session?.user?.id ?? null;
+        setUserId(uid);
+        if (uid) {
+          await loadAll(uid);
         } else {
-          setBooting(false);
+          const chosen = await isGuestChosen();
+          if (chosen) {
+            setGuestMode(true);
+            await loadAll('guest');
+          }
         }
+      } catch (e) {
+        console.error('Boot error:', e);
+      } finally {
+        setBooting(false);
       }
+    }).catch(() => {
+      setBooting(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (_event === 'PASSWORD_RECOVERY') {
+          setBooting(false);
           router.replace('/reset-password');
           return;
         }
@@ -57,7 +64,7 @@ export default function RootLayout() {
         setUserId(uid);
         if (uid) {
           setGuestMode(false);
-          await loadAll(uid);
+          try { await loadAll(uid); } catch (e) { console.error('Auth load error:', e); }
         }
       }
     );
