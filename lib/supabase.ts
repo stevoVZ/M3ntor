@@ -120,10 +120,13 @@ const STEP_COLUMNS = [
   'sort_order', 'created_at',
 ];
 
+let _stepColumnsBlacklist: Set<string> = new Set();
+
 export async function upsertStep(step: Record<string, unknown>) {
   if (!_supabase) return null;
   const row: Record<string, unknown> = {};
   for (const key of STEP_COLUMNS) {
+    if (_stepColumnsBlacklist.has(key)) continue;
     if (key in step && step[key] !== undefined) {
       row[key] = step[key];
     }
@@ -133,6 +136,13 @@ export async function upsertStep(step: Record<string, unknown>) {
     .upsert(row)
     .select()
     .single();
+  if (error && error.code === 'PGRST204' && error.message?.includes("column")) {
+    const match = error.message.match(/the '(\w+)' column/);
+    if (match) {
+      _stepColumnsBlacklist.add(match[1]);
+      return upsertStep(step);
+    }
+  }
   if (error) throw error;
   return data;
 }
