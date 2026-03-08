@@ -33,47 +33,24 @@ const TIME_OPTIONS = ['morning', 'afternoon', 'evening', 'anytime'] as const;
 const DURATION_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90] as const;
 
 function StepRow({
-  step, itemId, projectTitle, allSteps,
-  onToggle, onMarkToday, onDelete, onStatusCycle, onPriorityCycle, onEffortCycle,
-  onAddSubtask, onToggleSubtask, onDeleteSubtask, onAiBreakdown, aiSubLoading,
+  step, itemId,
+  onToggle,
 }: {
   step:            Step;
   itemId:          string;
-  projectTitle:    string;
-  allSteps:        Step[];
   onToggle:        (done: boolean) => void;
-  onMarkToday:     (today: boolean) => void;
-  onDelete:        () => void;
-  onStatusCycle:   () => void;
-  onStatusSet:     (status: Step['status']) => void;
-  onPriorityCycle: () => void;
-  onEffortCycle:   () => void;
-  onAddSubtask:    (title: string) => void;
-  onToggleSubtask: (subtaskId: string) => void;
-  onDeleteSubtask: (subtaskId: string) => void;
-  onAiBreakdown:   () => void;
-  aiSubLoading:    boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [subtaskDraft, setSubtaskDraft] = useState('');
-  const [addingSub, setAddingSub] = useState(false);
-  const subInputRef = useRef<TextInput>(null);
   const statusConf = STEP_STATUS[step.status] ?? STEP_STATUS.todo;
   const prConf = PRIORITY[step.priority] ?? PRIORITY.normal;
   const efConf = EFFORT[step.effort] ?? EFFORT.medium;
   const subDone = (step.subtasks ?? []).filter(st => st.done).length;
   const subTotal = (step.subtasks ?? []).length;
 
-  function handleAddSub() {
-    if (!subtaskDraft.trim()) return;
-    onAddSubtask(subtaskDraft.trim());
-    setSubtaskDraft('');
-  }
-
   return (
     <View style={[styles.stepCard, step.done && styles.stepCardDone]}>
-      <Pressable style={styles.stepMain} onPress={() => setExpanded(e => !e)}>
-        <Pressable style={styles.statusButton} onPress={() => {
+      <Pressable style={styles.stepMain} onPress={() => router.push(`/step/${step.id}?itemId=${itemId}`)}>
+        <Pressable style={styles.statusButton} onPress={(e) => {
+          e.stopPropagation();
           if (step.done) { onToggle(false); }
           else { onToggle(true); }
         }}>
@@ -96,7 +73,7 @@ function StepRow({
         </Pressable>
 
         <View style={{ flex: 1 }}>
-          <Text style={[styles.stepTitle, step.done && styles.stepTitleDone]} numberOfLines={expanded ? 0 : 2}>
+          <Text style={[styles.stepTitle, step.done && styles.stepTitleDone]} numberOfLines={2}>
             {step.title}
           </Text>
           <View style={styles.stepMeta}>
@@ -128,121 +105,8 @@ function StepRow({
           </View>
         </View>
 
-        <Feather name={expanded ? 'chevron-down' : 'chevron-right'} size={14} color={T.t3} />
+        <Feather name="chevron-right" size={14} color={T.t3} />
       </Pressable>
-
-      {expanded && (
-        <Animated.View entering={FadeIn.duration(150)} style={styles.expandPanel}>
-          <View style={styles.statusPickerRow}>
-            {STATUS_ORDER.map(s => {
-              const sc = STEP_STATUS[s];
-              const active = step.status === s;
-              return (
-                <Pressable
-                  key={s}
-                  style={[styles.statusPill, active && { backgroundColor: sc.dot + '18', borderColor: sc.dot + '40' }]}
-                  onPress={() => onStatusSet(s)}
-                >
-                  <View style={[styles.statusPillDot, { backgroundColor: active ? sc.dot : T.sep }]} />
-                  <Text style={[styles.statusPillText, active && { color: sc.color, fontWeight: '700' as const }]}>{sc.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.chipRow}>
-            <Pressable style={[styles.chip, { backgroundColor: prConf.bg, borderColor: prConf.color + '20' }]} onPress={onPriorityCycle}>
-              <Feather name="flag" size={10} color={prConf.color} />
-              <Text style={[styles.chipText, { color: prConf.color }]}>{prConf.label}</Text>
-            </Pressable>
-            <Pressable style={[styles.chip, { backgroundColor: efConf.color + '08', borderColor: efConf.color + '20' }]} onPress={onEffortCycle}>
-              <Text style={[styles.chipText, { color: efConf.color }]}>{efConf.emoji} {efConf.label}</Text>
-            </Pressable>
-            <Pressable style={[styles.chip, step.today ? { backgroundColor: T.brand + '10', borderColor: T.brand + '25' } : { backgroundColor: T.fill, borderColor: T.sep }]} onPress={() => onMarkToday(!step.today)}>
-              <Feather name={step.today ? 'sun' : 'plus'} size={10} color={step.today ? T.brand : T.t3} />
-              <Text style={[styles.chipText, { color: step.today ? T.brand : T.t3, fontWeight: step.today ? '700' as const : '500' as const }]}>
-                {step.today ? 'In Today' : 'Today'}
-              </Text>
-            </Pressable>
-          </View>
-
-          {step.description ? (
-            <Text style={styles.stepDesc}>{step.description}</Text>
-          ) : null}
-
-          {subTotal > 0 && (
-            <View style={styles.subtaskList}>
-              {(step.subtasks ?? []).map(sub => (
-                <View key={sub.id} style={styles.subtaskRow}>
-                  <Pressable onPress={() => onToggleSubtask(sub.id)}>
-                    <View style={[styles.subCheck, sub.done && styles.subCheckDone]}>
-                      {sub.done && <Feather name="check" size={8} color="white" />}
-                    </View>
-                  </Pressable>
-                  <Text style={[styles.subtaskText, sub.done && styles.subtaskDone, { flex: 1 }]}>
-                    {sub.title}
-                  </Text>
-                  <Pressable onPress={() => onDeleteSubtask(sub.id)} hitSlop={8}>
-                    <Feather name="x" size={12} color={T.red} style={{ opacity: 0.5 }} />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <View style={styles.subActions}>
-            {addingSub ? (
-              <View style={styles.addSubRow}>
-                <TextInput
-                  ref={subInputRef}
-                  autoFocus
-                  value={subtaskDraft}
-                  onChangeText={setSubtaskDraft}
-                  onSubmitEditing={handleAddSub}
-                  placeholder="Subtask name..."
-                  placeholderTextColor={T.t3}
-                  style={styles.addSubInput}
-                  returnKeyType="done"
-                />
-                <Pressable
-                  style={[styles.addSubBtn, subtaskDraft.trim() ? { backgroundColor: T.brand } : {}]}
-                  onPress={handleAddSub}
-                >
-                  <Text style={[styles.addSubBtnText, subtaskDraft.trim() ? { color: 'white' } : {}]}>Add</Text>
-                </Pressable>
-                <Pressable onPress={() => { setAddingSub(false); setSubtaskDraft(''); }} hitSlop={8}>
-                  <Feather name="x" size={14} color={T.t3} />
-                </Pressable>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                <Pressable style={[styles.chip, { borderColor: T.brand + '25' }]} onPress={() => setAddingSub(true)}>
-                  <Feather name="plus" size={10} color={T.brand} />
-                  <Text style={[styles.chipText, { color: T.brand }]}>Add subtask</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.chip, { backgroundColor: T.brand + '08', borderColor: T.brand + '20' }]}
-                  onPress={onAiBreakdown}
-                  disabled={aiSubLoading}
-                >
-                  {aiSubLoading ? (
-                    <ActivityIndicator size="small" color={T.brand} />
-                  ) : (
-                    <Text style={[styles.chipText, { color: T.brand }]}>AI break down</Text>
-                  )}
-                </Pressable>
-              </View>
-            )}
-          </View>
-
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-            <Pressable style={[styles.chip, { backgroundColor: T.red + '05', borderColor: T.red + '15' }]} onPress={onDelete}>
-              <Feather name="trash-2" size={10} color={T.red} />
-              <Text style={[styles.chipText, { color: T.red }]}>Remove</Text>
-            </Pressable>
-          </View>
-        </Animated.View>
-      )}
     </View>
   );
 }
@@ -934,25 +798,12 @@ export default function ItemDetailPage() {
                 </View>
               ) : (
                 <>
-                  {steps.map((step, stepIdx) => (
+                  {steps.map((step) => (
                     <StepRow
                       key={step.id}
                       step={step}
                       itemId={item.id}
-                      projectTitle={item.title}
-                      allSteps={steps}
                       onToggle={(done) => toggleStep(item.id, step.id, done)}
-                      onMarkToday={(today) => markStepToday(item.id, step.id, today)}
-                      onDelete={() => handleDeleteStep(step.id)}
-                      onStatusCycle={() => cycleStepStatus(step.id)}
-                      onStatusSet={(status) => setStepStatus(step.id, status)}
-                      onPriorityCycle={() => cycleStepPriority(step.id)}
-                      onEffortCycle={() => cycleStepEffort(step.id)}
-                      onAddSubtask={(title) => handleAddSubtask(step.id, title)}
-                      onToggleSubtask={(subtaskId) => toggleSubtaskAction(item.id, step.id, subtaskId)}
-                      onDeleteSubtask={(subtaskId) => removeSubtaskAction(item.id, step.id, subtaskId)}
-                      onAiBreakdown={() => handleAiSubtasks(step.id)}
-                      aiSubLoading={aiSubLoadingId === step.id}
                     />
                   ))}
 

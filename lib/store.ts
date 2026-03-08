@@ -159,6 +159,8 @@ interface AppState {
   recordCompletion:(actionId: string, status: 'done' | 'skipped') => void;
   recordMood:      (mood: MoodValue) => void;
 
+  signOut:         () => Promise<void>;
+
   streak:          () => number;
   getItem:         (id: string) => Item | undefined;
 }
@@ -857,6 +859,23 @@ export const useStore = create<AppState>((set, get) => ({
         upsertMoodEntry(uid, mood, now).catch(console.error);
       }
       return { moodLog: newLog };
+    });
+  },
+
+  signOut: async () => {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.auth.signOut().catch(console.error);
+    }
+    set({
+      items: [],
+      deletedItems: [],
+      journeys: [],
+      profile: null,
+      userId: null,
+      loading: false,
+      error: null,
+      completionLog: {},
+      moodLog: [],
     });
   },
 

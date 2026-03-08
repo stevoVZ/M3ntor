@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform, TextInput, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useStore } from '@/lib/store';
 import { T, S, F, R, shadow } from '@/constants/theme';
 import { PRG } from '@/constants/config';
@@ -35,8 +36,30 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
   const profile = useStore(s => s.profile);
   const journeys = useStore(s => s.journeys);
   const setCountry = useStore(s => s.setCountry);
+  const signOut = useStore(s => s.signOut);
+  const userId = useStore(s => s.userId);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
+  const isGuest = !userId || userId === 'guest';
+
+  function handleSignOut() {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out? You can sign back in anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            onClose();
+            await signOut();
+            router.replace('/login');
+          },
+        },
+      ],
+    );
+  }
 
   const userName = profile?.name || 'You';
   const userInitial = userName.charAt(0).toUpperCase();
@@ -167,6 +190,24 @@ export default function ProfileScreen({ onClose }: ProfileScreenProps) {
             </View>
           </View>
         ))}
+
+        <View style={styles.section}>
+          <View style={[styles.sectionCard, shadow.xs]}>
+            <Pressable
+              style={styles.signOutRow}
+              onPress={isGuest ? () => { onClose(); router.replace('/login'); } : handleSignOut}
+              testID="sign-out-btn"
+            >
+              <View style={styles.settingLeft}>
+                <View style={[styles.settingIcon, { backgroundColor: T.red + '10' }]}>
+                  <Feather name="log-out" size={15} color={T.red} />
+                </View>
+                <Text style={styles.signOutText}>{isGuest ? 'Sign In' : 'Sign Out'}</Text>
+              </View>
+              <Feather name="chevron-right" size={14} color={T.red + '60'} />
+            </Pressable>
+          </View>
+        </View>
 
         <Text style={styles.versionText}>M3NTOR v1.0 {'\u00B7'} Made with intention</Text>
         <View style={{ height: 40 }} />
@@ -413,6 +454,19 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 14,
     color: T.text,
+  },
+
+  signOutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+  },
+  signOutText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: T.red,
   },
 
   versionText: {

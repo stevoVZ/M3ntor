@@ -64,7 +64,7 @@ Uses `expo-router` for file-based routing:
 - **Auth Screen**: `login.tsx`.
 - **Tab Navigation**: `(tabs)/_layout.tsx` defines the main tab bar.
 - **Core Tabs**: `today.tsx`, `mylife.tsx`, `discover.tsx`, `plan.tsx`.
-- **Item Management**: `create.tsx` for new items and `item/[id].tsx` for item details.
+- **Item Management**: `create.tsx` for new items, `item/[id].tsx` for item details, and `step/[stepId].tsx` for task (step) detail within a project.
 
 ### Key Screens & Features
 
