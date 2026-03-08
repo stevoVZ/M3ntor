@@ -76,6 +76,7 @@ export interface Item {
   review_date?: string;
   deleted_at?: string;
   created_at: string;
+  item_kind?: ItemKind;
   updated_at: string;
 }
 

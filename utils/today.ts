@@ -1,5 +1,5 @@
 import type { Item, JourneyProgress, Journey, TodayAction, TimeOfDay } from '../types';
-import { matchesRecurrence } from './items';
+import { matchesRecurrence, itemKind } from './items';
 import { WA } from '../constants/weekly-actions';
 
 function inferTimeOfDay(title: string, desc: string): TimeOfDay {
@@ -64,9 +64,10 @@ export function getTodayActions(
   });
 
   items.filter(i => i.status === 'active' && !i.recurrence && !(i.steps?.length)).forEach(item => {
+    const kind = itemKind(item);
     actions.push({
-      id: `action-${item.id}`,
-      type: 'action',
+      id: `${kind}-${item.id}`,
+      type: kind,
       title: item.title,
       description: item.description,
       timeOfDay: item.habit_time_of_day || 'anytime',

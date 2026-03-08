@@ -4,7 +4,7 @@
 
 M3NTOR is a mobile-first productivity and life coaching application built with Expo (React Native). It helps users organize their lives into actionable items across different life areas (Health, Career, Finance, Relationships, Learning, Fun, Home, Spirituality, Life Tasks). Items can be categorized as actions (one-off tasks), habits (recurring), goals (aspirations), or projects (multi-step). The app includes an AI assistant powered by Claude (Anthropic) for contextual hints, project task generation, subtask breakdown, journey recommendations, and custom program building.
 
-The app runs as an Expo React Native app for mobile devices and web, with a companion Express.js backend server. AI calls go directly from the client to Anthropic (no server proxy). Data persistence uses Zustand for local state with optional Supabase cloud sync when authenticated.
+The app runs as an Expo React Native app for mobile devices and web, with a companion Express.js backend server. AI calls are proxied through the Express server (frontend `lib/ai.ts` calls server endpoints, server uses Replit AI Integrations for Anthropic access — no user API key required). Data persistence uses Zustand for local state with optional Supabase cloud sync when authenticated.
 
 ## User Preferences
 
@@ -17,7 +17,7 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Expo (React Native) with `expo-router` for file-based navigation.
 - **State Management**: Zustand store manages item CRUD, authentication, journey progress, completion/mood logging, streak tracking, and item reordering. Journeys are managed with `enrollJourney`, `unenrollJourney`, `removeJourney` (permanent deletion), `reEnrollJourney`, and `advanceJourneyDay`.
 - **Soft Delete / Trash**: Items are soft-deleted and can be restored or permanently deleted.
-- **AI Utilities**: `lib/ai.ts` provides client-side AI functions.
+- **AI Utilities**: `lib/ai.ts` provides AI functions that proxy through the Express server.
 - **Design System**: `constants/theme.ts` defines colors, spacing, fonts, and shadows.
 - **Configuration**: `constants/config.ts` stores core app constants including areas, item kinds, priorities, and journey catalog.
 - **Animations**: `react-native-reanimated` for transitions and `expo-haptics` for tactile feedback.
@@ -39,8 +39,9 @@ The application uses a modular component structure:
 
 ### AI Integration
 
-- **Provider**: Anthropic Claude (`claude-sonnet-4-5`) via `@anthropic-ai/sdk`.
-- **Client-side AI Module**: `lib/ai.ts` exports functions for AI assistance, hint generation, task generation, subtask expansion, and goal generation.
+- **Provider**: Anthropic Claude (`claude-sonnet-4-5`) via Replit AI Integrations (no API key needed, billed to Replit credits).
+- **Architecture**: Frontend `lib/ai.ts` proxies all AI calls through Express server endpoints (`/api/ai/*`). Server `server/ai.ts` uses `AI_INTEGRATIONS_ANTHROPIC_BASE_URL` and `AI_INTEGRATIONS_ANTHROPIC_API_KEY` env vars (auto-configured by Replit).
+- **Server Endpoints**: `/api/ai/assist`, `/api/ai/hint`, `/api/ai/item-hint`, `/api/ai/complexity`, `/api/ai/tasks`, `/api/ai/project-tasks`, `/api/ai/subtasks`, `/api/ai/briefing`, `/api/ai/habit-plan`, `/api/ai/action-plan`, `/api/ai/expand-phase`, `/api/ai/goal`.
 - **AI Coach**: Chat-style interface for journey recommendations, filtering by user's country.
 - **Smart Type Suggestion**: `getItemHint()` provides AI-recommended item types based on text input.
 - **Creation Mode Toggle**: Users can choose between "M3NTOR plans it" (AI mode) or "I'll set it up" (manual mode) for item creation.
@@ -56,7 +57,7 @@ The application uses a modular component structure:
 - **Step Phases**: Steps have an optional `phase?: string` field. Steps sharing the same phase string are grouped under collapsible headers in the project detail view (`app/item/[id].tsx`). Phases show per-phase progress counts, can be collapsed/expanded, and support adding steps directly into a phase. Phase assignment is editable from the step detail screen (`app/step/[stepId].tsx`). AI task generation (`lib/ai.ts`) produces phased steps automatically.
 - **User & Progress**: `Profile`, `JourneyProgress`, `CompletionLog`, `MoodEntry` track user-specific data.
 - **Static Data**: `Journey` defines expert-curated programs.
-- **Dynamic Type Detection**: Item type is derived at runtime via `itemKind()`.
+- **Dynamic Type Detection**: Item type is derived at runtime via `itemKind()`. Items now store `item_kind` as an explicit fallback so items retain their intended type even without steps/recurrence.
 
 ### Routing Structure
 
@@ -78,7 +79,7 @@ Uses `expo-router` for file-based routing:
 
 ### Third-Party Services
 
-- **Anthropic Claude API**: AI capabilities. Requires `EXPO_PUBLIC_ANTHROPIC_KEY`.
+- **Anthropic Claude API**: AI capabilities via Replit AI Integrations (no user API key needed).
 - **Supabase**: Cloud database and authentication. Requires `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
 
 ### Key Libraries
@@ -94,7 +95,8 @@ Uses `expo-router` for file-based routing:
 
 ### Environment Variables
 
-- `EXPO_PUBLIC_ANTHROPIC_KEY`: Anthropic API key.
+- `AI_INTEGRATIONS_ANTHROPIC_API_KEY`: Auto-configured by Replit AI Integrations (server-side).
+- `AI_INTEGRATIONS_ANTHROPIC_BASE_URL`: Auto-configured by Replit AI Integrations (server-side).
 - `EXPO_PUBLIC_SUPABASE_URL`: Supabase project URL.
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon/public key.
 - `EXPO_PUBLIC_DOMAIN`: Public domain for API URL resolution.

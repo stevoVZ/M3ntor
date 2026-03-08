@@ -9,6 +9,7 @@ export function itemKind(item: Item): ItemKind {
   if (item.status === 'someday')          return 'goal';
   if (item.recurrence)                    return 'habit';
   if ((item.steps?.length ?? 0) > 0)     return 'project';
+  if (item.item_kind)                     return item.item_kind;
   return 'action';
 }
 

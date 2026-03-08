@@ -418,6 +418,7 @@ export default function CreateScreen() {
       status:            type === 'goal' ? 'someday' : 'active',
       emoji:             enrichedEmoji,
       description,
+      item_kind:         type as any,
       habit_time_of_day: (tod as 'morning' | 'afternoon' | 'evening') ?? undefined,
       recurrence:        recurrence as any,
       priority,
