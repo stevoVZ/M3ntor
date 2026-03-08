@@ -20,6 +20,10 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { Step, Subtask, JourneyProgress, Journey } from '../../types';
 import * as Crypto from 'expo-crypto';
 
+function isValidDate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
+}
+
 const STATUS_ORDER: Step['status'][] = ['todo', 'doing', 'blocked', 'done'];
 const PRIORITY_ORDER = ['normal', 'high', 'urgent', 'low'] as const;
 const EFFORT_ORDER = ['quick', 'medium', 'deep'] as const;
@@ -204,6 +208,13 @@ export default function ItemDetailPage() {
   const [editingDuration, setEditingDuration] = useState(false);
   const [editingPriority, setEditingPriority] = useState(false);
   const [editingEffort, setEditingEffort] = useState(false);
+  const [editingDeadline, setEditingDeadline] = useState(false);
+  const [deadlineDraft, setDeadlineDraft] = useState('');
+  const [editingReview, setEditingReview] = useState(false);
+  const [reviewDraft, setReviewDraft] = useState('');
+  const [editingEstimate, setEditingEstimate] = useState(false);
+  const [editingActual, setEditingActual] = useState(false);
+  const [editingArea, setEditingArea] = useState(false);
 
   if (!item) {
     return (
@@ -500,11 +511,29 @@ export default function ItemDetailPage() {
                     <Feather name="edit-2" size={12} color={T.t3} style={{ opacity: 0.5 }} />
                   </Pressable>
                 )}
-                {area && (
-                  <View style={styles.areaRow}>
-                    <Text style={{ fontSize: 14 }}>{area.e}</Text>
-                    <Text style={[styles.areaName, { color: area.c }]}>{area.n}</Text>
+                {editingArea ? (
+                  <View style={{ marginTop: 6 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {Object.entries(ITEM_AREAS).map(([key, a]) => {
+                        const sel = item.area === key;
+                        return (
+                          <Pressable
+                            key={key}
+                            style={[styles.pickerOption, sel && { backgroundColor: a.c + '15', borderColor: a.c + '40' }]}
+                            onPress={() => { updateItem(item.id, { area: key }); setEditingArea(false); }}
+                          >
+                            <Text style={[styles.pickerOptionText, { color: sel ? a.c : T.t2 }]}>{a.e} {a.n}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                   </View>
+                ) : (
+                  <Pressable onPress={() => setEditingArea(true)} style={styles.areaRow}>
+                    {area ? <Text style={{ fontSize: 14 }}>{area.e}</Text> : null}
+                    <Text style={[styles.areaName, { color: area?.c || T.t3 }]}>{area?.n || 'Set area...'}</Text>
+                    <Feather name="chevron-down" size={12} color={T.t3} />
+                  </Pressable>
                 )}
               </View>
             </View>
@@ -539,14 +568,43 @@ export default function ItemDetailPage() {
               </View>
             )}
 
-            {item.deadline && (
-              <View style={styles.deadlineRow}>
-                <Feather name="calendar" size={12} color={isOverdue(item.deadline) ? T.red : T.orange} />
-                <Text style={[styles.deadlineText, isOverdue(item.deadline) && { color: T.red }]}>
-                  {formatDeadline(item.deadline)}
-                </Text>
-              </View>
-            )}
+            <View style={styles.deadlineRow}>
+              {editingDeadline ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <Feather name="calendar" size={12} color={T.orange} />
+                  <TextInput
+                    autoFocus
+                    value={deadlineDraft}
+                    onChangeText={setDeadlineDraft}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={T.t3}
+                    keyboardType="numbers-and-punctuation"
+                    style={[styles.deadlineText, { flex: 1, padding: 0, borderBottomWidth: 1, borderBottomColor: T.brand + '40' }]}
+                    onBlur={() => { const v = deadlineDraft.trim(); if (v && !isValidDate(v)) { setEditingDeadline(false); return; } updateItem(item.id, { deadline: v || undefined }); setEditingDeadline(false); }}
+                    onSubmitEditing={() => { const v = deadlineDraft.trim(); if (v && !isValidDate(v)) { setEditingDeadline(false); return; } updateItem(item.id, { deadline: v || undefined }); setEditingDeadline(false); }}
+                    returnKeyType="done"
+                  />
+                  {deadlineDraft.trim() ? (
+                    <Pressable onPress={() => { updateItem(item.id, { deadline: undefined }); setDeadlineDraft(''); setEditingDeadline(false); }} hitSlop={8}>
+                      <Feather name="x" size={14} color={T.red} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : item.deadline ? (
+                <Pressable onPress={() => { setDeadlineDraft(item.deadline || ''); setEditingDeadline(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="calendar" size={12} color={isOverdue(item.deadline) ? T.red : T.orange} />
+                  <Text style={[styles.deadlineText, isOverdue(item.deadline) && { color: T.red }]}>
+                    {formatDeadline(item.deadline)}
+                  </Text>
+                  <Feather name="edit-2" size={10} color={T.t3} style={{ opacity: 0.3 }} />
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => { setDeadlineDraft(''); setEditingDeadline(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="calendar" size={12} color={T.t3} />
+                  <Text style={{ fontSize: 12, color: T.t3 }}>Set deadline...</Text>
+                </Pressable>
+              )}
+            </View>
 
             <View style={{ marginTop: 8 }}>
               {editingDesc ? (
@@ -667,27 +725,104 @@ export default function ItemDetailPage() {
                 <Text style={styles.detailLabel}>Updated</Text>
                 <Text style={styles.detailValue}>{fromNow(item.updated_at)}</Text>
               </View>
-              {item.estimated_minutes != null && (
-                <View style={styles.detailRow}>
-                  <Feather name="target" size={12} color={T.t3} />
-                  <Text style={styles.detailLabel}>Estimate</Text>
-                  <Text style={styles.detailValue}>{item.estimated_minutes} min</Text>
-                </View>
-              )}
-              {item.actual_minutes != null && (
-                <View style={styles.detailRow}>
-                  <Feather name="activity" size={12} color={T.t3} />
-                  <Text style={styles.detailLabel}>Actual</Text>
-                  <Text style={styles.detailValue}>{item.actual_minutes} min</Text>
-                </View>
-              )}
-              {item.review_date && (
-                <View style={styles.detailRow}>
-                  <Feather name="eye" size={12} color={T.t3} />
-                  <Text style={styles.detailLabel}>Review</Text>
-                  <Text style={styles.detailValue}>{formatDate(item.review_date)}</Text>
-                </View>
-              )}
+
+              <View style={styles.detailRow}>
+                <Feather name="target" size={12} color={T.t3} />
+                <Text style={styles.detailLabel}>Estimate</Text>
+                {editingEstimate ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Pressable style={styles.stepperBtnSm} onPress={() => {
+                      const val = Math.max(5, (item.estimated_minutes ?? 15) - 5);
+                      updateItem(item.id, { estimated_minutes: val });
+                    }}>
+                      <Feather name="minus" size={12} color={T.t2} />
+                    </Pressable>
+                    <Text style={[styles.detailValue, { minWidth: 45, textAlign: 'center' as const }]}>{item.estimated_minutes ?? 15} min</Text>
+                    <Pressable style={styles.stepperBtnSm} onPress={() => {
+                      const val = Math.min(480, (item.estimated_minutes ?? 15) + 5);
+                      updateItem(item.id, { estimated_minutes: val });
+                    }}>
+                      <Feather name="plus" size={12} color={T.t2} />
+                    </Pressable>
+                    <Pressable onPress={() => setEditingEstimate(false)} hitSlop={8}>
+                      <Feather name="check" size={14} color={T.brand} />
+                    </Pressable>
+                    <Pressable onPress={() => { updateItem(item.id, { estimated_minutes: undefined }); setEditingEstimate(false); }} hitSlop={8}>
+                      <Feather name="x" size={14} color={T.red} style={{ opacity: 0.5 }} />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable onPress={() => setEditingEstimate(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.detailValue}>{item.estimated_minutes != null ? `${item.estimated_minutes} min` : 'Set estimate...'}</Text>
+                    <Feather name="chevron-down" size={12} color={T.t3} />
+                  </Pressable>
+                )}
+              </View>
+
+              <View style={styles.detailRow}>
+                <Feather name="activity" size={12} color={T.t3} />
+                <Text style={styles.detailLabel}>Actual</Text>
+                {editingActual ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Pressable style={styles.stepperBtnSm} onPress={() => {
+                      const val = Math.max(0, (item.actual_minutes ?? 0) - 5);
+                      updateItem(item.id, { actual_minutes: val });
+                    }}>
+                      <Feather name="minus" size={12} color={T.t2} />
+                    </Pressable>
+                    <Text style={[styles.detailValue, { minWidth: 45, textAlign: 'center' as const }]}>{item.actual_minutes ?? 0} min</Text>
+                    <Pressable style={styles.stepperBtnSm} onPress={() => {
+                      const val = Math.min(480, (item.actual_minutes ?? 0) + 5);
+                      updateItem(item.id, { actual_minutes: val });
+                    }}>
+                      <Feather name="plus" size={12} color={T.t2} />
+                    </Pressable>
+                    <Pressable onPress={() => setEditingActual(false)} hitSlop={8}>
+                      <Feather name="check" size={14} color={T.brand} />
+                    </Pressable>
+                    <Pressable onPress={() => { updateItem(item.id, { actual_minutes: undefined }); setEditingActual(false); }} hitSlop={8}>
+                      <Feather name="x" size={14} color={T.red} style={{ opacity: 0.5 }} />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable onPress={() => setEditingActual(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.detailValue}>{item.actual_minutes != null ? `${item.actual_minutes} min` : 'Log time...'}</Text>
+                    <Feather name="chevron-down" size={12} color={T.t3} />
+                  </Pressable>
+                )}
+              </View>
+
+              <View style={styles.detailRow}>
+                <Feather name="eye" size={12} color={T.t3} />
+                <Text style={styles.detailLabel}>Review</Text>
+                {editingReview ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TextInput
+                      autoFocus
+                      value={reviewDraft}
+                      onChangeText={setReviewDraft}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={T.t3}
+                      keyboardType="numbers-and-punctuation"
+                      style={[styles.detailValue, { flex: 1, padding: 0, borderBottomWidth: 1, borderBottomColor: T.brand + '40' }]}
+                      onBlur={() => { const v = reviewDraft.trim(); if (v && !isValidDate(v)) { setEditingReview(false); return; } updateItem(item.id, { review_date: v || undefined }); setEditingReview(false); }}
+                      onSubmitEditing={() => { const v = reviewDraft.trim(); if (v && !isValidDate(v)) { setEditingReview(false); return; } updateItem(item.id, { review_date: v || undefined }); setEditingReview(false); }}
+                      returnKeyType="done"
+                    />
+                    {reviewDraft.trim() ? (
+                      <Pressable onPress={() => { updateItem(item.id, { review_date: undefined }); setReviewDraft(''); setEditingReview(false); }} hitSlop={8}>
+                        <Feather name="x" size={14} color={T.red} style={{ opacity: 0.5 }} />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : (
+                  <Pressable onPress={() => { setReviewDraft(item.review_date || ''); setEditingReview(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.detailValue}>{item.review_date ? formatDate(item.review_date) : 'Set review date...'}</Text>
+                    <Feather name="chevron-down" size={12} color={T.t3} />
+                  </Pressable>
+                )}
+              </View>
+
               {item.tags && item.tags.length > 0 && (
                 <View style={styles.detailRow}>
                   <Feather name="tag" size={12} color={T.t3} />
@@ -1122,6 +1257,7 @@ const styles = StyleSheet.create({
 
   pickerOption: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: T.sep, backgroundColor: T.fill },
   pickerOptionText: { fontSize: 12, fontWeight: '600' as const, color: T.t2 },
+  stepperBtnSm: { width: 26, height: 26, borderRadius: 13, backgroundColor: T.fill, borderWidth: 1, borderColor: T.sep, alignItems: 'center' as const, justifyContent: 'center' as const },
 
   statusRow: { flexDirection: 'row', gap: 8, marginTop: S.sm },
   statusBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: R.md, borderWidth: 1 },

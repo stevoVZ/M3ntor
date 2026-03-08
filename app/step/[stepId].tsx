@@ -11,6 +11,10 @@ import { useStore } from '../../lib/store';
 import type { Step, Subtask } from '../../types';
 import * as Crypto from 'expo-crypto';
 
+function isValidDate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
+}
+
 const STATUS_ORDER: Step['status'][] = ['todo', 'doing', 'blocked', 'done'];
 const PRIORITY_ORDER = ['normal', 'high', 'urgent', 'low'] as const;
 const EFFORT_ORDER = ['quick', 'medium', 'deep'] as const;
@@ -37,6 +41,9 @@ export default function StepDetailScreen() {
   const [notesDraft, setNotesDraft] = useState('');
   const [subtaskDraft, setSubtaskDraft] = useState('');
   const [addingSub, setAddingSub] = useState(false);
+  const [editingDue, setEditingDue] = useState(false);
+  const [dueDraft, setDueDraft] = useState('');
+  const [editingEstMin, setEditingEstMin] = useState(false);
   const subInputRef = useRef<TextInput>(null);
 
   if (!item || !step || !itemId) {
@@ -228,24 +235,80 @@ export default function StepDetailScreen() {
               </Text>
             </Pressable>
           </View>
-          {step.due_date && (
-            <>
-              <View style={styles.metaDivider} />
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Due</Text>
-                <Text style={styles.metaValueText}>{step.due_date}</Text>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Due</Text>
+            {editingDue ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <TextInput
+                  autoFocus
+                  value={dueDraft}
+                  onChangeText={setDueDraft}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={T.t3}
+                  keyboardType="numbers-and-punctuation"
+                  style={[styles.metaValueText, { flex: 1, padding: 0, borderBottomWidth: 1, borderBottomColor: T.brand + '40' }]}
+                  onBlur={() => { const v = dueDraft.trim(); if (v && !isValidDate(v)) { setEditingDue(false); return; } updateStep(itemId!, step.id, { due_date: v || undefined }); setEditingDue(false); }}
+                  onSubmitEditing={() => { const v = dueDraft.trim(); if (v && !isValidDate(v)) { setEditingDue(false); return; } updateStep(itemId!, step.id, { due_date: v || undefined }); setEditingDue(false); }}
+                  returnKeyType="done"
+                />
+                {dueDraft.trim() ? (
+                  <Pressable onPress={() => { updateStep(itemId!, step.id, { due_date: undefined }); setDueDraft(''); setEditingDue(false); }} hitSlop={8}>
+                    <Feather name="x" size={14} color={T.red} style={{ opacity: 0.5 }} />
+                  </Pressable>
+                ) : null}
               </View>
-            </>
-          )}
-          {step.estimated_minutes && (
-            <>
-              <View style={styles.metaDivider} />
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Estimate</Text>
-                <Text style={[styles.metaValueText, { color: T.t2 }]}>{step.estimated_minutes} min</Text>
+            ) : (
+              <Pressable
+                style={[styles.metaValue, { backgroundColor: step.due_date ? T.orange + '08' : T.fill }]}
+                onPress={() => { setDueDraft(step.due_date || ''); setEditingDue(true); }}
+              >
+                <Feather name="calendar" size={11} color={step.due_date ? T.orange : T.t3} />
+                <Text style={[styles.metaValueText, { color: step.due_date ? T.orange : T.t3 }]}>
+                  {step.due_date || 'Set due date...'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaRow}>
+            <Text style={styles.metaLabel}>Estimate</Text>
+            {editingEstMin ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Pressable style={styles.stepperBtn} onPress={() => {
+                  const val = Math.max(5, (step.estimated_minutes ?? 15) - 5);
+                  updateStep(itemId!, step.id, { estimated_minutes: val });
+                }}>
+                  <Feather name="minus" size={12} color={T.t2} />
+                </Pressable>
+                <Text style={[styles.metaValueText, { minWidth: 45, textAlign: 'center' as const, color: T.t2 }]}>
+                  {step.estimated_minutes ?? 15} min
+                </Text>
+                <Pressable style={styles.stepperBtn} onPress={() => {
+                  const val = Math.min(480, (step.estimated_minutes ?? 15) + 5);
+                  updateStep(itemId!, step.id, { estimated_minutes: val });
+                }}>
+                  <Feather name="plus" size={12} color={T.t2} />
+                </Pressable>
+                <Pressable onPress={() => setEditingEstMin(false)} hitSlop={8}>
+                  <Feather name="check" size={14} color={T.brand} />
+                </Pressable>
+                <Pressable onPress={() => { updateStep(itemId!, step.id, { estimated_minutes: undefined }); setEditingEstMin(false); }} hitSlop={8}>
+                  <Feather name="x" size={14} color={T.red} style={{ opacity: 0.5 }} />
+                </Pressable>
               </View>
-            </>
-          )}
+            ) : (
+              <Pressable
+                style={[styles.metaValue, { backgroundColor: T.fill }]}
+                onPress={() => setEditingEstMin(true)}
+              >
+                <Feather name="clock" size={11} color={T.t3} />
+                <Text style={[styles.metaValueText, { color: step.estimated_minutes ? T.t2 : T.t3 }]}>
+                  {step.estimated_minutes ? `${step.estimated_minutes} min` : 'Set estimate...'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
         </View>
 
         <View style={[styles.card, shadow.xs]}>
@@ -471,6 +534,7 @@ const styles = StyleSheet.create({
   },
   metaValueText: { fontSize: 13, fontWeight: '600' as const, color: T.t2 },
   metaDivider: { height: 0.5, backgroundColor: T.sep },
+  stepperBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: T.fill, borderWidth: 1, borderColor: T.sep, alignItems: 'center' as const, justifyContent: 'center' as const },
 
   descText: { fontSize: 14, color: T.text, lineHeight: 20 },
   descPlaceholder: { fontSize: 14, color: T.t3, fontStyle: 'italic' },
