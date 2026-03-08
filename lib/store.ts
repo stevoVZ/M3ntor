@@ -210,13 +210,9 @@ export const useStore = create<AppState>((set, get) => ({
       ]);
 
       if (isGuest) {
-        const sampleItems = SAMPLE_ITEMS.map(convertSampleItem);
-        const sampleJourneys = SAMPLE_COMMITTED
-          .filter(c => c.status !== 'queued')
-          .map(convertCommittedToJourney);
         set({
-          items: sampleItems,
-          journeys: sampleJourneys,
+          items: [],
+          journeys: [],
           profile: { id: 'guest', created_at: new Date().toISOString(), country: savedCountry || undefined },
           completionLog: localCompletionLog,
           moodLog: localMoodLog,
