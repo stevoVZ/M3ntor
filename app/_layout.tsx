@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { useStore } from '../lib/store';
+import { useStore, isGuestChosen } from '../lib/store';
 import { T } from '../constants/theme';
 
 function useAuthRedirect(userId: string | null, loading: boolean, guestMode: boolean) {
@@ -22,15 +22,8 @@ function useAuthRedirect(userId: string | null, loading: boolean, guestMode: boo
 }
 
 export default function RootLayout() {
-  const { userId, setUserId, loadAll } = useStore();
+  const { userId, guestMode, setUserId, setGuestMode, loadAll } = useStore();
   const [booting, setBooting] = useState(true);
-  const guestRef = useRef(false);
-  const segments = useSegments();
-  const inApp = segments[0] === '(tabs)' || segments[0] === 'item';
-
-  if (!guestRef.current && !userId && inApp) guestRef.current = true;
-  if (userId) guestRef.current = false;
-  const guestMode = guestRef.current;
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -38,11 +31,20 @@ export default function RootLayout() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       const uid = session?.user?.id ?? null;
       setUserId(uid);
-      if (uid) loadAll(uid).finally(() => setBooting(false));
-      else loadAll('guest').finally(() => setBooting(false));
+      if (uid) {
+        loadAll(uid).finally(() => setBooting(false));
+      } else {
+        const chosen = await isGuestChosen();
+        if (chosen) {
+          setGuestMode(true);
+          loadAll('guest').finally(() => setBooting(false));
+        } else {
+          setBooting(false);
+        }
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -53,7 +55,10 @@ export default function RootLayout() {
         }
         const uid = session?.user?.id ?? null;
         setUserId(uid);
-        if (uid) await loadAll(uid);
+        if (uid) {
+          setGuestMode(false);
+          await loadAll(uid);
+        }
       }
     );
     return () => subscription.unsubscribe();

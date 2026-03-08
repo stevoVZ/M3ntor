@@ -10,6 +10,7 @@ import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { useStore } from '../lib/store';
 import { T, S, F, R, shadow } from '../constants/theme';
 
 type Mode = 'signin' | 'signup';
@@ -257,7 +258,12 @@ export default function LoginScreen() {
 
           <Pressable
             style={styles.guestBtn}
-            onPress={() => router.replace('/(tabs)/today')}>
+            onPress={async () => {
+              const store = useStore.getState();
+              store.setGuestMode(true);
+              await store.loadAll('guest');
+              router.replace('/(tabs)/today');
+            }}>
             <Feather name="arrow-right" size={18} color={T.brand} />
             <Text style={styles.guestBtnText}>Continue as Guest</Text>
           </Pressable>

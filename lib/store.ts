@@ -15,6 +15,7 @@ const GUEST_ITEMS_KEY = 'm3ntor_guest_items';
 const GUEST_DELETED_ITEMS_KEY = 'm3ntor_guest_deleted_items';
 const GUEST_JOURNEYS_KEY = 'm3ntor_guest_journeys';
 const GUEST_NAME_KEY = 'm3ntor_guest_name';
+const GUEST_CHOSEN_KEY = 'm3ntor_guest_chosen';
 
 async function saveCompletionLogToStorage(log: CompletionLog) {
   try {
@@ -143,12 +144,31 @@ async function loadGuestNameFromStorage(): Promise<string | null> {
   }
 }
 
+export async function setGuestChosen(chosen: boolean) {
+  try {
+    if (chosen) {
+      await AsyncStorage.setItem(GUEST_CHOSEN_KEY, '1');
+    } else {
+      await AsyncStorage.removeItem(GUEST_CHOSEN_KEY);
+    }
+  } catch {}
+}
+
+export async function isGuestChosen(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(GUEST_CHOSEN_KEY)) === '1';
+  } catch {
+    return false;
+  }
+}
+
 interface AppState {
   items:         Item[];
   deletedItems:  Item[];
   journeys:      JourneyProgress[];
   profile:       Profile | null;
   userId:        string | null;
+  guestMode:     boolean;
   loading:       boolean;
   error:         string | null;
   completionLog: CompletionLog;
@@ -157,6 +177,7 @@ interface AppState {
   scoreHistory:  ScoreSnapshot[];
 
   setUserId:       (id: string | null) => void;
+  setGuestMode:    (on: boolean) => void;
   setCountry:      (country: string | null) => void;
   loadAll:         (userId: string) => Promise<void>;
 
@@ -211,6 +232,7 @@ export const useStore = create<AppState>((set, get) => ({
   journeys:      [],
   profile:       null,
   userId:        null,
+  guestMode:     false,
   loading:       false,
   error:         null,
   completionLog: {},
@@ -219,6 +241,10 @@ export const useStore = create<AppState>((set, get) => ({
   scoreHistory:  [],
 
   setUserId:  (id) => set({ userId: id }),
+  setGuestMode: (on) => {
+    set({ guestMode: on });
+    setGuestChosen(on);
+  },
   setCountry: (country) => {
     set(s => ({
       profile: s.profile ? { ...s.profile, country: country ?? undefined } : null,
@@ -970,12 +996,14 @@ export const useStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured && supabase) {
       await supabase.auth.signOut().catch(console.error);
     }
+    await setGuestChosen(false);
     set({
       items: [],
       deletedItems: [],
       journeys: [],
       profile: null,
       userId: null,
+      guestMode: false,
       loading: false,
       error: null,
       completionLog: {},
