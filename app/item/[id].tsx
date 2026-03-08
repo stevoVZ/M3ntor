@@ -445,41 +445,30 @@ export default function ItemDetailPage() {
     }
   }
 
-  async function handleExpandPhase(stepId: string) {
-    const step = steps.find(s => s.id === stepId);
-    if (!step || expandingPhase) return;
+  async function handleExpandPhase(phaseName: string) {
+    if (expandingPhase) return;
     setShowPhasePicker(false);
-    setExpandingPhase(stepId);
+    setExpandingPhase(phaseName);
     setAiBanner(null);
     try {
-      const siblingPhases = steps.filter(s => s.id !== stepId).map(s => s.title);
-      const existingSubs = (step.subtasks || []).map(s => s.title);
-      const result = await expandProjectPhase(item.title, step.title, existingSubs, siblingPhases);
+      const phaseSteps = steps.filter(s => s.phase === phaseName);
+      const existingTitles = phaseSteps.map(s => s.title);
+      const siblingPhases = existingPhases.filter(p => p !== phaseName);
+      const result = await expandProjectPhase(item.title, phaseName, existingTitles, siblingPhases);
       if (result.tasks?.length) {
-        const newStepIds: string[] = [];
         result.tasks.forEach((t, i) => {
           const newStep = createStep(item.id, {
             title: t.title,
             sort_order: steps.length + i,
             effort: t.effort || undefined,
-            phase: t.phase || step.title,
+            phase: phaseName,
           });
           addStepAction(item.id, newStep);
-          newStepIds.push(newStep.id);
         });
-        const freshSteps = useStore.getState().items.find(it => it.id === item.id)?.steps || [];
-        const oldSteps = freshSteps.filter(s => !newStepIds.includes(s.id));
-        oldSteps.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-        const targetIdx = oldSteps.findIndex(s => s.id === stepId);
-        const before = oldSteps.slice(0, targetIdx + 1);
-        const newOnes = freshSteps.filter(s => newStepIds.includes(s.id));
-        const after = oldSteps.slice(targetIdx + 1);
-        const ordered = [...before, ...newOnes, ...after];
-        ordered.forEach((s, i) => updateStepAction(item.id, s.id, { sort_order: i }));
-        setAiBanner(`Added ${result.tasks.length} tasks under "${step.title}"`);
+        setAiBanner(`Added ${result.tasks.length} tasks to "${phaseName}"`);
         setTimeout(() => setAiBanner(null), 3000);
       } else {
-        setAiBanner('No additional tasks found for this step.');
+        setAiBanner(`No additional tasks found for "${phaseName}".`);
         setTimeout(() => setAiBanner(null), 3000);
       }
     } catch {
@@ -958,7 +947,7 @@ export default function ItemDetailPage() {
                 <Pressable style={styles.aiBtn} onPress={handleMoreTasksPress} disabled={aiLoading || !!expandingPhase}>
                   {(aiLoading || !!expandingPhase)
                     ? <ActivityIndicator size="small" color={T.brand} />
-                    : <Text style={styles.aiBtnText}>{(aiLoading || !!expandingPhase) ? 'Generating...' : steps.length > 0 ? 'More tasks' : 'Generate tasks'}</Text>
+                    : <Text style={styles.aiBtnText}>{(aiLoading || !!expandingPhase) ? 'Generating...' : steps.length > 0 ? 'Expand project' : 'Generate tasks'}</Text>
                   }
                 </Pressable>
               </View>
@@ -985,29 +974,31 @@ export default function ItemDetailPage() {
                     </View>
                     <Feather name="chevron-right" size={16} color={T.t3} />
                   </Pressable>
-                  <View style={styles.phasePickerDivider} />
-                  <Text style={styles.phaseExpandLabel}>Or expand an existing step</Text>
-                  {[...steps].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)).map(step => {
-                    const subCount = (step.subtasks || []).length;
-                    return (
-                      <Pressable
-                        key={step.id}
-                        style={styles.phaseStepRow}
-                        onPress={() => handleExpandPhase(step.id)}
-                      >
-                        <View style={[styles.phaseOptionIcon, { backgroundColor: (area?.c || T.brand) + '12' }]}>
-                          <Feather name="git-branch" size={14} color={area?.c || T.brand} />
-                        </View>
-                        <View style={styles.phaseOptionContent}>
-                          <Text style={styles.phaseStepTitle} numberOfLines={1}>{step.title}</Text>
-                          {subCount > 0 && (
-                            <Text style={styles.phaseStepSub}>{subCount} subtask{subCount !== 1 ? 's' : ''}</Text>
-                          )}
-                        </View>
-                        <Feather name="chevron-right" size={14} color={T.t3} />
-                      </Pressable>
-                    );
-                  })}
+                  {existingPhases.length > 0 && (
+                    <>
+                      <View style={styles.phasePickerDivider} />
+                      <Text style={styles.phaseExpandLabel}>Or expand tasks within a phase</Text>
+                      {existingPhases.map(phaseName => {
+                        const phaseStepCount = (groupedSteps.phaseMap.get(phaseName) || []).length;
+                        return (
+                          <Pressable
+                            key={phaseName}
+                            style={styles.phaseStepRow}
+                            onPress={() => handleExpandPhase(phaseName)}
+                          >
+                            <View style={[styles.phaseOptionIcon, { backgroundColor: (area?.c || T.brand) + '12' }]}>
+                              <Feather name="folder" size={14} color={area?.c || T.brand} />
+                            </View>
+                            <View style={styles.phaseOptionContent}>
+                              <Text style={styles.phaseStepTitle} numberOfLines={1}>{phaseName}</Text>
+                              <Text style={styles.phaseStepSub}>{phaseStepCount} task{phaseStepCount !== 1 ? 's' : ''}</Text>
+                            </View>
+                            <Feather name="chevron-right" size={14} color={T.t3} />
+                          </Pressable>
+                        );
+                      })}
+                    </>
+                  )}
                 </View>
               )}
 
