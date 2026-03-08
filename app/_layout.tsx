@@ -15,7 +15,8 @@ function useAuthRedirect(userId: string | null, loading: boolean, guestMode: boo
     if (!isSupabaseConfigured) return;
     if (guestMode) return;
     const inLogin = segments[0] === 'login';
-    if (!userId && !inLogin) router.replace('/login');
+    const inReset = segments[0] === 'reset-password';
+    if (!userId && !inLogin && !inReset) router.replace('/login');
     else if (userId && inLogin) router.replace('/(tabs)/today');
   }, [userId, loading, segments, guestMode]);
 }
@@ -46,6 +47,10 @@ export default function RootLayout() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        if (_event === 'PASSWORD_RECOVERY') {
+          router.replace('/reset-password');
+          return;
+        }
         const uid = session?.user?.id ?? null;
         setUserId(uid);
         if (uid) await loadAll(uid);
@@ -71,6 +76,7 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)"    options={{ headerShown: false }} />
           <Stack.Screen name="login"     options={{ headerShown: false }} />
+          <Stack.Screen name="reset-password" options={{ headerShown: false }} />
           <Stack.Screen name="item/[id]" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="step/[stepId]" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen
