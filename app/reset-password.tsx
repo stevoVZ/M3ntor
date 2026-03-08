@@ -59,7 +59,18 @@ export default function ResetPasswordScreen() {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        setFeedback({ type: 'error', message: 'No active session. Please use the reset link from your email.' });
+        setLoading(false);
+        return;
+      }
+
+      const updatePromise = supabase.auth.updateUser({ password });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out. Please try again.')), 15000)
+      );
+      const { error } = await Promise.race([updatePromise, timeoutPromise]);
       if (error) throw error;
       setFeedback({ type: 'success', message: 'Password updated successfully.' });
       setTimeout(() => router.replace('/(tabs)/today'), 1500);
