@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useStore } from '../../lib/store';
+import { useNeuroStore } from '../../lib/neuroStore';
 import { router } from 'expo-router';
 import { T, S, F, R, shadow } from '../../constants/theme';
 import { ITEM_AREAS, KIND_CONFIG, PRG } from '../../constants/config';
@@ -39,25 +40,13 @@ function ActionMenuModal({ item, visible, onClose, onEdit, onDelete, onOpenProje
         <View style={menuStyles.card}>
           <View style={menuStyles.handle} />
 
-          {kind !== 'goal' && (
-            <Pressable
-              style={menuStyles.menuBtn}
-              onPress={() => { onEdit(); onClose(); }}
-            >
-              <Feather name="edit-2" size={15} color={T.brand} />
-              <Text style={[menuStyles.menuBtnText, { color: T.brand }]}>Edit</Text>
-            </Pressable>
-          )}
-
-          {kind === 'goal' && (
-            <Pressable
-              style={menuStyles.menuBtn}
-              onPress={() => { onEdit(); onClose(); }}
-            >
-              <Feather name="edit-2" size={15} color={T.brand} />
-              <Text style={[menuStyles.menuBtnText, { color: T.brand }]}>Edit</Text>
-            </Pressable>
-          )}
+          <Pressable
+            style={menuStyles.menuBtn}
+            onPress={() => { onEdit(); onClose(); }}
+          >
+            <Feather name="edit-2" size={15} color={T.brand} />
+            <Text style={[menuStyles.menuBtnText, { color: T.brand }]}>Edit</Text>
+          </Pressable>
 
           {kind === 'project' && onOpenProject && (
             <Pressable
@@ -358,6 +347,7 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
   index?: number;
 }) {
   const updateItem = useStore(s => s.updateItem);
+  const adaptations = useNeuroStore(s => s.adaptations);
   const kind = itemKind(item);
   const kc = KIND_CONFIG[kind];
   const area = ITEM_AREAS[item.area];
@@ -440,6 +430,7 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={[
           styles.itemTitle,
+          { fontSize: Math.round(13 * adaptations.fontScale) },
           isDone && styles.itemTitleDone,
           isPaused && styles.itemTitlePaused,
         ]} numberOfLines={1}>{item.title}</Text>
@@ -493,6 +484,8 @@ function ItemRow({ item, indented = false, onMenu, reorderable = false, isFirst 
 }
 
 export default function PlanScreen() {
+  const adaptations = useNeuroStore(s => s.adaptations);
+
   const [viewMode, setViewMode] = useState<ViewMode>('hierarchy');
   const [filter, setFilter] = useState<FilterId>('all');
   const [listSort, setListSort] = useState<ListSort>('custom');
@@ -611,13 +604,13 @@ export default function PlanScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, Platform.OS === 'web' && { paddingTop: 67 }, { backgroundColor: adaptations.bgTint }]} edges={['top']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
 
         <View style={styles.hero}>
           <Text style={styles.heroEyebrow}>GOALS & PROJECTS</Text>
-          <Text style={styles.heroTitle}>Plan.</Text>
+          <Text style={[styles.heroTitle, { fontSize: Math.round(34 * adaptations.fontScale) }]}>Plan.</Text>
           <View style={styles.heroStats}>
             <View style={[styles.heroBadge, { backgroundColor: T.green + '14' }]}>
               <Text style={[styles.heroBadgeText, { color: T.green }]}>

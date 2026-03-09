@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useStore, isGuestChosen } from '../lib/store';
+import { useNeuroStore } from '../lib/neuroStore';
 import { T } from '../constants/theme';
 
 function useAuthRedirect(userId: string | null, loading: boolean, guestMode: boolean) {
@@ -23,7 +24,12 @@ function useAuthRedirect(userId: string | null, loading: boolean, guestMode: boo
 
 export default function RootLayout() {
   const { userId, guestMode, setUserId, setGuestMode, loadAll } = useStore();
+  const neuroLoadAll = useNeuroStore(s => s.loadAll);
   const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    neuroLoadAll();
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {

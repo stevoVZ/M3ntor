@@ -16,6 +16,7 @@ Preferred communication style: Simple, everyday language.
 
 - **Framework**: Expo (React Native) with `expo-router` for file-based navigation.
 - **State Management**: Zustand store manages item CRUD, authentication, journey progress, completion/mood logging, streak tracking, and item reordering. Journeys are managed with `enrollJourney`, `unenrollJourney`, `removeJourney` (permanent deletion), `reEnrollJourney`, and `advanceJourneyDay`.
+- **Neuro Adaptations**: `constants/neuro.ts` defines base profiles (ADHD, Autism, Dyslexia, Sensory) and state profiles (Anxiety, Low Energy) with a merge engine (DEFAULT → base → state → custom overrides). `lib/neuroStore.ts` is a Zustand store persisted via AsyncStorage with daily reset for state profiles. `components/today/NeuroBanner.tsx` provides a pill + 3-step sheet (base → state → customise). Loaded in `_layout.tsx` on boot. Plan screen consumes `adaptations.fontScale` and `adaptations.bgTint`.
 - **Soft Delete / Trash**: Items are soft-deleted and can be restored or permanently deleted.
 - **AI Utilities**: `lib/ai.ts` provides AI functions that proxy through the Express server.
 - **Design System**: `constants/theme.ts` defines colors, spacing, fonts, and shadows.
